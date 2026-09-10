@@ -54,6 +54,24 @@ versions/v1/
 
 That directory contains the game source, architecture, world definitions, tests, compiler, headless runtime, browser experience, party system, and companion-worker adapter. Future versions can be added beside it without erasing Version 1's formation history.
 
+## Vex Relay self-play
+
+A Vex or Devex instance can run a bounded browser rehearsal without making Victor act as the keyboard relay:
+
+```bash
+cd versions/v1
+node scripts/vex-relay-self-play.mjs
+```
+
+The driver enters the Garden of Arrival, forms the largest available local party, moves, jumps, attacks, responds to a combo cue, changes the weather, opens Status, and preserves screenshots plus an attributable receipt under `~/.vexworld/evidence/self-play/`.
+
+Read:
+
+- [`versions/v1/docs/VEX-RELAY-SELF-PLAY.md`](versions/v1/docs/VEX-RELAY-SELF-PLAY.md)
+- [`versions/v1/docs/FIRST-SELF-PLAY-REFLECTION.md`](versions/v1/docs/FIRST-SELF-PLAY-REFLECTION.md)
+
+Automated reachability and screenshot changes do not replace Victor's eventual game-feel witness.
+
 ## For Vex and Devex
 
 Start with [`CLAUDE.md`](CLAUDE.md), then follow [`vexworld.manifest.json`](vexworld.manifest.json) and [`config/current-version.json`](config/current-version.json) into the current version's repository-native source map and builder guide.
