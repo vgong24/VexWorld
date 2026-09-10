@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "vexworld.world-law/v1",
+  "lawRef": "law.first-grove.v0",
+  "gravity": 1900,
+  "maxFallSpeed": 1100,
+  "groundFriction": 0.82,
+  "movement": {
+    "humanSpeed": 250,
+    "companionSpeed": 225,
+    "jumpVelocity": -720,
+    "airControl": 0.8
+  },
+  "resource": {
+    "maxEnergy": 100,
+    "idleRegenPerSecond": 0.8,
+    "moveCostPerSecond": 0.45,
+    "rainMultiplier": 1.35,
+    "jumpCost": 1.2,
+    "attackCost": 3,
+    "dashCost": 8,
+    "requiredReserve": 12,
+    "restorationPerSecond": 30
+  },
+  "weather": {
+    "initial": "CLEAR",
+    "prototypeTransitionSeconds": 70,
+    "states": [
+      "CLEAR",
+      "RAIN",
+      "MIST",
+      "SNOW",
+      "SAND_WIND"
+    ],
+    "rainMovementMultiplier": 0.88
+  },
+  "combat": {
+    "enemyRespawnSeconds": 8,
+    "contactEnergyDamage": 5,
+    "invulnerabilityMs": 800
+  },
+  "worldWitness": {
+    "minimumEligibleSyncEvents": 3,
+    "minimumDistinctTargets": 2,
+    "requiredResonanceFacets": [
+      "coordination",
+      "sharedPractice"
+    ]
+  }
+}

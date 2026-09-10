@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "vexworld.scenario/v1",
+  "scenarioRef": "scenario.first-grove.rain-restoration",
+  "purpose": "Changing weather must update safe-return margin and allow calm assisted recovery.",
+  "startingState": {
+    "weather": "CLEAR",
+    "companionEnergy": 38,
+    "restorationDistance": 620
+  },
+  "actions": [
+    "RAIN_BEGINS",
+    "COMPANION_CONTINUES_OUTWARD",
+    "RETURN_ROUTE_COST_INCREASES",
+    "COMPANION_RETURNS_OR_REQUESTS_HELP"
+  ],
+  "expected": [
+    "margin band changes before critical failure",
+    "outward motion can halt",
+    "carry/cart recovery is available",
+    "restoration succeeds"
+  ],
+  "forbidden": [
+    "panic claim",
+    "lineage death",
+    "physical battery claim"
+  ]
+}

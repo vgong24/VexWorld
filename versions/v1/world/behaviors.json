@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "vexworld.behavior-catalog/v1",
+  "behaviors": [
+    {
+      "behaviorRef": "behavior.world.solid",
+      "brief": "Blocks ordinary traversal."
+    },
+    {
+      "behaviorRef": "behavior.world.platform",
+      "brief": "Supports a vessel standing on its upper surface."
+    },
+    {
+      "behaviorRef": "behavior.world.shelter",
+      "brief": "Reduces declared weather exposure."
+    },
+    {
+      "behaviorRef": "behavior.world.restoration",
+      "brief": "May restore compatible vessel resources."
+    },
+    {
+      "behaviorRef": "behavior.world.interactable",
+      "brief": "Exposes a semantic interaction."
+    },
+    {
+      "behaviorRef": "behavior.world.portal",
+      "brief": "Offers a typed world/zone transition."
+    },
+    {
+      "behaviorRef": "behavior.world.actor",
+      "brief": "Owns changing vessel state and actions."
+    },
+    {
+      "behaviorRef": "behavior.world.hostile-creature",
+      "brief": "May challenge participants under world law."
+    },
+    {
+      "behaviorRef": "behavior.world.decorative",
+      "brief": "Expressive world presence with no gameplay authority."
+    }
+  ]
+}

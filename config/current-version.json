@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "vexworld.current-version/v1",
+  "projectRef": "project.vextreme.vexworld",
+  "currentVersionRef": "version.vexworld.v1",
+  "displayName": "Version 1 — Vextory: First Grove",
+  "sourcePath": "versions/v1",
+  "homeSchemaVersion": "vexworld.home/v1",
+  "homeDirectoryName": ".vexworld",
+  "maturity": "PLAYABLE_FOUNDATION_DRAFT",
+  "supersedesVersionRefOrNull": null
+}

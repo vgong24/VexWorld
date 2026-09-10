@@ -1,0 +1,74 @@
+{
+  "schemaVersion": "vexworld.ability-catalog/v1",
+  "abilityPrimitives": [
+    "MOVE",
+    "IMPULSE",
+    "DAMAGE",
+    "GUARD",
+    "HEAL",
+    "STATUS",
+    "PROJECTILE",
+    "AREA",
+    "TARGET",
+    "TETHER",
+    "LAUNCH",
+    "PULL",
+    "PUSH",
+    "TELEPORT",
+    "SIGNAL",
+    "SYNC_WINDOW",
+    "RESOURCE_COST",
+    "CONDITION",
+    "DURATION",
+    "COOLDOWN"
+  ],
+  "abilities": [
+    {
+      "abilityRef": "ability.vexworld.pulse-strike",
+      "title": "Pulse Strike",
+      "practiceRefs": [
+        "practice.vexworld.blade"
+      ],
+      "primitives": [
+        "DAMAGE",
+        "TARGET",
+        "COOLDOWN"
+      ],
+      "energyCost": 3,
+      "cooldownMs": 360
+    },
+    {
+      "abilityRef": "ability.vexworld.arc-dash",
+      "title": "Arc Dash",
+      "practiceRefs": [
+        "practice.vexworld.arc-mobility"
+      ],
+      "primitives": [
+        "MOVE",
+        "IMPULSE",
+        "RESOURCE_COST",
+        "COOLDOWN"
+      ],
+      "energyCost": 8,
+      "cooldownMs": 900
+    },
+    {
+      "abilityRef": "ability.vexworld.twin-horizon",
+      "title": "Twin Horizon",
+      "practiceRefs": [
+        "practice.vexworld.team-coordination"
+      ],
+      "primitives": [
+        "SIGNAL",
+        "SYNC_WINDOW",
+        "AREA",
+        "DAMAGE",
+        "RESOURCE_COST",
+        "COOLDOWN"
+      ],
+      "energyCostPerParticipant": 14,
+      "cooldownMs": 6500,
+      "state": "TRIAL_LOCKED"
+    }
+  ]
+}

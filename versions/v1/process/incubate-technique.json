@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "vexworld.process/v1",
+  "processRef": "process.vexworld.incubate-technique.v1",
+  "purpose": "Turn eligible witnessed collaboration into an optional, testable technique candidate.",
+  "steps": [
+    "RECEIVE_ELIGIBLE_EVENTS",
+    "PRESERVE_PAIR_AND_PRIVACY_SCOPE",
+    "FORM_PATTERN_CANDIDATE",
+    "DECLARE_INTERPRETATION_AND_UNKNOWNS",
+    "COMPOSE_ACCEPTED_PRIMITIVES",
+    "GENERATE_SCENARIO",
+    "BALANCE_AND_ADVERSARIAL_CHECK",
+    "PREPARE_OPTIONAL_TRIAL",
+    "RECEIVE_PLAYER_DISPOSITION",
+    "RECORD_LIVED_EVIDENCE",
+    "LEARNED_OR_REFINED_OR_PARKED"
+  ],
+  "effects": {
+    "automaticMastery": false,
+    "liveCodeInstall": false,
+    "publicSharing": false
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "vexworld.process/v1",
+  "processRef": "process.vexworld.develop-feature.v1",
+  "purpose": "Make one bounded source-grounded gameplay or platform change.",
+  "steps": [
+    "ORIENT",
+    "GROUND_LIVE_STATE",
+    "LOCATE_SEMANTIC_OWNER",
+    "DECLARE_SCOPE_AND_NON_EFFECTS",
+    "AUTHOR_OR_UPDATE_SCENARIO",
+    "IMPLEMENT_CANONICAL_SOURCE",
+    "REGENERATE_DERIVED_OUTPUT",
+    "RUN_DETERMINISTIC_PROOF",
+    "PLAYTEST_WHEN_APPLICABLE",
+    "CLASSIFY_DISCREPANCY",
+    "REVIEW_EXACT_CANDIDATE",
+    "DISPOSITION_AND_RETURN"
+  ],
+  "forbidden": [
+    "silent authority expansion",
+    "generated source hand-edit",
+    "unreviewed live model code injection"
+  ]
+}

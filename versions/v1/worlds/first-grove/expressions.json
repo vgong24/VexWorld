@@ -1,0 +1,84 @@
+{
+  "schemaVersion": "vexworld.expression-profile/v1",
+  "expressionRef": "expression.first-grove.storybook-vex.v0",
+  "style": "original procedural storybook Vex",
+  "environments": {
+    "GARDEN_MEADOW": {
+      "sky": [
+        "#82cfff",
+        "#e7fbff"
+      ],
+      "far": "#7abf9a",
+      "mid": "#4c9e72",
+      "ground": "#5b8d4d",
+      "accent": "#ffd95a",
+      "weather": "RAIN"
+    },
+    "COAST": {
+      "sky": [
+        "#74d8ff",
+        "#eefcff"
+      ],
+      "far": "#5ab6c8",
+      "mid": "#3296aa",
+      "ground": "#d6b96d",
+      "accent": "#ff8e75",
+      "weather": "MIST"
+    },
+    "MOUNTAIN": {
+      "sky": [
+        "#91bce8",
+        "#f2f7ff"
+      ],
+      "far": "#768ba5",
+      "mid": "#526b82",
+      "ground": "#6f796a",
+      "accent": "#d7f2ff",
+      "weather": "MIST"
+    },
+    "ISLAND": {
+      "sky": [
+        "#67d8e3",
+        "#eaffd6"
+      ],
+      "far": "#44aa9b",
+      "mid": "#2e8b78",
+      "ground": "#c7aa5a",
+      "accent": "#ffcb69",
+      "weather": "RAIN"
+    },
+    "DESERT": {
+      "sky": [
+        "#f7bc73",
+        "#fff1c6"
+      ],
+      "far": "#ce8456",
+      "mid": "#b96043",
+      "ground": "#c58c52",
+      "accent": "#77d9d1",
+      "weather": "SAND_WIND"
+    },
+    "SNOWLAND": {
+      "sky": [
+        "#a7c9e9",
+        "#f8fcff"
+      ],
+      "far": "#9db6c9",
+      "mid": "#7891a4",
+      "ground": "#dbe9ef",
+      "accent": "#7de2ff",
+      "weather": "SNOW"
+    }
+  },
+  "avatarForms": [
+    "WANDERER",
+    "BLOOMKIN",
+    "STARLING"
+  ],
+  "companionForms": [
+    "WISP",
+    "SPROUTLING",
+    "LITTLE_WARDEN"
+  ],
+  "assetPolicy": "PROCEDURAL_PLACEHOLDER_ORIGINAL"
+}

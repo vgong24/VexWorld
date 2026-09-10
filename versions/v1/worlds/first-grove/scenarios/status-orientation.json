@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "vexworld.scenario/v1",
+  "scenarioRef": "scenario.first-grove.status-orientation",
+  "purpose": "Status action exposes identity, reality, vessel, party, resources, permissions, and return.",
+  "startingState": {
+    "realityClass": "FICTIONAL_WORLD"
+  },
+  "actions": [
+    "OPEN_STATUS_BY_KEY_OR_SEMANTIC_ACTION"
+  ],
+  "expected": [
+    "same state regardless input binding",
+    "physicalEffectPossible=false",
+    "return route visible"
+  ],
+  "forbidden": [
+    "key becomes canonical action identity"
+  ]
+}

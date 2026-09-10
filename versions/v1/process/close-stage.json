@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "vexworld.process/v1",
+  "processRef": "process.vexworld.close-stage.v1",
+  "purpose": "Close a candidate stage with recipient-complete evidence.",
+  "required": [
+    "candidate head or artifact fingerprint",
+    "changed paths",
+    "scenario evidence",
+    "test evidence",
+    "human playtest disposition when applicable",
+    "blocking findings",
+    "known residuals",
+    "accepted/rejected/split state",
+    "next unblocked stages"
+  ]
+}

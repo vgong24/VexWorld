@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VexWorld world manifest",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "worldRef",
+    "title",
+    "realityClass",
+    "mapRef",
+    "lawRef",
+    "expressionRef"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "vexworld.world-manifest/v1"
+    },
+    "worldRef": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "realityClass": {
+      "enum": [
+        "FICTIONAL_WORLD",
+        "SIMULATION",
+        "DIGITAL_TWIN",
+        "PHYSICAL_SHADOW",
+        "PHYSICAL_CONTROL",
+        "MIXED_OR_UNKNOWN"
+      ]
+    },
+    "mapRef": {
+      "type": "string"
+    },
+    "lawRef": {
+      "type": "string"
+    },
+    "expressionRef": {
+      "type": "string"
+    },
+    "partyCapacity": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4
+    }
+  },
+  "additionalProperties": true
+}

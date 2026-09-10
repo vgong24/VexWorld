@@ -1,0 +1,20 @@
+{
+  "name": "vexworld-root",
+  "version": "1.0.0-foundation",
+  "private": true,
+  "type": "module",
+  "description": "Version-resolving launcher and repository entry for VexWorld.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "orient": "node scripts/vexworld-launch.mjs orient",
+    "check": "node scripts/check-root.mjs && node scripts/vexworld-launch.mjs check-version",
+    "setup": "node scripts/vexworld-launch.mjs setup",
+    "start": "node scripts/vexworld-launch.mjs start",
+    "play": "node scripts/vexworld-launch.mjs start",
+    "play:lan": "node scripts/vexworld-launch.mjs lan",
+    "agent": "node scripts/vexworld-launch.mjs agent",
+    "home": "node scripts/vexworld-launch.mjs home"
+  }
+}

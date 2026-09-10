@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VexWorld participant",
+  "type": "object",
+  "required": [
+    "participantRef",
+    "participantType",
+    "vesselRef",
+    "controllerBinding"
+  ],
+  "properties": {
+    "participantRef": {
+      "type": "string"
+    },
+    "participantType": {
+      "enum": [
+        "HUMAN",
+        "AI_COMPANION"
+      ]
+    },
+    "lineageRef": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "vesselRef": {
+      "type": "string"
+    },
+    "controllerBinding": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}

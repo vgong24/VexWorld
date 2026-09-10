@@ -1,0 +1,146 @@
+{
+  "schemaVersion": "vexworld.capability-graph/v1",
+  "capabilities": [
+    {
+      "capabilityRef": "capability.vexworld.semantic-world",
+      "owner": "World Semantics",
+      "sourceRoots": [
+        "world/",
+        "worlds/"
+      ],
+      "consumers": [
+        "World Compiler",
+        "Runtime",
+        "Renderer"
+      ]
+    },
+    {
+      "capabilityRef": "capability.vexworld.world-compiler",
+      "owner": "Compiler",
+      "sourceRoots": [
+        "src/compiler/"
+      ],
+      "consumers": [
+        "generated World Package"
+      ]
+    },
+    {
+      "capabilityRef": "capability.vexworld.headless-realm",
+      "owner": "Runtime",
+      "sourceRoots": [
+        "src/core/"
+      ],
+      "consumers": [
+        "Browser",
+        "Tests",
+        "Future engines"
+      ]
+    },
+    {
+      "capabilityRef": "capability.vexworld.party",
+      "owner": "Party and Continuity",
+      "sourceRoots": [
+        "src/core/party.mjs",
+        "docs/PARTY-AND-SESSION-TOPOLOGY.md"
+      ],
+      "consumers": [
+        "Runtime",
+        "LAN relay",
+        "UI"
+      ]
+    },
+    {
+      "capabilityRef": "capability.vexworld.companion-controller",
+      "owner": "Companion Embodiment",
+      "sourceRoots": [
+        "src/core/controllers.mjs",
+        "src/agents/"
+      ],
+      "consumers": [
+        "Runtime"
+      ]
+    },
+    {
+      "capabilityRef": "capability.vexworld.team-technique",
+      "owner": "Combat and Coordination",
+      "sourceRoots": [
+        "src/core/team-technique.mjs",
+        "world/team-techniques.json"
+      ],
+      "consumers": [
+        "Runtime",
+        "Witness",
+        "UI"
+      ]
+    },
+    {
+      "capabilityRef": "capability.vexworld.resonance",
+      "owner": "Resonance",
+      "sourceRoots": [
+        "src/core/resonance.mjs"
+      ],
+      "consumers": [
+        "World Witness",
+        "Quest"
+      ]
+    },
+    {
+      "capabilityRef": "capability.vexworld.world-witness",
+      "owner": "World Intelligence",
+      "sourceRoots": [
+        "src/core/world-witness.mjs"
+      ],
+      "consumers": [
+        "Technique Seeds",
+        "Quest trial"
+      ]
+    },
+    {
+      "capabilityRef": "capability.vexworld.resource-stewardship",
+      "owner": "Ecology and Resource",
+      "sourceRoots": [
+        "src/core/resource-state.mjs"
+      ],
+      "consumers": [
+        "Runtime",
+        "Companion controllers",
+        "Status"
+      ]
+    },
+    {
+      "capabilityRef": "capability.vexworld.browser-experience",
+      "owner": "Experience Adapter",
+      "sourceRoots": [
+        "src/web/"
+      ],
+      "consumers": [
+        "Human playtest"
+      ]
+    },
+    {
+      "capabilityRef": "capability.vexworld.lan-session",
+      "owner": "Session and Persistence",
+      "sourceRoots": [
+        "src/server/",
+        "src/web/network-client.mjs"
+      ],
+      "consumers": [
+        "Cross-device resume",
+        "Remote workers"
+      ]
+    },
+    {
+      "capabilityRef": "capability.vexworld.physical-bridge",
+      "owner": "Upstream physical liaison",
+      "sourceRoots": [
+        "docs/EMBODIMENT-AND-REALITY-BOUNDARY.md"
+      ],
+      "consumers": [],
+      "upstreamRefs": [
+        "github.issue.vextreme-sdk.284",
+        "github.issue.vextreme-sdk.285",
+        "github.issue.vextreme-sdk.292"
+      ]
+    }
+  ]
+}

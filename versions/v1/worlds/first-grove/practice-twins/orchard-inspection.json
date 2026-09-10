@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "vexworld.practice-twin/v1",
+  "practiceTwinRef": "practice-twin.first-grove.orchard-inspection.v0",
+  "practiceRef": "practice.vexworld.orchard-inspection",
+  "truthClass": "REALITY_GROUNDED_PRACTICE",
+  "sourceState": "SYNTHETIC_TEACHING_CANDIDATE_NOT_AGRONOMIC_AUTHORITY",
+  "attentionPatterns": [
+    "lower-leaf-discoloration",
+    "neighbor-pattern-spread",
+    "soil-moisture-cue",
+    "weather-before-irrigation"
+  ],
+  "timingPatterns": [
+    "inspect-before-intervention",
+    "recheck-after-weather-change"
+  ],
+  "decisionPoints": [
+    "observe-more",
+    "ask-human-steward",
+    "recommend-no-action",
+    "recommend-bounded-action"
+  ],
+  "uncertainties": [
+    "synthetic example lacks real cultivar, soil, instrumentation, and local practitioner validation"
+  ]
+}

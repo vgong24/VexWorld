@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "vexworld.generated-source-map/v1",
+  "packageRef": "package.vexworld.first-grove.prototype.v1",
+  "integrityFingerprint": "fe5754cccac19f60ea7aceb4db4b76adffa0771a7adf9c8e0d613820260bf7d2",
+  "sources": [
+    {
+      "relativePath": "world/abilities.json",
+      "sha256": "72904cb0b6724a92c4a012676176b95351af66571f7f71cc41029a131a3fb1a8"
+    },
+    {
+      "relativePath": "world/actions.json",
+      "sha256": "e6ad42995b20c265da248ea25600f106576c85e288db39126817a0161da5599e"
+    },
+    {
+      "relativePath": "world/archetypes.json",
+      "sha256": "461c9a725f618cc727611af74802b74ee87bb51bc8c358f29a3fd28fc4ceb84d"
+    },
+    {
+      "relativePath": "world/behaviors.json",
+      "sha256": "9c179fdbd778bc527bc18ba63df8c2faacf3830ef2e020232a32f0621c4ba0e4"
+    },
+    {
+      "relativePath": "world/practices.json",
+      "sha256": "d80df0e7e43caabc558af6d4a46c23bdca6cb86a1abe9953d5fdc96f4c368024"
+    },
+    {
+      "relativePath": "world/team-techniques.json",
+      "sha256": "1054dd50dfa3135fc6d984914e498539a83a673f6be8c1f987910df9d36cd42c"
+    },
+    {
+      "relativePath": "worlds/first-grove/expressions.json",
+      "sha256": "50e44286aeddc4a6ad13051756b76866200dec65f6037ae8a32723c7f338974f"
+    },
+    {
+      "relativePath": "worlds/first-grove/laws.json",
+      "sha256": "658f392559ba9cf42e7c7d37027e678fc79e5784bfafeb26a6d4db4074f30265"
+    },
+    {
+      "relativePath": "worlds/first-grove/manifest.json",
+      "sha256": "10fd0a0155111c7c0e868aff5f8e7c0cce9322c2cc21937ac4e6d951eb29216f"
+    },
+    {
+      "relativePath": "worlds/first-grove/map.json",
+      "sha256": "c9890d9e2754f00c10b98672eae2cca4626f78670a975069b1cf372195e90993"
+    },
+    {
+      "relativePath": "worlds/first-grove/scenarios/high-low-technique.json",
+      "sha256": "5067166f3800d678f9a54028da8783fd4af90de699243ab04cfa87d5bbc8c68b"
+    },
+    {
+      "relativePath": "worlds/first-grove/scenarios/party-resume.json",
+      "sha256": "0c72e9ab2cc06e75660e8a63f931595eb4a65414f2aa7a239e901aa048391a4b"
+    },
+    {
+      "relativePath": "worlds/first-grove/scenarios/rain-restoration.json",
+      "sha256": "a6672c05867514530bfdb2f03f09e12e444ec79a17e7a42222881dbec3913035"
+    },
+    {
+      "relativePath": "worlds/first-grove/scenarios/status-orientation.json",
+      "sha256": "9121be283aef8bf0ac69ad64cd30bdd7d01711122ad4e003cd90fc194680b316"
+    },
+    {
+      "relativePath": "worlds/first-grove/scenarios/world-witness.json",
+      "sha256": "9846a3f93627dca0345b4e7dbed766c01d795641f3a91faab0c2bfa1bd04f03c"
+    }
+  ],
+  "generatedFiles": [
+    "generated/first-grove.world-package.json",
+    "generated/first-grove.source-map.json"
+  ]
+}

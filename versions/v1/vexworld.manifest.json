@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "vexworld.project-manifest/v1",
+  "projectRef": "project.vextreme.vexworld",
+  "repositoryRef": "github.repo.vgong24.vexworld",
+  "workingExperienceRef": "experience.vexworld.vextory",
+  "referenceWorldRef": "world.vexworld.first-grove",
+  "projectLedgerRef": "github.issue.vexworld.3",
+  "projectFoundationRef": "github.issue.vexworld.1",
+  "architectureAtlasRef": "github.issue.vexworld.2",
+  "crossRepoFoundationRef": "github.issue.vextreme-sdk.1299",
+  "currentCandidateStages": [
+    "VW-S0",
+    "VW-C0",
+    "VW-R0",
+    "VW-E0-PROTOTYPE",
+    "VW-PARTY0-PROTOTYPE",
+    "VW-LAN0-PROTOTYPE",
+    "VW-COMB0-PROTOTYPE",
+    "VW-RES0-PROTOTYPE"
+  ],
+  "maturity": "playable_prototype_candidate",
+  "sourceMapRef": "config/source-map.json",
+  "buildGraphRef": "config/build-graph.json",
+  "capabilityGraphRef": "config/capability-graph.json",
+  "unknownRegisterRef": "config/unknowns.json",
+  "generatedWorldPackageRef": "generated/first-grove.world-package.json",
+  "effects": {
+    "physicalActuation": false,
+    "modelTraining": false,
+    "productionNetworking": false,
+    "commerce": false,
+    "publicReleaseAcceptance": false
+  },
+  "bootstrapReceiptRef": "docs/BOOTSTRAP-RECEIPT.md",
+  "versionRef": "version.vexworld.v1",
+  "repositoryVersionPath": "versions/v1",
+  "rootCurrentVersionRef": "config/current-version.json",
+  "localHome": {
+    "schemaVersion": "vexworld.home/v1",
+    "windowsDefault": "%USERPROFILE%\\.vexworld",
+    "macDefault": "~/.vexworld",
+    "sourceOwned": false
+  }
+}

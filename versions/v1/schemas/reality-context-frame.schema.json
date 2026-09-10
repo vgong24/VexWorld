@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Reality context frame",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "realityClass",
+    "physicalEffectPossible",
+    "returnRouteRef"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "vexworld.reality-context-frame/v1"
+    },
+    "realityClass": {
+      "type": "string"
+    },
+    "physicalEffectPossible": {
+      "type": "boolean"
+    },
+    "returnRouteRef": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

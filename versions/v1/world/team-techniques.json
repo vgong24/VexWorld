@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "vexworld.team-technique-catalog/v1",
+  "techniques": [
+    {
+      "schemaVersion": "vexworld.team-technique/v1",
+      "teamTechniqueRef": "technique.vexworld.high-low",
+      "title": "High / Low",
+      "roles": [
+        {
+          "roleRef": "role.high",
+          "action": "AERIAL_STRIKE"
+        },
+        {
+          "roleRef": "role.low",
+          "action": "LOW_SWEEP"
+        }
+      ],
+      "requiredPartySize": 2,
+      "timing": {
+        "signalLeadMs": 650,
+        "criticalWindowMs": 45,
+        "excellentWindowMs": 100,
+        "goodWindowMs": 220,
+        "partialWindowMs": 350,
+        "expiresMs": 1300
+      },
+      "energyCostPerParticipant": 5,
+      "practiceRefs": [
+        "practice.vexworld.team-coordination"
+      ],
+      "declineAllowed": true,
+      "abortAllowed": true
+    }
+  ]
+}

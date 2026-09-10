@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "vexworld.world-manifest/v1",
+  "worldRef": "world.vexworld.first-grove",
+  "title": "First Grove",
+  "experienceRef": "experience.vexworld.vextory",
+  "realityClass": "FICTIONAL_WORLD",
+  "physicalEffectPossible": false,
+  "partyCapacity": 4,
+  "mapRef": "worlds/first-grove/map.json",
+  "lawRef": "worlds/first-grove/laws.json",
+  "expressionRef": "worlds/first-grove/expressions.json",
+  "catalogRefs": [
+    "world/archetypes.json",
+    "world/behaviors.json",
+    "world/actions.json",
+    "world/practices.json",
+    "world/abilities.json",
+    "world/team-techniques.json"
+  ],
+  "scenarioDirectory": "worlds/first-grove/scenarios",
+  "returnRouteRef": "route.vexworld.first-grove.to-garden-of-arrival",
+  "sourceState": "PROTOTYPE_CANDIDATE"
+}

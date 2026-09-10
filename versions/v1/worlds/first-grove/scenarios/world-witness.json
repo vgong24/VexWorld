@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "vexworld.scenario/v1",
+  "scenarioRef": "scenario.first-grove.world-witness",
+  "purpose": "Repeated eligible coordination may form a Technique Seed without auto-granting an ability.",
+  "startingState": {
+    "eligibleSyncEvents": 0
+  },
+  "actions": [
+    "RECORD_VARIED_SYNC_EVENTS",
+    "CHECK_RESONANCE",
+    "FORM_PATTERN_CANDIDATE"
+  ],
+  "expected": [
+    "Technique Seed is candidate",
+    "optional trial may appear"
+  ],
+  "forbidden": [
+    "hidden affection score",
+    "live code injection",
+    "automatic mastery"
+  ]
+}

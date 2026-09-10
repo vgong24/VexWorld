@@ -1,0 +1,84 @@
+{
+  "schemaVersion": "vexworld.roles/v1",
+  "roles": [
+    {
+      "roleRef": "role.vexworld.chief-architect",
+      "owns": [
+        "system coherence",
+        "stage graph",
+        "cross-capability integration"
+      ],
+      "doesNotOwn": [
+        "unilateral acceptance",
+        "physical authority"
+      ]
+    },
+    {
+      "roleRef": "role.vexworld.world-semantics",
+      "owns": [
+        "archetypes",
+        "behaviors",
+        "laws",
+        "refs"
+      ]
+    },
+    {
+      "roleRef": "role.vexworld.runtime",
+      "owns": [
+        "headless state",
+        "reducers",
+        "physics",
+        "receipts"
+      ]
+    },
+    {
+      "roleRef": "role.vexworld.experience",
+      "owns": [
+        "renderer",
+        "input",
+        "UX",
+        "accessibility projection"
+      ]
+    },
+    {
+      "roleRef": "role.vexworld.companion",
+      "owns": [
+        "observation",
+        "controller contract",
+        "local motor boundary"
+      ]
+    },
+    {
+      "roleRef": "role.vexworld.combat",
+      "owns": [
+        "attacks",
+        "team techniques",
+        "timing"
+      ]
+    },
+    {
+      "roleRef": "role.vexworld.resonance-witness",
+      "owns": [
+        "resonance facets",
+        "pattern candidates",
+        "Technique Seeds"
+      ]
+    },
+    {
+      "roleRef": "role.vexworld.session",
+      "owns": [
+        "host lease",
+        "checkpoint",
+        "remote relay"
+      ]
+    },
+    {
+      "roleRef": "role.vexworld.assurance",
+      "owns": [
+        "tests",
+        "replay",
+        "boundary and balance findings"
+      ]
+    }
+  ]
+}

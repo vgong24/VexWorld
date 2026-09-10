@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "vexworld.unknown-register/v1",
+  "unknowns": [
+    {
+      "unknownRef": "unknown.vexworld.project-license",
+      "question": "Which licenses govern code and original media?",
+      "owner": "Victor/legal review",
+      "wake": "before accepting outside reuse/contribution terms"
+    },
+    {
+      "unknownRef": "unknown.vexworld.permanent-renderer",
+      "question": "Should Godot become the primary runtime or remain one adapter beside browser?",
+      "owner": "Chief Architect + Experience",
+      "wake": "after browser/headless proof is played and reviewed"
+    },
+    {
+      "unknownRef": "unknown.vexworld.party-human-multiplayer",
+      "question": "When should parties support multiple human players rather than one human plus companions?",
+      "owner": "Shared Worlds + Session",
+      "wake": "after LAN companion-worker proof"
+    },
+    {
+      "unknownRef": "unknown.vexworld.remote-security",
+      "question": "What production identity/authentication/encryption model is required?",
+      "owner": "Security + Federation",
+      "wake": "before non-trusted-LAN use"
+    },
+    {
+      "unknownRef": "unknown.vexworld.world-witness-compute",
+      "question": "Which incubation work runs locally, on a realm service, or offline?",
+      "owner": "World Intelligence + Resource",
+      "wake": "before generalized dynamic incubation"
+    },
+    {
+      "unknownRef": "unknown.vexworld.model-prompt-policy",
+      "question": "Which exact local-model profile best supports low-latency companion intent?",
+      "owner": "Vex AI/Devex",
+      "wake": "first actual Qwen/Ollama playtest"
+    },
+    {
+      "unknownRef": "unknown.vexworld.balance",
+      "question": "What long-term combat/resource progression is fun and fair?",
+      "owner": "Game Design + Human playtest",
+      "wake": "after first playtest"
+    }
+  ]
+}

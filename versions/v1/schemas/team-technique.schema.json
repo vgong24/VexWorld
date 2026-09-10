@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Team technique",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "teamTechniqueRef",
+    "roles",
+    "timing"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "vexworld.team-technique/v1"
+    },
+    "teamTechniqueRef": {
+      "type": "string"
+    },
+    "roles": {
+      "type": "array",
+      "minItems": 2
+    },
+    "timing": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "vexworld.scenario/v1",
+  "scenarioRef": "scenario.first-grove.high-low",
+  "purpose": "Two participants coordinate independently and earn timing-based outcomes.",
+  "startingState": {
+    "partySize": 2,
+    "techniqueReady": true
+  },
+  "actions": [
+    "SIGNAL",
+    "ACCEPT_OR_DECLINE",
+    "EXECUTE_BEATS",
+    "RESOLVE_TIMING"
+  ],
+  "expected": [
+    "decline is valid",
+    "critical depends on timing",
+    "pair evidence updates"
+  ],
+  "forbidden": [
+    "forced partner action",
+    "RNG-only critical",
+    "relationship worth mutation"
+  ]
+}

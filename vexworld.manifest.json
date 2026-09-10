@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "vexworld.repository-manifest/v1",
+  "projectRef": "project.vextreme.vexworld",
+  "repositoryRef": "github.repo.vgong24.vexworld",
+  "currentVersionConfigRef": "config/current-version.json",
+  "currentVersionRef": "version.vexworld.v1",
+  "versions": [
+    {
+      "versionRef": "version.vexworld.v1",
+      "sourcePath": "versions/v1",
+      "displayName": "Vextory: First Grove",
+      "maturity": "PLAYABLE_FOUNDATION_DRAFT",
+      "supersedesVersionRefOrNull": null
+    }
+  ],
+  "setupEntrypoints": {
+    "windows": "setup-vexworld.cmd",
+    "mac": "setup-vexworld.command",
+    "windowsStart": "start-vexworld.cmd",
+    "macStart": "start-vexworld.command",
+    "windowsLan": "start-vexworld-lan.cmd",
+    "macLan": "start-vexworld-lan.command"
+  },
+  "localHome": {
+    "schemaVersion": "vexworld.home/v1",
+    "windowsDefault": "%USERPROFILE%\\.vexworld",
+    "macDefault": "~/.vexworld",
+    "canonicalSource": false
+  },
+  "navigationRefs": {
+    "rootPortfolioLedgerRef": "github.issue.vextreme-sdk.230",
+    "crossRepoFoundationRef": "github.issue.vextreme-sdk.1299",
+    "projectLedgerRef": "github.issue.vexworld.3",
+    "projectFoundationRef": "github.issue.vexworld.1",
+    "architectureAtlasRef": "github.issue.vexworld.2"
+  },
+  "effects": {
+    "physicalActuation": false,
+    "modelTraining": false,
+    "productionNetworking": false,
+    "commerce": false
+  }
+}

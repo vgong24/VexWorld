@@ -1,0 +1,23 @@
+{
+  "name": "@vexworld/version-1",
+  "version": "1.0.0-foundation",
+  "private": true,
+  "type": "module",
+  "description": "Vextory: First Grove Version 1 playable foundation.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "orient": "node src/cli/orient.mjs",
+    "validate": "node src/cli/validate.mjs",
+    "compile": "node src/cli/compile.mjs",
+    "compile:first-grove": "node src/cli/compile.mjs",
+    "compile:check": "node src/cli/compile.mjs --check",
+    "test": "node --test",
+    "check": "npm run validate && npm run compile && npm run compile:check && npm test",
+    "play": "node src/server/server.mjs",
+    "demo:headless": "node src/cli/demo-headless.mjs",
+    "agent": "node src/agents/remote-worker.mjs",
+    "play:lan": "node src/server/server.mjs --lan"
+  }
+}

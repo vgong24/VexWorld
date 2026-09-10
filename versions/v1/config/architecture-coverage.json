@@ -1,0 +1,142 @@
+{
+  "schemaVersion": "vexworld.architecture-coverage/v1",
+  "rows": [
+    {
+      "capabilityRef": "capability.vexworld.semantic-world",
+      "source": [
+        "world/",
+        "worlds/first-grove/"
+      ],
+      "implementation": [
+        "src/compiler/world-compiler.mjs"
+      ],
+      "tests": [
+        "test/compiler.test.mjs"
+      ],
+      "coverage": "PROTOTYPE"
+    },
+    {
+      "capabilityRef": "capability.vexworld.headless-realm",
+      "source": [
+        "docs/HEADLESS-RUNTIME.md"
+      ],
+      "implementation": [
+        "src/core/engine.mjs"
+      ],
+      "tests": [
+        "test/engine.test.mjs"
+      ],
+      "coverage": "PROTOTYPE"
+    },
+    {
+      "capabilityRef": "capability.vexworld.party",
+      "source": [
+        "docs/PARTY-AND-SESSION-TOPOLOGY.md"
+      ],
+      "implementation": [
+        "src/core/party.mjs"
+      ],
+      "tests": [
+        "test/party.test.mjs"
+      ],
+      "coverage": "PROTOTYPE"
+    },
+    {
+      "capabilityRef": "capability.vexworld.team-technique",
+      "source": [
+        "world/team-techniques.json"
+      ],
+      "implementation": [
+        "src/core/team-technique.mjs",
+        "src/core/engine.mjs"
+      ],
+      "tests": [
+        "test/team-technique.test.mjs"
+      ],
+      "coverage": "PROTOTYPE"
+    },
+    {
+      "capabilityRef": "capability.vexworld.resonance",
+      "source": [
+        "docs/WORLD-WITNESS-AND-RESONANCE.md"
+      ],
+      "implementation": [
+        "src/core/resonance.mjs"
+      ],
+      "tests": [
+        "test/practice-resonance-witness.test.mjs"
+      ],
+      "coverage": "PROTOTYPE"
+    },
+    {
+      "capabilityRef": "capability.vexworld.world-witness",
+      "source": [
+        "docs/WORLD-WITNESS-AND-RESONANCE.md"
+      ],
+      "implementation": [
+        "src/core/world-witness.mjs"
+      ],
+      "tests": [
+        "test/practice-resonance-witness.test.mjs"
+      ],
+      "coverage": "FIXED_DEMONSTRATOR_ONLY"
+    },
+    {
+      "capabilityRef": "capability.vexworld.resource-stewardship",
+      "source": [
+        "worlds/first-grove/laws.json"
+      ],
+      "implementation": [
+        "src/core/resource-state.mjs"
+      ],
+      "tests": [
+        "test/resource-state.test.mjs"
+      ],
+      "coverage": "PROTOTYPE"
+    },
+    {
+      "capabilityRef": "capability.vexworld.browser-experience",
+      "source": [
+        "docs/VEXTORY-FOUNDATION.md"
+      ],
+      "implementation": [
+        "src/web/"
+      ],
+      "tests": [
+        "test/browser-source.test.mjs"
+      ],
+      "coverage": "HUMAN_PLAYTEST_OWED"
+    },
+    {
+      "capabilityRef": "capability.vexworld.lan-session",
+      "source": [
+        "docs/PARTY-AND-SESSION-TOPOLOGY.md"
+      ],
+      "implementation": [
+        "src/server/",
+        "src/web/network-client.mjs"
+      ],
+      "tests": [
+        "test/session-store.test.mjs",
+        "test/server-http.test.mjs",
+        "test/remote-workers.test.mjs"
+      ],
+      "coverage": "TRUSTED_LAN_PROTOTYPE"
+    },
+    {
+      "capabilityRef": "capability.vexworld.companion-adapter",
+      "source": [
+        "docs/COMPANION-ADAPTER.md"
+      ],
+      "implementation": [
+        "src/core/controllers.mjs",
+        "src/agents/remote-worker.mjs"
+      ],
+      "tests": [
+        "test/controllers.test.mjs",
+        "test/remote-workers.test.mjs"
+      ],
+      "coverage": "TWO_WORKER_TRANSPORT_AND_MOCK_OLLAMA_PROTOTYPE"
+    }
+  ]
+}

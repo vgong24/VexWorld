@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LAN development session",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "sessionRef",
+    "stateVersion",
+    "hostLease"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "vexworld.session/v1"
+    },
+    "sessionRef": {
+      "type": "string"
+    },
+    "stateVersion": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "hostLease": {
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": true
+}

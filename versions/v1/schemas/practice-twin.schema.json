@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Practice Twin",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "practiceTwinRef",
+    "truthClass",
+    "attentionPatterns",
+    "timingPatterns"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "vexworld.practice-twin/v1"
+    },
+    "practiceTwinRef": {
+      "type": "string"
+    },
+    "truthClass": {
+      "enum": [
+        "FICTIONAL_PRACTICE",
+        "REALITY_GROUNDED_PRACTICE"
+      ]
+    },
+    "attentionPatterns": {
+      "type": "array"
+    },
+    "timingPatterns": {
+      "type": "array"
+    }
+  },
+  "additionalProperties": true
+}

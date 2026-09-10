@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Technique Seed",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "techniqueSeedRef",
+    "state",
+    "observedPatternSummary",
+    "effects"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "vexworld.technique-seed/v1"
+    },
+    "techniqueSeedRef": {
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "PATTERN_CANDIDATE",
+        "INCUBATING",
+        "TRIAL_READY",
+        "DEMONSTRATED",
+        "LEARNED_VARIANT",
+        "REJECTED",
+        "PARKED"
+      ]
+    },
+    "observedPatternSummary": {
+      "type": "string"
+    },
+    "effects": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}

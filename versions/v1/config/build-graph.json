@@ -1,0 +1,133 @@
+{
+  "schemaVersion": "vexworld.build-graph/v1",
+  "stages": [
+    {
+      "stageRef": "VW-S0",
+      "title": "Source foundation",
+      "parents": [],
+      "state": "candidate",
+      "outputs": [
+        "repository school",
+        "source map",
+        "contracts"
+      ]
+    },
+    {
+      "stageRef": "VW-C0",
+      "title": "World compiler minimum",
+      "parents": [
+        "VW-S0"
+      ],
+      "state": "candidate",
+      "outputs": [
+        "deterministic World Package"
+      ]
+    },
+    {
+      "stageRef": "VW-R0",
+      "title": "Headless realm",
+      "parents": [
+        "VW-C0"
+      ],
+      "state": "candidate",
+      "outputs": [
+        "renderer-independent world state"
+      ]
+    },
+    {
+      "stageRef": "VW-E0-PROTOTYPE",
+      "title": "Playable browser First Grove",
+      "parents": [
+        "VW-R0"
+      ],
+      "state": "candidate",
+      "outputs": [
+        "procedural rendered slice",
+        "human input",
+        "status UX"
+      ]
+    },
+    {
+      "stageRef": "VW-PARTY0-PROTOTYPE",
+      "title": "Max-four party and controller bindings",
+      "parents": [
+        "VW-R0"
+      ],
+      "state": "candidate",
+      "outputs": [
+        "one human plus up to three companions"
+      ]
+    },
+    {
+      "stageRef": "VW-LAN0-PROTOTYPE",
+      "title": "LAN session/remote-worker bridge",
+      "parents": [
+        "VW-PARTY0-PROTOTYPE"
+      ],
+      "state": "candidate",
+      "outputs": [
+        "host lease",
+        "checkpoint resume",
+        "remote intents"
+      ]
+    },
+    {
+      "stageRef": "VW-COMB0-PROTOTYPE",
+      "title": "Synchronized team technique",
+      "parents": [
+        "VW-PARTY0-PROTOTYPE"
+      ],
+      "state": "candidate",
+      "outputs": [
+        "signal/accept/timing/critical"
+      ]
+    },
+    {
+      "stageRef": "VW-RES0-PROTOTYPE",
+      "title": "Bond resonance and World Witness seed",
+      "parents": [
+        "VW-COMB0-PROTOTYPE"
+      ],
+      "state": "candidate",
+      "outputs": [
+        "resonance facets",
+        "Technique Seed",
+        "optional trial"
+      ]
+    },
+    {
+      "stageRef": "VW-LM0",
+      "title": "Real local-model companion bridge",
+      "parents": [
+        "VW-LAN0-PROTOTYPE"
+      ],
+      "state": "planned",
+      "outputs": [
+        "evaluated model controller"
+      ]
+    },
+    {
+      "stageRef": "VW-GODOT0",
+      "title": "Godot adapter decision/proof",
+      "parents": [
+        "VW-R0",
+        "VW-E0-PROTOTYPE"
+      ],
+      "state": "planned",
+      "outputs": [
+        "alternate engine realization"
+      ]
+    },
+    {
+      "stageRef": "VW-PHYS0",
+      "title": "Physical shadow only",
+      "parents": [
+        "VW-LM0"
+      ],
+      "state": "deferred",
+      "outputs": [
+        "read-only physical projection"
+      ]
+    }
+  ]
+}

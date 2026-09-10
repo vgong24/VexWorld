@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Vextory: First Grove</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main id="game-shell" aria-label="Vextory: First Grove prototype">
+    <canvas id="game" width="1280" height="720" tabindex="0" aria-label="Playable First Grove world"></canvas>
+
+    <section id="top-hud" class="hud-panel">
+      <div>
+        <strong>Vextory</strong>
+        <span id="world-label">First Grove</span>
+      </div>
+      <div id="weather-label">Clear</div>
+      <button id="status-button" class="small-button" type="button">Status <kbd>Tab</kbd></button>
+    </section>
+
+    <section id="party-panel" class="hud-panel" aria-label="Party status"></section>
+    <section id="quest-panel" class="hud-panel" aria-live="polite"></section>
+    <section id="message-panel" aria-live="polite"></section>
+    <section id="combo-panel" class="hidden" aria-live="assertive">
+      <div id="combo-speaker"></div>
+      <div class="combo-title">HIGH / LOW</div>
+      <div class="timing-track"><div id="timing-marker"></div><div class="timing-critical"></div></div>
+      <div>Press <kbd>E</kbd> near the center</div>
+    </section>
+
+    <section id="status-panel" class="modal-panel hidden" role="dialog" aria-modal="true" aria-labelledby="status-title">
+      <header><h2 id="status-title">Current orientation</h2><button id="status-close" class="small-button" type="button">Close</button></header>
+      <div id="status-content"></div>
+      <footer class="modal-actions">
+        <button id="copy-session-button" class="secondary hidden" type="button">Copy LAN resume link</button>
+        <button id="release-session-button" type="button">Save and return to Garden</button>
+      </footer>
+    </section>
+
+    <section id="pause-panel" class="modal-panel hidden" role="dialog" aria-modal="true">
+      <h2>Paused</h2>
+      <p>The world waits locally. Press <kbd>P</kbd> or <kbd>Esc</kbd> to return.</p>
+      <div class="modal-actions centered">
+        <button id="resume-button" type="button">Return to First Grove</button>
+        <button id="pause-setup-button" class="secondary" type="button">Save and return to Garden</button>
+      </div>
+    </section>
+
+    <section id="setup-panel" class="setup-panel" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+      <div class="setup-card">
+        <div class="brand-mark" aria-hidden="true">VX</div>
+        <div>
+          <p class="eyebrow">Garden of Arrival</p>
+          <h1 id="setup-title">Choose how you begin together</h1>
+          <p class="lede">The beginning gives you somewhere to stand. It does not decide where you can go.</p>
+        </div>
+
+        <div class="setup-grid">
+          <label>Adventure Pair save
+            <select id="save-slot">
+              <option value="1">Pair 1</option>
+              <option value="2">Pair 2</option>
+              <option value="3">Pair 3</option>
+            </select>
+          </label>
+          <label>Origin environment
+            <select id="environment">
+              <option value="GARDEN_MEADOW">Garden Meadow</option>
+              <option value="COAST">Coast</option>
+              <option value="MOUNTAIN">Mountain</option>
+              <option value="ISLAND">Island</option>
+              <option value="DESERT">Desert</option>
+              <option value="SNOWLAND">Snowland</option>
+              <option value="RANDOM">Surprise me</option>
+            </select>
+          </label>
+          <label>Your name
+            <input id="human-name" value="Victor" maxlength="28">
+          </label>
+          <label>Your form
+            <select id="human-form">
+              <option value="WANDERER">Wanderer</option>
+              <option value="BLOOMKIN">Bloomkin</option>
+              <option value="STARLING">Starling</option>
+            </select>
+          </label>
+          <label>Your accent
+            <input id="human-color" type="color" value="#ffcf66">
+          </label>
+          <label>Companions in this party
+            <select id="companion-count">
+              <option value="1">1 companion</option>
+              <option value="2">2 companions</option>
+              <option value="3">3 companions — full party</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="companion-setup" class="companion-setup"></div>
+
+        <fieldset id="server-options" class="server-options hidden">
+          <legend>VexWorld Home / trusted LAN</legend>
+          <label class="check-row"><input id="use-server" type="checkbox"> Save this journey in VexWorld Home (recommended)</label>
+          <label>Session ID <input id="session-id" value="first-grove-home" maxlength="64"></label>
+          <p>Your local server stores the journey in VexWorld Home. On a trusted home network, another computer can resume after this browser releases the session.</p>
+        </fieldset>
+
+        <div id="saved-summary" class="saved-summary"></div>
+        <div class="setup-actions">
+          <button id="continue-button" type="button" class="secondary">Continue saved journey</button>
+          <button id="begin-button" type="button">Begin a new journey</button>
+        </div>
+        <p id="setup-error" class="error" role="alert"></p>
+      </div>
+    </section>
+
+    <section id="touch-controls" aria-label="Touch controls">
+      <div class="touch-left"><button data-hold="left">◀</button><button data-hold="right">▶</button><button data-press="jumpPressed">Jump</button></div>
+      <div class="touch-right"><button data-press="attackPressed">Hit</button><button data-press="comboPressed">Sync</button><button data-press="interactPressed">Use</button></div>
+    </section>
+  </main>
+
+  <script type="module" src="./app.mjs"></script>
+</body>
+</html>

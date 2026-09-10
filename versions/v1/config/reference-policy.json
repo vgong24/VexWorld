@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "vexworld.reference-policy/v1",
+  "allowedPrefixes": [
+    "project.",
+    "world.",
+    "experience.",
+    "archetype.",
+    "behavior.",
+    "law.",
+    "entity.",
+    "participant.",
+    "lineage.",
+    "vessel.",
+    "action.",
+    "ability.",
+    "technique.",
+    "practice.",
+    "scenario.",
+    "quest.",
+    "expression.",
+    "asset.",
+    "controller.",
+    "session.",
+    "github.",
+    "capability.",
+    "role.",
+    "stage.",
+    "source."
+  ],
+  "rules": [
+    "refs are stable semantic identities",
+    "file paths and engine nodes are not refs by implication",
+    "unknown external refs remain explicit"
+  ]
+}

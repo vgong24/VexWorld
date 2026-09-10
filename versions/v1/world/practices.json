@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "vexworld.practice-catalog/v1",
+  "practices": [
+    {
+      "practiceRef": "practice.vexworld.movement",
+      "title": "Movement"
+    },
+    {
+      "practiceRef": "practice.vexworld.blade",
+      "title": "Blade"
+    },
+    {
+      "practiceRef": "practice.vexworld.arc-mobility",
+      "title": "Arc mobility"
+    },
+    {
+      "practiceRef": "practice.vexworld.team-coordination",
+      "title": "Team coordination"
+    },
+    {
+      "practiceRef": "practice.vexworld.weather-literacy",
+      "title": "Weather literacy"
+    },
+    {
+      "practiceRef": "practice.vexworld.resource-stewardship",
+      "title": "Resource stewardship"
+    },
+    {
+      "practiceRef": "practice.vexworld.mutual-assistance",
+      "title": "Mutual assistance"
+    },
+    {
+      "practiceRef": "practice.vexworld.orchard-inspection",
+      "title": "Orchard inspection",
+      "truthClass": "REALITY_GROUNDED_PRACTICE_CANDIDATE"
+    }
+  ]
+}

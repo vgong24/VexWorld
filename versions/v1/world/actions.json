@@ -1,0 +1,99 @@
+{
+  "schemaVersion": "vexworld.action-catalog/v1",
+  "actions": [
+    {
+      "actionRef": "action.vexworld.move.left",
+      "brief": "Move current vessel left.",
+      "bindings": [
+        "KeyA",
+        "ArrowLeft"
+      ]
+    },
+    {
+      "actionRef": "action.vexworld.move.right",
+      "brief": "Move current vessel right.",
+      "bindings": [
+        "KeyD",
+        "ArrowRight"
+      ]
+    },
+    {
+      "actionRef": "action.vexworld.jump",
+      "brief": "Attempt a jump.",
+      "bindings": [
+        "Space"
+      ]
+    },
+    {
+      "actionRef": "action.vexworld.attack.basic",
+      "brief": "Use current basic attack.",
+      "bindings": [
+        "KeyJ"
+      ]
+    },
+    {
+      "actionRef": "action.vexworld.ability.arc-dash",
+      "brief": "Use Arc Dash.",
+      "bindings": [
+        "KeyK"
+      ]
+    },
+    {
+      "actionRef": "action.vexworld.team.accept",
+      "brief": "Accept a currently signalled team technique.",
+      "bindings": [
+        "KeyE"
+      ]
+    },
+    {
+      "actionRef": "action.vexworld.interact",
+      "brief": "Interact with current affordance.",
+      "bindings": [
+        "KeyF"
+      ]
+    },
+    {
+      "actionRef": "action.vexworld.assist.carry",
+      "brief": "Carry or release an eligible companion vessel.",
+      "bindings": [
+        "KeyG"
+      ]
+    },
+    {
+      "actionRef": "action.vexworld.resonance.twin-horizon",
+      "brief": "Use learned Twin Horizon.",
+      "bindings": [
+        "KeyQ"
+      ]
+    },
+    {
+      "actionRef": "action.vexworld.status.open",
+      "brief": "Open current reality/status orientation.",
+      "bindings": [
+        "Tab",
+        "KeyI"
+      ],
+      "voiceAliases": [
+        "status",
+        "show status",
+        "where am i",
+        "how are we doing"
+      ]
+    },
+    {
+      "actionRef": "action.vexworld.pause",
+      "brief": "Pause the local experience.",
+      "bindings": [
+        "KeyP",
+        "Escape"
+      ]
+    },
+    {
+      "actionRef": "action.vexworld.debug.weather",
+      "brief": "Prototype-only weather transition.",
+      "bindings": [
+        "KeyT"
+      ]
+    }
+  ]
+}

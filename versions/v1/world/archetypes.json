@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "vexworld.archetype-catalog/v1",
+  "archetypes": [
+    {
+      "archetypeRef": "archetype.world.tree",
+      "kind": "TREE",
+      "behaviorRefs": [
+        "behavior.world.solid",
+        "behavior.world.shelter"
+      ]
+    },
+    {
+      "archetypeRef": "archetype.world.rock",
+      "kind": "ROCK",
+      "behaviorRefs": [
+        "behavior.world.solid"
+      ]
+    },
+    {
+      "archetypeRef": "archetype.world.person",
+      "kind": "PERSON",
+      "behaviorRefs": [
+        "behavior.world.actor",
+        "behavior.world.interactable"
+      ]
+    },
+    {
+      "archetypeRef": "archetype.world.creature",
+      "kind": "CREATURE",
+      "behaviorRefs": [
+        "behavior.world.actor"
+      ]
+    },
+    {
+      "archetypeRef": "archetype.world.portal",
+      "kind": "PORTAL",
+      "behaviorRefs": [
+        "behavior.world.portal",
+        "behavior.world.interactable"
+      ]
+    },
+    {
+      "archetypeRef": "archetype.world.rest-point",
+      "kind": "REST_POINT",
+      "behaviorRefs": [
+        "behavior.world.restoration",
+        "behavior.world.interactable",
+        "behavior.world.shelter"
+      ]
+    },
+    {
+      "archetypeRef": "archetype.world.item",
+      "kind": "ITEM",
+      "behaviorRefs": []
+    },
+    {
+      "archetypeRef": "archetype.world.ability",
+      "kind": "ABILITY",
+      "behaviorRefs": []
+    },
+    {
+      "archetypeRef": "archetype.world.ux-hub",
+      "kind": "UX_HUB",
+      "behaviorRefs": [
+        "behavior.world.interactable"
+      ]
+    }
+  ]
+}

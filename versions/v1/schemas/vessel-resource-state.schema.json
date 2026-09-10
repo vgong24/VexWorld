@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Vessel resource state",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "vesselRef",
+    "energy",
+    "restorationMethods",
+    "reserveRequired"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "vexworld.vessel-resource-state/v1"
+    },
+    "vesselRef": {
+      "type": "string"
+    },
+    "energy": {
+      "type": "number",
+      "minimum": 0
+    },
+    "restorationMethods": {
+      "type": "array"
+    },
+    "reserveRequired": {
+      "type": "number",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": true
+}

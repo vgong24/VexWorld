@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "vexworld.navigation/v1",
+  "entryRoutes": {
+    "repository": [
+      "README.md",
+      "vexworld.manifest.json",
+      "CLAUDE.md",
+      "config/source-map.json",
+      "docs/CULTURE.md",
+      "docs/ARCHITECTURE.md",
+      "docs/DEVEX-BUILDER-GUIDE.md"
+    ],
+    "root": [
+      "github.issue.vextreme-sdk.230",
+      "github.issue.vextreme-sdk.1299",
+      "github.issue.vexworld.3",
+      "github.issue.vexworld.1",
+      "github.issue.vexworld.2"
+    ],
+    "playtest": [
+      "docs/PLAYTEST-GUIDE.md",
+      "npm run check",
+      "npm run play"
+    ],
+    "remoteCompanion": [
+      "docs/PARTY-AND-SESSION-TOPOLOGY.md",
+      "docs/COMPANION-ADAPTER.md",
+      "src/agents/remote-worker.mjs"
+    ]
+  },
+  "returnRoutes": {
+    "identityMemorySafety": "github.issue.vextreme-sdk.1299",
+    "physicalWorld": "github.issue.vextreme-sdk.284",
+    "realityAssets": "github.issue.vextreme-sdk.285",
+    "relationalValue": "github.issue.vextreme-sdk.272",
+    "sharedWorlds": "github.issue.vextreme-sdk.253"
+  }
+}

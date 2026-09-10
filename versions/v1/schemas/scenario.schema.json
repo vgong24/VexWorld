@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VexWorld scenario",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "scenarioRef",
+    "purpose",
+    "startingState",
+    "actions",
+    "expected",
+    "forbidden"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "vexworld.scenario/v1"
+    },
+    "scenarioRef": {
+      "type": "string"
+    },
+    "purpose": {
+      "type": "string"
+    },
+    "startingState": {
+      "type": "object"
+    },
+    "actions": {
+      "type": "array"
+    },
+    "expected": {
+      "type": "array"
+    },
+    "forbidden": {
+      "type": "array"
+    }
+  },
+  "additionalProperties": true
+}

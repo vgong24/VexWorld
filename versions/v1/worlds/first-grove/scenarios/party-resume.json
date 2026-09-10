@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "vexworld.scenario/v1",
+  "scenarioRef": "scenario.first-grove.party-resume",
+  "purpose": "One realm host may resume a max-four party while companion controller bindings reconnect independently.",
+  "startingState": {
+    "partySize": 3,
+    "hostLease": "A",
+    "stateVersion": 4
+  },
+  "actions": [
+    "CHECKPOINT",
+    "RELEASE_OR_EXPIRE_A",
+    "CLAIM_B",
+    "LOAD_VERSION_5",
+    "REBIND_WORKERS"
+  ],
+  "expected": [
+    "one authoritative host",
+    "stable participant refs",
+    "remote workers do not mutate realm directly"
+  ],
+  "forbidden": [
+    "dual host writes",
+    "new lineage inferred from new device",
+    "private memory transfer"
+  ]
+}
