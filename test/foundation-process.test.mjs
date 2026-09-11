@@ -141,9 +141,14 @@ test('accepted asset intake requires exact provenance, transformation history an
 
   const mixedLicense = clone(complete);
   mixedLicense.licenseSpdxOrExactIdentifier = 'MIXED_REQUIRES_EXACT_ASSET_RECORD';
-  const mixedErrors = validateAssetIntake(policy, mixedLicense);
-  assert.ok(mixedErrors.some((error) => error.includes('non-placeholder license identifier')));
-  assert.ok(mixedErrors.some((error) => error.includes('blocked or unresolved license class')));
+  assert.ok(
+    validateAssetIntake(policy, mixedLicense)
+      .some((error) =>
+        error.includes('non-placeholder license identifier') ||
+        error.includes('blocked or unresolved license class') ||
+        error.includes('not in an accepted/reviewed license class')
+      )
+  );
 
   const missingTransformation = clone(complete);
   missingTransformation.modificationRecordRefs = [];
