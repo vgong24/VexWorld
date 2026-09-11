@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "vexworld.engine-release-receipt/v1",
+  "engineRef": "technology.godot.4.7.2-stable",
+  "name": "Godot Engine",
+  "releaseTag": "4.7.2-stable",
+  "sourceCommit": "ed1daf0bf001b61586d9930840f2f1394092c079",
+  "upstreamRepository": "https://github.com/godotengine/godot",
+  "releaseApiUrl": "https://api.github.com/repos/godotengine/godot/releases/tags/4.7.2-stable",
+  "releaseUrl": "https://github.com/godotengine/godot/releases/tag/4.7.2-stable",
+  "licenseIdentifier": "MIT",
+  "licenseUrl": "https://github.com/godotengine/godot/blob/4.7.2-stable/LICENSE.txt",
+  "licenseBlobSha": "0e3ba08d6b2e8cf435241829c96f10b74e4356fe",
+  "assets": {
+    "linux-x64": "Godot_v4.7.2-stable_linux.x86_64.zip",
+    "windows-x64": "Godot_v4.7.2-stable_win64.exe.zip",
+    "macos-universal": "Godot_v4.7.2-stable_macos.universal.zip"
+  },
+  "integrityPolicy": "FETCH_EXACT_RELEASE_ASSET_AND_VERIFY_GITHUB_RELEASE_API_SHA256_DIGEST",
+  "engineBinaryVendored": false,
+  "permanentOrExclusiveAdoption": false
+}

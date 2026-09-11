@@ -1,0 +1,112 @@
+name: VexWorld Godot Adapter
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'adapters/godot/**'
+      - 'test/godot-adapter.test.mjs'
+      - 'config/technology-candidates.json'
+      - 'docs/architecture/GODOT-ADAPTER.md'
+      - '.github/workflows/godot-adapter.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vexworld-godot-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  adapter-proof:
+    name: Godot adapter (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout exact pull-request head
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Checkout workflow-dispatch ref
+        if: github.event_name != 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Compile canonical Version 1 package
+        run: npm --prefix versions/v1 run compile
+
+      - name: Static adapter boundary and deterministic build
+        run: npm --prefix adapters/godot run check
+
+      - name: Acquire exact official Godot 4.7.2 runtime
+        run: npm --prefix adapters/godot run bootstrap
+
+      - name: Godot headless semantic parity
+        run: npm --prefix adapters/godot run godot:check
+
+      - name: Upload parity and runtime receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-adapter-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            adapters/godot/artifacts/parity-receipt.json
+            adapters/godot/.runtime/4.7.2-stable/runtime.json
+
+  visual-smoke-linux:
+    name: Godot visual smoke (ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact pull-request head
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Checkout workflow-dispatch ref
+        if: github.event_name != 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Compile and bootstrap
+        run: |
+          npm --prefix versions/v1 run compile
+          npm --prefix adapters/godot run build
+          npm --prefix adapters/godot run bootstrap
+
+      - name: Run virtual-display smoke
+        shell: bash
+        run: |
+          command -v xvfb-run
+          xvfb-run -a npm --prefix adapters/godot run godot:smoke
+
+      - name: Upload visual smoke evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-first-grove-smoke
+          if-no-files-found: error
+          path: |
+            adapters/godot/artifacts/first-grove-smoke.png
+            adapters/godot/artifacts/visual-smoke-receipt.json
+
+# [VXG RealForever]

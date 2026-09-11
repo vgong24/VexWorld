@@ -1,0 +1,16 @@
+{
+  "name": "@vexworld/godot-adapter",
+  "version": "0.1.0-stage-b",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "node tools/build-adapter.mjs",
+    "check:source": "node tools/check-source.mjs",
+    "bootstrap": "node tools/bootstrap-godot.mjs --ensure",
+    "godot:check": "node tools/run-godot.mjs --check",
+    "godot:smoke": "node tools/run-godot.mjs --smoke",
+    "test": "node --test test/*.test.mjs",
+    "check": "npm run check:source && npm test && npm run build"
+  }
+}
