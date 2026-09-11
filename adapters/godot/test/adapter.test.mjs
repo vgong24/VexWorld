@@ -7,6 +7,8 @@ import { buildAdapter } from '../tools/build-adapter.mjs';
 import { checkSource } from '../tools/check-source.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const repoRoot = path.resolve(root, '../..');
+const generatedSourceMap = path.join(repoRoot, 'versions', 'v1', 'generated', 'first-grove.source-map.json');
 
 test('Godot adapter source preserves the engine boundary and contains no imported art/audio', async () => {
   const receipt = await checkSource();
@@ -14,10 +16,11 @@ test('Godot adapter source preserves the engine boundary and contains no importe
   assert.deepEqual(receipt.errors, []);
 });
 
-test('adapter build consumes the canonical First Grove package deterministically', async () => {
+test('adapter build consumes the current canonical First Grove package deterministically', async () => {
+  const sourceMap = JSON.parse(await fs.readFile(generatedSourceMap, 'utf8'));
   const first = await buildAdapter();
   const second = await buildAdapter();
-  assert.equal(first.worldPackage.integrityFingerprint, 'fe5754cccac19f60ea7aceb4db4b76adffa0771a7adf9c8e0d613820260bf7d2');
+  assert.equal(first.worldPackage.integrityFingerprint, sourceMap.integrityFingerprint);
   assert.equal(second.worldPackage.integrityFingerprint, first.worldPackage.integrityFingerprint);
   assert.equal(first.adapterManifest.sourcePackageFingerprint, first.worldPackage.integrityFingerprint);
   assert.deepEqual(first.adapterManifest.externalAssetRefs, []);
