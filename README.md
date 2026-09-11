@@ -54,13 +54,43 @@ versions/v1/
 
 That directory contains the game source, architecture, world definitions, tests, compiler, headless runtime, browser experience, party system, and companion-worker adapter. Future versions can be added beside it without erasing Version 1's formation history.
 
+## Build forward
+
+VexWorld uses one source-changing implementation lane at a time. Future stages can exist as blocked issue breadcrumbs so the whole trajectory remains visible without creating competing source owners.
+
+Start with:
+
+```bash
+npm run orient
+npm run health
+npm run check
+npm run handoff
+```
+
+Current machine-readable state lives in [`config/project-state.json`](config/project-state.json). The forward program is VexWorld Issue #6, and its current active stage is Issue #7.
+
+Read:
+
+- [`docs/process/ONE-LANE-FORWARD-PROTOCOL.md`](docs/process/ONE-LANE-FORWARD-PROTOCOL.md)
+- [`docs/process/CHANGE-IMPACT-AND-ANOMALY-PROTOCOL.md`](docs/process/CHANGE-IMPACT-AND-ANOMALY-PROTOCOL.md)
+- [`docs/process/FRESH-INSTANCE-HANDOFF-TEMPLATE.md`](docs/process/FRESH-INSTANCE-HANDOFF-TEMPLATE.md)
+- [`docs/architecture/ENGINE-AND-ASSET-ADAPTER-STRATEGY.md`](docs/architecture/ENGINE-AND-ASSET-ADAPTER-STRATEGY.md)
+- [`docs/architecture/CHARACTER-VESSEL-ADAPTER.md`](docs/architecture/CHARACTER-VESSEL-ADAPTER.md)
+
+Before opening a pull request, classify its paths:
+
+```bash
+npm run impact -- --base <accepted-base> --head HEAD
+```
+
+An unmapped source path is an anomaly to place, not a check to bypass.
+
 ## Vex Relay self-play
 
 A Vex or Devex instance can run a bounded browser rehearsal without making Victor act as the keyboard relay:
 
 ```bash
-cd versions/v1
-node scripts/vex-relay-self-play.mjs
+npm run selfplay
 ```
 
 The driver enters the Garden of Arrival, forms the largest available local party, moves, jumps, attacks, responds to a combo cue, changes the weather, opens Status, and preserves screenshots plus an attributable receipt under `~/.vexworld/evidence/self-play/`.
@@ -74,7 +104,7 @@ Automated reachability and screenshot changes do not replace Victor's eventual g
 
 ## For Vex and Devex
 
-Start with [`CLAUDE.md`](CLAUDE.md), then follow [`vexworld.manifest.json`](vexworld.manifest.json) and [`config/current-version.json`](config/current-version.json) into the current version's repository-native source map and builder guide.
+Start with [`CLAUDE.md`](CLAUDE.md), then follow [`config/project-state.json`](config/project-state.json), [`vexworld.manifest.json`](vexworld.manifest.json), and [`config/current-version.json`](config/current-version.json) into the current version's repository-native source map and builder guide.
 
 The durable project route is:
 
@@ -82,7 +112,8 @@ The durable project route is:
 Vextreme Root
 → Vextreme-SDK #1299
 → VexWorld #3 project ledger
-→ this repository
+→ config/project-state.json
+→ active stage issue
 → current version source
 → exact task source and tests
 ```

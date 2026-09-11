@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "vexworld.source-map-fragment/v1",
+  "fragmentRef": "source-map-fragment.vexworld.v1.self-play",
+  "reason": "Register published self-play documentation and driver added after the original Version 1 source map without rewriting historical source-map formation.",
+  "entries": [
+    {
+      "path": "config/source-map.fragments/self-play.json",
+      "category": "navigation-and-coverage",
+      "owner": "Chief Architect",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "docs/AUTONOMOUS-PLAYTEST-2026-09-10.md",
+      "category": "evidence-receipt",
+      "owner": "Assurance",
+      "sourceClass": "EVIDENCE_SOURCE"
+    },
+    {
+      "path": "docs/FIRST-SELF-PLAY-REFLECTION.md",
+      "category": "evidence-receipt",
+      "owner": "Assurance",
+      "sourceClass": "EVIDENCE_SOURCE"
+    },
+    {
+      "path": "docs/SELF-PLAY-RECEIPT-2026-09-10.md",
+      "category": "evidence-receipt",
+      "owner": "Assurance",
+      "sourceClass": "EVIDENCE_SOURCE"
+    },
+    {
+      "path": "docs/VEX-RELAY-SELF-PLAY.md",
+      "category": "developer-guide",
+      "owner": "Developer Experience",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "scripts/vex-relay-self-play.mjs",
+      "category": "developer-entry",
+      "owner": "Developer Experience",
+      "sourceClass": "CANONICAL_SOURCE"
+    }
+  ]
+}

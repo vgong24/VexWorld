@@ -1,20 +1,27 @@
 {
   "name": "vexworld-root",
-  "version": "1.0.0-foundation",
+  "version": "1.0.0",
   "private": true,
+  "description": "Repository front door and current-version launcher for VexWorld.",
   "type": "module",
-  "description": "Version-resolving launcher and repository entry for VexWorld.",
-  "engines": {
-    "node": ">=20"
-  },
   "scripts": {
-    "orient": "node scripts/vexworld-launch.mjs orient",
-    "check": "node scripts/check-root.mjs && node scripts/vexworld-launch.mjs check-version",
+    "orient": "node scripts/check-root.mjs",
+    "health": "node scripts/vexworld-health.mjs",
+    "impact": "node scripts/vexworld-impact.mjs",
+    "handoff": "node scripts/vexworld-handoff.mjs --format markdown",
+    "test": "node --test test/*.test.mjs",
+    "check:root": "node scripts/check-root.mjs",
+    "check": "npm run health && npm test && npm --prefix versions/v1 run check",
     "setup": "node scripts/vexworld-launch.mjs setup",
     "start": "node scripts/vexworld-launch.mjs start",
     "play": "node scripts/vexworld-launch.mjs start",
     "play:lan": "node scripts/vexworld-launch.mjs lan",
-    "agent": "node scripts/vexworld-launch.mjs agent",
-    "home": "node scripts/vexworld-launch.mjs home"
-  }
+    "agent": "npm --prefix versions/v1 run agent --",
+    "home": "node scripts/vexworld-launch.mjs home",
+    "selfplay": "node scripts/vexworld-selfplay.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "UNLICENSED"
 }

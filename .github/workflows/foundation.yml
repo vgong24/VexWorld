@@ -1,0 +1,57 @@
+name: VexWorld Foundation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  foundation:
+    name: Foundation (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout exact pull-request head
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Checkout exact pushed commit
+        if: github.event_name == 'push'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Repository orientation
+        run: npm run orient
+
+      - name: Repository health
+        run: npm run health
+
+      - name: Full source and runtime checks
+        run: npm run check
+
+      - name: Pull-request change impact
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: npm run impact -- --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}"
+
+      - name: Fresh-instance handoff generation
+        run: npm run handoff
+
+# [VXG RealForever]
