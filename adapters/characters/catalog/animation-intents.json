@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "vexworld.animation-intent-catalog/v1",
+  "catalogRef": "catalog.vexworld.animation-intents.v1",
+  "intents": [
+    {"animationIntentRef":"animation.intent.idle","required":true,"fallbackIntentRef":null},
+    {"animationIntentRef":"animation.intent.walk","required":true,"fallbackIntentRef":"animation.intent.idle"},
+    {"animationIntentRef":"animation.intent.run","required":false,"fallbackIntentRef":"animation.intent.walk"},
+    {"animationIntentRef":"animation.intent.jump.start","required":true,"fallbackIntentRef":"animation.intent.walk"},
+    {"animationIntentRef":"animation.intent.jump.airborne","required":false,"fallbackIntentRef":"animation.intent.jump.start"},
+    {"animationIntentRef":"animation.intent.land","required":false,"fallbackIntentRef":"animation.intent.idle"},
+    {"animationIntentRef":"animation.intent.attack.light","required":true,"fallbackIntentRef":"animation.intent.signal.primary"},
+    {"animationIntentRef":"animation.intent.attack.heavy","required":false,"fallbackIntentRef":"animation.intent.attack.light"},
+    {"animationIntentRef":"animation.intent.cast","required":false,"fallbackIntentRef":"animation.intent.signal.primary"},
+    {"animationIntentRef":"animation.intent.guard","required":false,"fallbackIntentRef":"animation.intent.idle"},
+    {"animationIntentRef":"animation.intent.hit-react","required":false,"fallbackIntentRef":"animation.intent.idle"},
+    {"animationIntentRef":"animation.intent.rest","required":true,"fallbackIntentRef":"animation.intent.idle"},
+    {"animationIntentRef":"animation.intent.carry","required":false,"fallbackIntentRef":"animation.intent.walk"},
+    {"animationIntentRef":"animation.intent.assisted-recovery","required":false,"fallbackIntentRef":"animation.intent.rest"},
+    {"animationIntentRef":"animation.intent.signal.primary","required":true,"fallbackIntentRef":"animation.intent.idle"},
+    {"animationIntentRef":"animation.intent.signal.high","required":false,"fallbackIntentRef":"animation.intent.signal.primary"},
+    {"animationIntentRef":"animation.intent.signal.low","required":false,"fallbackIntentRef":"animation.intent.signal.primary"},
+    {"animationIntentRef":"animation.intent.team-technique.execute","required":false,"fallbackIntentRef":"animation.intent.signal.primary"}
+  ],
+  "laws": [
+    "ANIMATION_INTENT != CLIP_NAME",
+    "MISSING_CLIP != MISSING_ACTION_MEANING",
+    "ACCESSIBLE_EXPRESSION_MAY_USE_DIFFERENT_MODALITY"
+  ]
+}
