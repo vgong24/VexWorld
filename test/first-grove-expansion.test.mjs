@@ -1,16 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 
 import { compileFirstGrove } from '../versions/v1/src/compiler/world-compiler.mjs';
 import { createInitialGame } from '../versions/v1/src/core/runtime-state.mjs';
 import { getHuman } from '../versions/v1/src/core/party.mjs';
 import { interact, updateEnemies, updateFirstGroveProgress } from '../versions/v1/src/core/world-loop.mjs';
 
-const root = new URL('../versions/v1/', import.meta.url);
+const root = fileURLToPath(new URL('../versions/v1/', import.meta.url));
 
 test('First Grove source forms a five-region outward-and-return adventure rather than a flat demonstration field', async () => {
-  const world = await compileFirstGrove({ root: root.pathname });
+  const world = await compileFirstGrove({ root });
   assert.deepEqual(world.map.regions.map((region) => region.regionRef), [
     'region.first-grove.arrival-hearth',
     'region.first-grove.sunbloom-rise',
@@ -23,7 +24,7 @@ test('First Grove source forms a five-region outward-and-return adventure rather
 });
 
 test('origins change early context without becoming potential ceilings', async () => {
-  const world = await compileFirstGrove({ root: root.pathname });
+  const world = await compileFirstGrove({ root });
   const entries = Object.entries(world.map.originConsequences);
   assert.equal(entries.length, 6);
   for (const [, consequence] of entries) {
@@ -36,7 +37,7 @@ test('origins change early context without becoming potential ceilings', async (
 });
 
 test('resident opportunity is voluntary practice rather than identity or license', async () => {
-  const world = await compileFirstGrove({ root: root.pathname });
+  const world = await compileFirstGrove({ root });
   const resident = world.map.residents.find((entry) => entry.residentRef === 'resident.first-grove.ilex');
   const opportunity = world.map.opportunities.find((entry) => entry.opportunityRef === 'opportunity.first-grove.orchard-inspection');
   assert.equal(resident.roleIsIdentity, false);
@@ -47,7 +48,7 @@ test('resident opportunity is voluntary practice rather than identity or license
 });
 
 test('cooperative encounter and World Witness remain invitations rather than hidden relationship scoring', async () => {
-  const world = await compileFirstGrove({ root: root.pathname });
+  const world = await compileFirstGrove({ root });
   const encounter = world.map.encounters[0];
   const site = world.map.worldWitnessSites[0];
   assert.equal(encounter.teamTechniqueRef, 'technique.vexworld.high-low');
@@ -61,7 +62,7 @@ test('cooperative encounter and World Witness remain invitations rather than hid
 });
 
 test('creature placement exposes several distinct behavior profiles and optional discoveries', async () => {
-  const world = await compileFirstGrove({ root: root.pathname });
+  const world = await compileFirstGrove({ root });
   const behaviors = new Set(world.map.enemies.map((enemy) => enemy.behaviorProfileRef));
   assert.ok(behaviors.size >= 5);
   assert.ok(world.map.discoveries.length >= 2);
@@ -70,7 +71,7 @@ test('creature placement exposes several distinct behavior profiles and optional
 });
 
 test('First Grove runtime consumes region resident discovery and Witness source through explicit interaction', async () => {
-  const world = await compileFirstGrove({ root: root.pathname });
+  const world = await compileFirstGrove({ root });
   const state = createInitialGame(world, { environment: 'GARDEN_MEADOW' });
   const human = getHuman(state.party);
 
@@ -97,8 +98,6 @@ test('First Grove runtime consumes region resident discovery and Witness source 
   assert.equal(interact(state, world), true);
   assert.ok(state.firstGrove.discoveredRefs.includes('discovery.first-grove.echo-petals'));
 
-  // Move to the edge of Echo Overlook's bounded witness radius without also
-  // standing inside Echo Petals' discovery radius, then explicitly ask it to witness.
   human.body.x = 5540;
   human.body.y = 250;
   assert.equal(interact(state, world), true);
@@ -112,7 +111,7 @@ test('First Grove runtime consumes region resident discovery and Witness source 
 });
 
 test('distinct creature behavior profiles survive into runtime and affect deterministic movement tuning', async () => {
-  const world = await compileFirstGrove({ root: root.pathname });
+  const world = await compileFirstGrove({ root });
   const state = createInitialGame(world);
   const human = getHuman(state.party);
   human.body.x = 40;
