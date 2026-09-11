@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -165,21 +166,79 @@ test('accepted asset intake requires exact provenance, transformation history an
   );
 });
 
+test('repository health rejects a checked-in asset promoted to accepted without evidence', async (t) => {
+  const tempRoot = await fs.mkdtemp(path.join(tmpdir(), 'vexworld-asset-health-'));
+  t.after(async () => {
+    await fs.rm(tempRoot, { recursive: true, force: true });
+  });
+
+  await fs.cp(root, tempRoot, {
+    recursive: true,
+    filter(source) {
+      const relative = path.relative(root, source).replaceAll('\\', '/');
+      return relative === '' ||
+        (!relative.startsWith('.git') && !relative.startsWith('node_modules') && !relative.startsWith('.vexworld'));
+    }
+  });
+
+  const policyPath = path.join(tempRoot, 'config', 'asset-intake-policy.json');
+  const policy = JSON.parse(await fs.readFile(policyPath, 'utf8'));
+  const promoted = policy.candidateAssets[0];
+  promoted.disposition = 'ACCEPTED_REFERENCE_STRUCTURE_ONLY';
+  await fs.writeFile(policyPath, `${JSON.stringify(policy, null, 2)}\n`, 'utf8');
+
+  const receipt = await runHealth({ root: tempRoot, includeInventory: false });
+  assert.equal(receipt.disposition, 'ATTENTION_REQUIRED');
+  assert.ok(
+    receipt.errors.some((error) =>
+      error.includes(promoted.assetCandidateRef) &&
+      error.includes('artifactVersionOrRelease')
+    ),
+    receipt.errors.join('\n')
+  );
+  assert.ok(
+    receipt.errors.some((error) => error.includes('replacementProofRefOrNull')),
+    receipt.errors.join('\n')
+  );
+});
+
 test('known paths reveal impacted capabilities and genuinely new implementation paths fail visibly', async () => {
   const map = await loadImpactMap(root);
   const receipt = classifyFiles([
     'README.md',
     'versions/v1/src/web/index.html',
     'adapters/godot/README.md',
-    'versions/v1/src/new-capability/foo.mjs'
+    'versions/v1/src/new-capability/foo.mjs',
+    'versions/v1/scripts/new-capability.mjs'
   ], map);
 
   assert.equal(receipt.disposition, 'ATTENTION_UNMAPPED_PATHS');
-  assert.deepEqual(receipt.unmappedFiles, ['versions/v1/src/new-capability/foo.mjs']);
+  assert.deepEqual(receipt.unmappedFiles, [
+    'versions/v1/scripts/new-capability.mjs',
+    'versions/v1/src/new-capability/foo.mjs'
+  ]);
   assert.ok(receipt.capabilityRefs.includes('capability.vexworld.repository-orientation'));
   assert.ok(receipt.capabilityRefs.includes('capability.vexworld.browser-experience'));
   assert.ok(receipt.capabilityRefs.includes('capability.vexworld.engine-adapter'));
   assert.equal(map.rules.some((rule) => rule.pathPatterns.includes('versions/*/src/**')), false);
+  assert.equal(map.rules.some((rule) => rule.pathPatterns.includes('versions/*/scripts/**')), false);
+});
+
+test('existing Version 1 scripts have explicit semantic impact routes', async () => {
+  const map = await loadImpactMap(root);
+  const receipt = classifyFiles([
+    'versions/v1/scripts/start-mac.command',
+    'versions/v1/scripts/start-windows.bat',
+    'versions/v1/scripts/start-lan-mac.command',
+    'versions/v1/scripts/start-lan-windows.bat',
+    'versions/v1/scripts/vex-relay-self-play.mjs'
+  ], map);
+
+  assert.equal(receipt.disposition, 'IMPACT_CLASSIFIED');
+  assert.deepEqual(receipt.unmappedFiles, []);
+  assert.ok(receipt.matchedRuleRefs.includes('impact.vexworld.version-local-start-scripts'));
+  assert.ok(receipt.matchedRuleRefs.includes('impact.vexworld.version-lan-start-scripts'));
+  assert.ok(receipt.matchedRuleRefs.includes('impact.vexworld.version-selfplay-script'));
 });
 
 test('existing Version 1 process definitions have a narrow semantic impact route', async () => {
