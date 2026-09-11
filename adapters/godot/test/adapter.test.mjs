@@ -41,6 +41,14 @@ test('Godot projection consumes VexWorld-owned character expression refs without
   assert.deepEqual(adapterManifest.externalAssetRefs, []);
 });
 
+test('current World Package carries Stage D resident discovery and Witness semantics into the Godot build', async () => {
+  const { worldPackage } = await buildAdapter();
+  assert.ok(worldPackage.map.residents.some((entry) => entry.residentRef === 'resident.first-grove.ilex'));
+  assert.ok(worldPackage.map.discoveries.some((entry) => entry.discoveryRef === 'discovery.first-grove.sunshower-bell'));
+  assert.ok(worldPackage.map.discoveries.some((entry) => entry.discoveryRef === 'discovery.first-grove.echo-petals'));
+  assert.ok(worldPackage.map.worldWitnessSites.some((entry) => entry.siteRef === 'site.first-grove.echo-overlook'));
+});
+
 test('reference parity fixture captures weather-driven return-margin semantics', async () => {
   const { parity } = await buildAdapter();
   assert.deepEqual(parity.expected.CLEAR, {
