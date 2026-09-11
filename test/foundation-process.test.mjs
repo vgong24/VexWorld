@@ -18,6 +18,7 @@ import {
   matchesPattern,
   validateImpactMap
 } from '../scripts/vexworld-impact.mjs';
+import { resolveCurrentVersionSourcePath } from '../scripts/vexworld-selfplay.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -27,6 +28,28 @@ async function readJson(relative) {
 
 function clone(value) {
   return structuredClone(value);
+}
+
+function acceptedAssetFixture() {
+  return {
+    assetCandidateRef: 'asset-candidate.synthetic.fixture',
+    displayName: 'Synthetic fixture',
+    assetClass: 'TEST_ONLY',
+    officialSourceUrl: 'https://example.invalid/fixture',
+    sourcePublisherRef: 'publisher.synthetic',
+    artifactVersionOrRelease: '1.0.0',
+    downloadedAtOrNull: '2026-09-10T00:00:00Z',
+    sha256OrNull: 'a'.repeat(64),
+    licenseSpdxOrExactIdentifier: 'CC0-1.0',
+    licenseSourceUrl: 'https://example.invalid/license',
+    permittedUseSummary: 'Synthetic test fixture permitted for contract proof.',
+    attributionRequirement: 'NONE',
+    modificationRecordRefs: ['modification.synthetic.none.v1'],
+    intendedVexWorldUse: 'Contract test',
+    localPathOrNull: 'assets/quarantine/synthetic-fixture.glb',
+    replacementProofRefOrNull: 'proof.synthetic.asset-replacement.v1',
+    disposition: 'ACCEPTED_REFERENCE_STRUCTURE_ONLY'
+  };
 }
 
 test('current repository control sources are internally valid', async () => {
@@ -82,60 +105,97 @@ test('technology candidates cannot become adopted from a name or preference alon
   assert.ok(errors.some((error) => error.includes('cannot be ADOPTED without implementation evidence')));
 });
 
-test('accepted asset intake requires exact downloaded artifact, hash, license and local path', async () => {
-  const policy = await readJson('config/asset-intake-policy.json');
-  const incomplete = Object.fromEntries(policy.requiredIntakeFields.map((field) => [field, null]));
-  Object.assign(incomplete, {
-    assetCandidateRef: 'asset-candidate.synthetic.fixture',
-    displayName: 'Synthetic fixture',
-    assetClass: 'TEST_ONLY',
-    officialSourceUrl: 'https://example.invalid/fixture',
-    sourcePublisherRef: 'publisher.synthetic',
-    artifactVersionOrRelease: '1.0.0',
-    licenseSpdxOrExactIdentifier: 'CC0-1.0',
-    licenseSourceUrl: 'https://example.invalid/license',
-    permittedUseSummary: 'Synthetic test only',
-    attributionRequirement: 'NONE',
-    modificationRecordRefs: [],
-    intendedVexWorldUse: 'Contract test',
-    disposition: 'ACCEPTED_REFERENCE_STRUCTURE_ONLY'
-  });
-
-  const incompleteErrors = validateAssetIntake(policy, incomplete);
-  assert.ok(incompleteErrors.some((error) => error.includes('downloadedAtOrNull')));
-  assert.ok(incompleteErrors.some((error) => error.includes('SHA-256')));
-  assert.ok(incompleteErrors.some((error) => error.includes('localPathOrNull')));
-
-  const complete = {
-    ...incomplete,
-    downloadedAtOrNull: '2026-09-10T00:00:00Z',
-    sha256OrNull: 'a'.repeat(64),
-    localPathOrNull: 'assets/quarantine/synthetic-fixture.glb'
-  };
-  assert.deepEqual(validateAssetIntake(policy, complete), []);
+test('root self-play resolves the canonical current-version sourcePath', async () => {
+  const currentVersion = await readJson('config/current-version.json');
+  assert.equal(currentVersion.sourcePath, 'versions/v1');
+  assert.equal(resolveCurrentVersionSourcePath(currentVersion), 'versions/v1');
 });
 
-test('known paths reveal impacted capabilities and unmapped paths fail visibly', async () => {
+test('accepted asset intake requires exact provenance, transformation history and replacement proof', async () => {
+  const policy = await readJson('config/asset-intake-policy.json');
+  const complete = acceptedAssetFixture();
+  assert.deepEqual(validateAssetIntake(policy, complete), []);
+
+  const missingIdentity = clone(complete);
+  missingIdentity.officialSourceUrl = null;
+  missingIdentity.sourcePublisherRef = null;
+  missingIdentity.artifactVersionOrRelease = null;
+  const identityErrors = validateAssetIntake(policy, missingIdentity);
+  assert.ok(identityErrors.some((error) => error.includes('officialSourceUrl')));
+  assert.ok(identityErrors.some((error) => error.includes('sourcePublisherRef')));
+  assert.ok(identityErrors.some((error) => error.includes('artifactVersionOrRelease')));
+
+  const placeholderVersion = clone(complete);
+  placeholderVersion.artifactVersionOrRelease = 'UNPINNED';
+  assert.ok(
+    validateAssetIntake(policy, placeholderVersion)
+      .some((error) => error.includes('non-placeholder artifactVersionOrRelease'))
+  );
+
+  const candidateLicense = clone(complete);
+  candidateLicense.licenseSpdxOrExactIdentifier = 'CC0-1.0_CANDIDATE_VERIFY_AT_DOWNLOAD';
+  assert.ok(
+    validateAssetIntake(policy, candidateLicense)
+      .some((error) => error.includes('non-placeholder license identifier'))
+  );
+
+  const mixedLicense = clone(complete);
+  mixedLicense.licenseSpdxOrExactIdentifier = 'MIXED_REQUIRES_EXACT_ASSET_RECORD';
+  const mixedErrors = validateAssetIntake(policy, mixedLicense);
+  assert.ok(mixedErrors.some((error) => error.includes('non-placeholder license identifier')));
+  assert.ok(mixedErrors.some((error) => error.includes('blocked or unresolved license class')));
+
+  const missingTransformation = clone(complete);
+  missingTransformation.modificationRecordRefs = [];
+  assert.ok(
+    validateAssetIntake(policy, missingTransformation)
+      .some((error) => error.includes('modification/transformation'))
+  );
+
+  const missingReplacement = clone(complete);
+  missingReplacement.replacementProofRefOrNull = null;
+  assert.ok(
+    validateAssetIntake(policy, missingReplacement)
+      .some((error) => error.includes('replacementProofRefOrNull'))
+  );
+});
+
+test('known paths reveal impacted capabilities and genuinely new implementation paths fail visibly', async () => {
   const map = await loadImpactMap(root);
   const receipt = classifyFiles([
     'README.md',
-    'versions/v1/browser/index.html',
+    'versions/v1/src/web/index.html',
     'adapters/godot/README.md',
-    'unplaced/new-system.xyz'
+    'versions/v1/src/new-capability/foo.mjs'
   ], map);
 
   assert.equal(receipt.disposition, 'ATTENTION_UNMAPPED_PATHS');
-  assert.deepEqual(receipt.unmappedFiles, ['unplaced/new-system.xyz']);
+  assert.deepEqual(receipt.unmappedFiles, ['versions/v1/src/new-capability/foo.mjs']);
   assert.ok(receipt.capabilityRefs.includes('capability.vexworld.repository-orientation'));
   assert.ok(receipt.capabilityRefs.includes('capability.vexworld.browser-experience'));
   assert.ok(receipt.capabilityRefs.includes('capability.vexworld.engine-adapter'));
+  assert.equal(map.rules.some((rule) => rule.pathPatterns.includes('versions/*/src/**')), false);
+});
+
+test('existing Version 1 process definitions have a narrow semantic impact route', async () => {
+  const map = await loadImpactMap(root);
+  const receipt = classifyFiles([
+    'versions/v1/process/close-stage.json',
+    'versions/v1/process/develop-feature.json',
+    'versions/v1/process/incubate-technique.json'
+  ], map);
+
+  assert.equal(receipt.disposition, 'IMPACT_CLASSIFIED');
+  assert.deepEqual(receipt.unmappedFiles, []);
+  assert.ok(receipt.matchedRuleRefs.includes('impact.vexworld.process-definitions'));
+  assert.ok(receipt.capabilityRefs.includes('capability.vexworld.process-definition'));
 });
 
 test('glob matching keeps explicit world, adapter and root routes distinguishable', () => {
-  assert.equal(matchesPattern('versions/v1/browser/index.html', 'versions/*/browser/**'), true);
+  assert.equal(matchesPattern('versions/v1/src/web/index.html', 'versions/*/src/web/**'), true);
   assert.equal(matchesPattern('adapters/godot/project.godot', 'adapters/**'), true);
   assert.equal(matchesPattern('README.md', 'README.md'), true);
-  assert.equal(matchesPattern('versions/v1/browser/index.html', 'versions/*/world/**'), false);
+  assert.equal(matchesPattern('versions/v1/src/web/index.html', 'versions/*/world/**'), false);
 });
 
 test('current-version drift is rejected instead of selecting a nearby version', async () => {
