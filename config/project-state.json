@@ -44,7 +44,9 @@
         "scripts/vexworld-impact.mjs",
         "scripts/vexworld-handoff.mjs",
         "scripts/vexworld-selfplay.mjs",
-        "test/foundation-process.test.mjs"
+        "test/foundation-process.test.mjs",
+        "versions/v1/config/source-map.fragments/**",
+        "versions/v1/src/cli/validate.mjs"
       ],
       "allowedEffects": [
         "PUBLIC_SOURCE_CANDIDATE",
@@ -150,7 +152,7 @@
     "unknown.vexworld.multiplayer-witness-privacy"
   ],
   "currentStrongestClaim": "VERSION_1_PUBLISHED__FORWARD_STABILITY_STAGE_ACTIVE",
-  "observedAt": "2026-09-10T00:00:00Z",
+  "observedAt": "2026-09-10T21:00:00-07:00",
   "effects": {
     "modelTraining": false,
     "productionNetwork": false,
