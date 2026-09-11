@@ -23,6 +23,10 @@ if (receipt.humanSemanticRef !== 'vessel.first-grove.human.reference') errors.pu
 if (receipt.companionSemanticRef !== 'vessel.first-grove.companion.reference') errors.push(`companion vessel did not materialize: ${receipt.companionSemanticRef}`);
 if (receipt.humanExpressionBindingRef !== 'expression.vexworld.original-human-reference.v1') errors.push(`human expression did not materialize: ${receipt.humanExpressionBindingRef}`);
 if (receipt.companionExpressionBindingRef !== 'expression.vexworld.original-companion-reference.v1') errors.push(`companion expression did not materialize: ${receipt.companionExpressionBindingRef}`);
+if (!receipt.residentSemanticRefs?.includes('resident.first-grove.ilex')) errors.push('Ilex resident ref did not materialize from World Package');
+if (!receipt.discoverySemanticRefs?.includes('discovery.first-grove.sunshower-bell')) errors.push('Sunshower Bell discovery ref did not materialize from World Package');
+if (!receipt.discoverySemanticRefs?.includes('discovery.first-grove.echo-petals')) errors.push('Echo Petals discovery ref did not materialize from World Package');
+if (!receipt.worldWitnessSiteSemanticRefs?.includes('site.first-grove.echo-overlook')) errors.push('Echo Overlook World Witness site did not materialize from World Package');
 if (receipt.characterExpressionSemanticOwner !== 'VEXWORLD_CHARACTER_VESSEL_ADAPTER') errors.push('character expression semantic owner leaked into Godot');
 if (receipt.semanticOwner !== 'VEXWORLD_WORLD_PACKAGE') errors.push('world semantic owner leaked away from World Package');
 if (receipt.engineRole !== 'REPLACEABLE_REALIZATION_ADAPTER') errors.push('Godot adapter role changed');
