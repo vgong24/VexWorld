@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 import { compileFirstGrove } from '../versions/v1/src/compiler/world-compiler.mjs';
+import { createInitialGame } from '../versions/v1/src/core/runtime-state.mjs';
+import { getHuman } from '../versions/v1/src/core/party.mjs';
+import { interact, updateEnemies, updateFirstGroveProgress } from '../versions/v1/src/core/world-loop.mjs';
 
 const root = new URL('../versions/v1/', import.meta.url);
 
@@ -66,15 +69,74 @@ test('creature placement exposes several distinct behavior profiles and optional
   assert.equal(world.manifest.partyCapacity, 4);
 });
 
-test('Garden browser entry presents an in-world arrival ritual and origin response surface', async () => {
+test('First Grove runtime consumes region resident discovery and Witness source through explicit interaction', async () => {
+  const world = await compileFirstGrove({ root: root.pathname });
+  const state = createInitialGame(world, { environment: 'GARDEN_MEADOW' });
+  const human = getHuman(state.party);
+
+  assert.equal(state.firstGrove.homeAnchorRef, 'entity.first-grove.sunbloom-hearth');
+  assert.equal(state.firstGrove.originContext.potentialCeilingEffect, 'NONE');
+
+  human.body.x = 2860;
+  human.body.y = 535;
+  updateFirstGroveProgress(state, world);
+  assert.equal(state.firstGrove.currentRegionRef, 'region.first-grove.hushed-orchard');
+  assert.equal(interact(state, world), true);
+  assert.ok(state.firstGrove.acceptedOpportunityRefs.includes('opportunity.first-grove.orchard-inspection'));
+  assert.ok(human.practice['practice.vexworld.orchard-inspection'].evidence > 0);
+
+  human.body.x = 1510;
+  human.body.y = 300;
+  assert.equal(interact(state, world), true);
+  assert.ok(state.firstGrove.discoveredRefs.includes('discovery.first-grove.sunshower-bell'));
+
+  human.body.x = 5660;
+  human.body.y = 250;
+  updateFirstGroveProgress(state, world);
+  assert.equal(state.firstGrove.currentRegionRef, 'region.first-grove.echo-overlook');
+  assert.equal(interact(state, world), true);
+  assert.ok(state.firstGrove.visitedWitnessSiteRefs.includes('site.first-grove.echo-overlook'));
+  assert.equal(state.quest.twinHorizonUnlocked, false);
+
+  const witnessReceipt = [...state.receipts].reverse().find((receipt) => receipt.type === 'WORLD_WITNESS_SITE_VISITED');
+  assert.equal(witnessReceipt.automaticFactPromotion, false);
+  assert.equal(witnessReceipt.automaticAbilityGrant, false);
+  assert.equal(witnessReceipt.relationshipWorthScoring, false);
+});
+
+test('distinct creature behavior profiles survive into runtime and affect deterministic movement tuning', async () => {
+  const world = await compileFirstGrove({ root: root.pathname });
+  const state = createInitialGame(world);
+  const human = getHuman(state.party);
+  human.body.x = 40;
+  human.body.y = 530;
+  for (const enemy of state.enemies) enemy.body.onGround = true;
+
+  const curious = state.enemies.find((enemy) => enemy.behaviorProfileRef.includes('curious'));
+  const orchard = state.enemies.find((enemy) => enemy.behaviorProfileRef.includes('orchard-loop'));
+  assert.ok(curious);
+  assert.ok(orchard);
+  assert.notEqual(curious.behaviorProfileRef, orchard.behaviorProfileRef);
+
+  updateEnemies(state, world, 1 / 60);
+  assert.notEqual(curious.body.vx, orchard.body.vx);
+});
+
+test('Garden browser entry and renderer expose ritual, resident, discovery, region, and Witness readability surfaces', async () => {
   const html = await readFile(new URL('../versions/v1/src/web/index.html', import.meta.url), 'utf8');
   const script = await readFile(new URL('../versions/v1/src/web/origin-ritual.mjs', import.meta.url), 'utf8');
+  const renderer = await readFile(new URL('../versions/v1/src/web/renderer.mjs', import.meta.url), 'utf8');
   assert.match(html, /Arrival ritual/);
   assert.match(html, /enter knowing the way home/i);
   assert.match(html, /id="origin-note"/);
   assert.match(html, /Enter First Grove/);
   assert.match(script, /potential/i);
   assert.match(script, /environment.*addEventListener/s);
+  assert.match(renderer, /drawResident/);
+  assert.match(renderer, /drawDiscovery/);
+  assert.match(renderer, /drawWitnessSite/);
+  assert.match(renderer, /drawRegionMarkers/);
+  assert.match(renderer, /coordination is an invitation/);
 });
 
 // [VXG RealForever]
