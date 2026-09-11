@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "vexworld.equipment-socket-proof-fixture/v1",
+  "fixtureRef": "fixture.vexworld.human-reference.training-lantern.v1",
+  "itemRef": "item.vexworld.training-lantern.reference",
+  "requiredSocketRef": "socket.vexworld.hand.primary.right",
+  "beforeExpressionRef": "expression.vexworld.original-human-reference.v1",
+  "afterExpressionRef": "expression.vexworld.original-human-reference.alt.v1",
+  "expected": {
+    "itemRefUnchanged": true,
+    "socketRefUnchanged": true,
+    "vesselRefUnchanged": true,
+    "engineTransformMayChange": true
+  },
+  "laws": [
+    "ITEM_REF != ATTACHMENT_TRANSFORM",
+    "SOCKET_REF != BONE_NAME",
+    "EXPRESSION_REPLACEMENT != INVENTORY_RESET"
+  ]
+}

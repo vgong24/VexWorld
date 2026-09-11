@@ -1,0 +1,12 @@
+{
+  "name": "@vexworld/character-vessel-adapter",
+  "version": "0.1.0-stage-c",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "validate": "node tools/validate-character-adapter.mjs",
+    "replacement:proof": "node tools/replacement-proof.mjs",
+    "equipment:proof": "node tools/equipment-proof.mjs",
+    "check": "npm run validate && npm run replacement:proof && npm run equipment:proof"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "vexworld.attachment-socket-catalog/v1",
+  "catalogRef": "catalog.vexworld.attachment-sockets.v1",
+  "sockets": [
+    {"socketRef":"socket.vexworld.hand.primary.right","purpose":"PRIMARY_HELD_ITEM","requiredTopologyClasses":["BIPED_HUMANOID"]},
+    {"socketRef":"socket.vexworld.hand.secondary.left","purpose":"SECONDARY_HELD_ITEM","requiredTopologyClasses":["BIPED_HUMANOID"]},
+    {"socketRef":"socket.vexworld.back.center","purpose":"BACK_CARRIED_ITEM","requiredTopologyClasses":["BIPED_HUMANOID"]},
+    {"socketRef":"socket.vexworld.head.accessory","purpose":"HEAD_ACCESSORY","requiredTopologyClasses":["BIPED_HUMANOID"]},
+    {"socketRef":"socket.vexworld.waist.left","purpose":"WAIST_ACCESSORY","requiredTopologyClasses":["BIPED_HUMANOID"]},
+    {"socketRef":"socket.vexworld.companion.perch","purpose":"COMPANION_CARRIED_OR_RESTING_RELATION","requiredTopologyClasses":["FLOATING_ORB"]},
+    {"socketRef":"socket.vexworld.companion.accessory","purpose":"COMPANION_ACCESSORY","requiredTopologyClasses":["FLOATING_ORB"]}
+  ],
+  "laws": [
+    "SOCKET_REF != BONE_NAME",
+    "ITEM_REF != ATTACHMENT_TRANSFORM",
+    "MISSING_SOCKET_REQUIRES_EXPLICIT_COMPATIBILITY_RESULT"
+  ]
+}

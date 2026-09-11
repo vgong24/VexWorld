@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "vexworld.character-expression-binding/v1",
+  "expressionBindingRef": "expression.vexworld.original-companion-reference.v1",
+  "characterRefOrArchetypeRef": "archetype.participant.companion",
+  "vesselRef": "vessel.first-grove.companion.reference",
+  "topologyRef": "topology.vexworld.floating-companion.reference.v1",
+  "targetRuntimeRefs": ["runtime.vexworld.2d-procedural", "runtime.vexworld.3d-procedural-placeholder"],
+  "sourceClass": "VEXWORLD_ORIGINAL_PROCEDURAL",
+  "sourceAssetRefs": [],
+  "assetProvenanceReceiptRefs": [],
+  "skeletonSemanticMapRefOrNull": null,
+  "socketBindings": {
+    "socket.vexworld.companion.perch": "transform.semantic.companion.perch",
+    "socket.vexworld.companion.accessory": "transform.semantic.companion.accessory"
+  },
+  "animationIntentBindings": {
+    "animation.intent.idle": {"mode":"PROCEDURAL_MOTION","bindingRef":"motion.original-companion.hover"},
+    "animation.intent.walk": {"mode":"PROCEDURAL_MOTION","bindingRef":"motion.original-companion.travel"},
+    "animation.intent.jump.start": {"mode":"PROCEDURAL_MOTION","bindingRef":"motion.original-companion.rise"},
+    "animation.intent.attack.light": {"mode":"PROCEDURAL_EFFECT","bindingRef":"motion.original-companion.arc"},
+    "animation.intent.rest": {"mode":"PROCEDURAL_POSE","bindingRef":"motion.original-companion.rest"},
+    "animation.intent.signal.primary": {"mode":"PROCEDURAL_LIGHT_GESTURE","bindingRef":"motion.original-companion.signal-primary"},
+    "animation.intent.signal.high": {"mode":"PROCEDURAL_LIGHT_GESTURE","bindingRef":"motion.original-companion.signal-high"},
+    "animation.intent.signal.low": {"mode":"PROCEDURAL_LIGHT_GESTURE","bindingRef":"motion.original-companion.signal-low"}
+  },
+  "expressionSlots": ["core", "face-or-attention", "wing-or-signal", "accessory", "status-overlay", "attention-overlay"],
+  "paletteRoles": ["core-primary", "living-tech-accent", "attention-light", "outline", "status-glow"],
+  "silhouetteAndReadabilityProfileRef": "readability.vexworld.companion-reference.game-distance.v1",
+  "collisionExpressionRef": "collision.vexworld.companion-reference.orb.v1",
+  "projectionBindings": {
+    "2D": "projection.vexworld.companion-reference.procedural-2d.v1",
+    "3D": "projection.vexworld.companion-reference.procedural-3d-placeholder.v1"
+  },
+  "transformationRecordRefs": ["transformation.vexworld.original-companion-reference.initial.v1"],
+  "replacementCandidateRefs": [],
+  "replacementProofRef": "proof.vexworld.companion-reference-originality-and-replaceability.v1",
+  "knownLossRefs": ["loss.vexworld.3d-placeholder-not-final-art"],
+  "rights": {
+    "origin": "ORIGINAL_VEXWORLD_SOURCE",
+    "externalAssetDependency": false
+  },
+  "laws": [
+    "SMALL_BODY != LOW_CAPABILITY",
+    "EXPRESSION_BINDING != AI_LINEAGE_IDENTITY"
+  ]
+}

@@ -16,7 +16,10 @@ if (receipt.packageRef !== 'package.vexworld.first-grove.prototype.v1') errors.p
 if (receipt.integrityFingerprint !== 'fe5754cccac19f60ea7aceb4db4b76adffa0771a7adf9c8e0d613820260bf7d2') errors.push('unexpected World Package fingerprint');
 if (receipt.humanSemanticRef !== 'vessel.first-grove.human.reference') errors.push(`human vessel did not materialize: ${receipt.humanSemanticRef}`);
 if (receipt.companionSemanticRef !== 'vessel.first-grove.companion.reference') errors.push(`companion vessel did not materialize: ${receipt.companionSemanticRef}`);
-if (receipt.semanticOwner !== 'VEXWORLD_WORLD_PACKAGE') errors.push('semantic owner leaked away from World Package');
+if (receipt.humanExpressionBindingRef !== 'expression.vexworld.original-human-reference.v1') errors.push(`human expression did not materialize: ${receipt.humanExpressionBindingRef}`);
+if (receipt.companionExpressionBindingRef !== 'expression.vexworld.original-companion-reference.v1') errors.push(`companion expression did not materialize: ${receipt.companionExpressionBindingRef}`);
+if (receipt.characterExpressionSemanticOwner !== 'VEXWORLD_CHARACTER_VESSEL_ADAPTER') errors.push('character expression semantic owner leaked into Godot');
+if (receipt.semanticOwner !== 'VEXWORLD_WORLD_PACKAGE') errors.push('world semantic owner leaked away from World Package');
 if (receipt.engineRole !== 'REPLACEABLE_REALIZATION_ADAPTER') errors.push('Godot adapter role changed');
 if (receipt.screenshotWriteError !== 0) errors.push(`screenshot write failed with ${receipt.screenshotWriteError}`);
 if (screenshot.size < 1024) errors.push(`smoke screenshot is implausibly small: ${screenshot.size} bytes`);

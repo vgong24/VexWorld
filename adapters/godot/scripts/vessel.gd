@@ -6,6 +6,9 @@ var vessel_kind: String = "HUMAN"
 var laws: Dictionary = {}
 var follow_target: CharacterBody2D = null
 var expression_color: Color = Color("#f7d46a")
+var expression_profile: Dictionary = {}
+var expression_binding_ref: String = ""
+var topology_ref: String = ""
 var facing: float = 1.0
 var dash_remaining: float = 0.0
 var attack_flash: float = 0.0
@@ -17,9 +20,21 @@ func configure(config: Dictionary) -> void:
     laws = config.get("laws", {})
     follow_target = config.get("followTarget", null) as CharacterBody2D
     expression_color = Color.from_string(str(config.get("color", "#f7d46a")), Color.WHITE)
+    expression_profile = config.get("expressionBinding", {})
+    expression_binding_ref = str(expression_profile.get("expressionBindingRef", ""))
+    topology_ref = str(expression_profile.get("topologyRef", ""))
+
+    if expression_binding_ref.is_empty():
+        push_error("VexWorld vessel requires a semantic character expression binding")
+    if str(expression_profile.get("vesselRef", "")) != semantic_ref:
+        push_error("Character expression vesselRef does not match semantic vessel ref")
+
     set_meta("vexworld_ref", semantic_ref)
     set_meta("participant_ref", participant_ref)
     set_meta("adapter_role", vessel_kind)
+    set_meta("expression_binding_ref", expression_binding_ref)
+    set_meta("body_topology_ref", topology_ref)
+    set_meta("expression_semantic_owner", "VEXWORLD_CHARACTER_VESSEL_ADAPTER")
     _install_collision()
     queue_redraw()
 
@@ -73,6 +88,10 @@ func _physics_process(delta: float) -> void:
 
 func _draw() -> void:
     var glow: Color = expression_color.lightened(0.24 if attack_flash > 0.0 else 0.0)
+    var source_class: String = str(expression_profile.get("sourceClass", "UNKNOWN"))
+    if source_class != "VEXWORLD_ORIGINAL_PROCEDURAL":
+        draw_rect(Rect2(-14, -44, 28, 44), Color("#ff4fd8"), false, 2.0)
+
     if vessel_kind == "COMPANION":
         draw_circle(Vector2(0, -27), 18.0, Color(glow.r, glow.g, glow.b, 0.24))
         draw_circle(Vector2(0, -27), 11.0, glow)

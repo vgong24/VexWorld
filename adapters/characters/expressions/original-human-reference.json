@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "vexworld.character-expression-binding/v1",
+  "expressionBindingRef": "expression.vexworld.original-human-reference.v1",
+  "characterRefOrArchetypeRef": "archetype.participant.human-adventurer",
+  "vesselRef": "vessel.first-grove.human.reference",
+  "topologyRef": "topology.vexworld.biped-humanoid.reference.v1",
+  "targetRuntimeRefs": ["runtime.vexworld.2d-procedural", "runtime.vexworld.3d-procedural-placeholder"],
+  "sourceClass": "VEXWORLD_ORIGINAL_PROCEDURAL",
+  "sourceAssetRefs": [],
+  "assetProvenanceReceiptRefs": [],
+  "skeletonSemanticMapRefOrNull": null,
+  "socketBindings": {
+    "socket.vexworld.hand.primary.right": "transform.semantic.hand.primary.right",
+    "socket.vexworld.hand.secondary.left": "transform.semantic.hand.secondary.left",
+    "socket.vexworld.back.center": "transform.semantic.back.center",
+    "socket.vexworld.head.accessory": "transform.semantic.head.accessory",
+    "socket.vexworld.waist.left": "transform.semantic.waist.left"
+  },
+  "animationIntentBindings": {
+    "animation.intent.idle": {"mode":"PROCEDURAL_POSE","bindingRef":"motion.original-human.idle"},
+    "animation.intent.walk": {"mode":"PROCEDURAL_MOTION","bindingRef":"motion.original-human.walk"},
+    "animation.intent.jump.start": {"mode":"PROCEDURAL_MOTION","bindingRef":"motion.original-human.jump"},
+    "animation.intent.attack.light": {"mode":"PROCEDURAL_MOTION","bindingRef":"motion.original-human.attack-light"},
+    "animation.intent.rest": {"mode":"PROCEDURAL_POSE","bindingRef":"motion.original-human.rest"},
+    "animation.intent.signal.primary": {"mode":"PROCEDURAL_GESTURE","bindingRef":"motion.original-human.signal-primary"}
+  },
+  "expressionSlots": ["body-base", "face", "head-expression", "clothing", "held-item", "status-overlay", "attention-overlay"],
+  "paletteRoles": ["skin", "cloth-primary", "cloth-secondary", "living-tech-accent", "outline", "status-glow"],
+  "silhouetteAndReadabilityProfileRef": "readability.vexworld.human-reference.game-distance.v1",
+  "collisionExpressionRef": "collision.vexworld.human-reference.capsule.v1",
+  "projectionBindings": {
+    "2D": "projection.vexworld.human-reference.procedural-2d.v1",
+    "3D": "projection.vexworld.human-reference.procedural-3d-placeholder.v1"
+  },
+  "transformationRecordRefs": ["transformation.vexworld.original-human-reference.initial.v1"],
+  "replacementCandidateRefs": ["expression.vexworld.original-human-reference.alt.v1"],
+  "replacementProofRef": "proof.vexworld.human-reference-expression-replacement.v1",
+  "knownLossRefs": ["loss.vexworld.3d-placeholder-not-final-art"],
+  "rights": {
+    "origin": "ORIGINAL_VEXWORLD_SOURCE",
+    "externalAssetDependency": false
+  },
+  "laws": [
+    "AVATAR_APPEARANCE != CAPABILITY_CEILING",
+    "EXPRESSION_BINDING != PARTICIPANT_IDENTITY"
+  ]
+}

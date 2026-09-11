@@ -3,6 +3,8 @@ import path from 'node:path';
 
 const SESSION_ID = /^[a-zA-Z0-9._-]{1,96}$/;
 const PARTICIPANT_ID = /^[a-zA-Z0-9._-]{1,160}$/;
+const WINDOWS_REPLACE_RETRY_CODES = new Set(['EPERM', 'EBUSY']);
+const DEFAULT_WINDOWS_REPLACE_RETRY_DELAYS_MS = Object.freeze([8, 24, 60, 120]);
 
 function assertId(value, pattern, label) {
   if (typeof value !== 'string' || !pattern.test(value)) throw new TypeError(`invalid ${label}`);
@@ -22,10 +24,25 @@ function emptyRecord(sessionRef) {
   };
 }
 
+function defaultSleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export class SessionStore {
-  constructor(rootDirectory) {
+  constructor(rootDirectory, {
+    platform = process.platform,
+    rename = fs.rename,
+    remove = fs.rm,
+    sleep = defaultSleep,
+    windowsReplaceRetryDelaysMs = DEFAULT_WINDOWS_REPLACE_RETRY_DELAYS_MS
+  } = {}) {
     this.rootDirectory = rootDirectory;
     this.locks = new Map();
+    this.platform = platform;
+    this.rename = rename;
+    this.remove = remove;
+    this.sleep = sleep;
+    this.windowsReplaceRetryDelaysMs = [...windowsReplaceRetryDelaysMs];
   }
 
   sessionPath(sessionRef) {
@@ -58,13 +75,49 @@ export class SessionStore {
     }
   }
 
+  isRetryableWindowsReplaceError(error) {
+    return this.platform === 'win32' && WINDOWS_REPLACE_RETRY_CODES.has(error?.code);
+  }
+
+  async replaceTemporaryFile(temporary, destination) {
+    let retryIndex = 0;
+    while (true) {
+      try {
+        await this.rename(temporary, destination);
+        return;
+      } catch (error) {
+        const canRetry =
+          this.isRetryableWindowsReplaceError(error) &&
+          retryIndex < this.windowsReplaceRetryDelaysMs.length;
+        if (!canRetry) throw error;
+        const delayMs = this.windowsReplaceRetryDelaysMs[retryIndex];
+        retryIndex += 1;
+        await this.sleep(delayMs);
+      }
+    }
+  }
+
+  async cleanupTemporaryFile(temporary) {
+    try {
+      await this.remove(temporary, { force: true });
+    } catch {
+      // Best-effort cleanup only. Never let cleanup mask the original write error.
+    }
+  }
+
   async write(record) {
     await fs.mkdir(this.rootDirectory, { recursive: true });
     const file = this.sessionPath(record.sessionRef);
     const temporary = `${file}.${process.pid}.${Date.now()}.tmp`;
     await fs.writeFile(temporary, JSON.stringify(record, null, 2) + '\n');
-    await fs.rename(temporary, file);
-    return record;
+    let replaced = false;
+    try {
+      await this.replaceTemporaryFile(temporary, file);
+      replaced = true;
+      return record;
+    } finally {
+      if (!replaced) await this.cleanupTemporaryFile(temporary);
+    }
   }
 
   async claimLease(sessionRef, hostId, { now = Date.now(), ttlMs = 15000 } = {}) {

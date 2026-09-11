@@ -4,6 +4,7 @@ const Vessel = preload("res://scripts/vessel.gd")
 const WorldEntity = preload("res://scripts/world_entity.gd")
 
 var package: Dictionary = {}
+var character_expressions: Dictionary = {}
 var human: CharacterBody2D
 var companion: CharacterBody2D
 var status_layer: CanvasLayer
@@ -15,8 +16,13 @@ var smoke_frames := 0
 func _ready() -> void:
     process_mode = Node.PROCESS_MODE_ALWAYS
     package = _load_json("res://generated/first-grove.world-package.json")
+    character_expressions = _load_json("res://generated/character-expressions.json")
     if package.is_empty():
         push_error("Missing generated First Grove World Package. Run npm --prefix adapters/godot run build.")
+        get_tree().quit(2)
+        return
+    if character_expressions.is_empty():
+        push_error("Missing generated character expression projection. Run npm --prefix adapters/godot run build.")
         get_tree().quit(2)
         return
     _register_semantic_input()
@@ -80,6 +86,9 @@ func _build_world() -> void:
     var expression: Dictionary = package.get("expressions", {})
     var envs: Dictionary = expression.get("environments", {})
     var palette: Dictionary = envs.get("GARDEN_MEADOW", {})
+    var character_bindings: Dictionary = character_expressions.get("bindings", {})
+    var human_expression: Dictionary = character_bindings.get("human", {})
+    var companion_expression: Dictionary = character_bindings.get("companion", {})
     RenderingServer.set_default_clear_color(Color.from_string(str(palette.get("sky", ["#82cfff"])[0]), Color("#82cfff")))
 
     for platform in map_data.get("platforms", []):
@@ -106,7 +115,8 @@ func _build_world() -> void:
         "participantRef": "participant.reference.human",
         "vesselKind": "HUMAN",
         "laws": laws,
-        "color": str(palette.get("accent", "#ffd95a"))
+        "color": str(palette.get("accent", "#ffd95a")),
+        "expressionBinding": human_expression
     })
     add_child(human)
 
@@ -119,7 +129,8 @@ func _build_world() -> void:
         "vesselKind": "COMPANION",
         "laws": laws,
         "followTarget": human,
-        "color": "#7de2ff"
+        "color": "#7de2ff",
+        "expressionBinding": companion_expression
     })
     add_child(companion)
 
@@ -198,14 +209,16 @@ func _build_status() -> void:
 
 func _status_text() -> String:
     var manifest: Dictionary = package.get("manifest", {})
-    return "VEXTORY / GODOT ADAPTER PROOF\n\nWorld: %s\nWorld ref: %s\nReality: %s\nPackage: %s\nFingerprint: %s\nHuman vessel ref: %s\nCompanion vessel ref: %s\n\nGodot scene/node paths are replaceable adapter state.\nCanonical meaning remains in the VexWorld World Package.\n\n[I or Tab] close status" % [
+    return "VEXTORY / GODOT ADAPTER PROOF\n\nWorld: %s\nWorld ref: %s\nReality: %s\nPackage: %s\nFingerprint: %s\nHuman vessel ref: %s\nHuman expression: %s\nCompanion vessel ref: %s\nCompanion expression: %s\n\nGodot scene/node paths are replaceable adapter state.\nCharacter expression bindings remain VexWorld semantic state.\n\n[I or Tab] close status" % [
         str(manifest.get("title", "First Grove")),
         str(manifest.get("worldRef", "UNKNOWN")),
         str(manifest.get("realityClass", "UNKNOWN")),
         str(package.get("packageRef", "UNKNOWN")),
         str(package.get("integrityFingerprint", "UNKNOWN")),
         str(human.get_meta("vexworld_ref", "UNKNOWN")) if human else "UNKNOWN",
-        str(companion.get_meta("vexworld_ref", "UNKNOWN")) if companion else "UNKNOWN"
+        str(human.get_meta("expression_binding_ref", "UNKNOWN")) if human else "UNKNOWN",
+        str(companion.get_meta("vexworld_ref", "UNKNOWN")) if companion else "UNKNOWN",
+        str(companion.get_meta("expression_binding_ref", "UNKNOWN")) if companion else "UNKNOWN"
     ]
 
 func _capture_smoke() -> void:
@@ -221,7 +234,10 @@ func _capture_smoke() -> void:
         "screenshotPath": screenshot_path,
         "screenshotWriteError": result,
         "humanSemanticRef": human.get_meta("vexworld_ref", "UNKNOWN") if human else "UNKNOWN",
+        "humanExpressionBindingRef": human.get_meta("expression_binding_ref", "UNKNOWN") if human else "UNKNOWN",
         "companionSemanticRef": companion.get_meta("vexworld_ref", "UNKNOWN") if companion else "UNKNOWN",
+        "companionExpressionBindingRef": companion.get_meta("expression_binding_ref", "UNKNOWN") if companion else "UNKNOWN",
+        "characterExpressionSemanticOwner": character_expressions.get("semanticOwner", "UNKNOWN"),
         "semanticOwner": "VEXWORLD_WORLD_PACKAGE",
         "engineRole": "REPLACEABLE_REALIZATION_ADAPTER"
     }

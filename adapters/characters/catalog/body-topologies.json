@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "vexworld.body-topology-catalog/v1",
+  "catalogRef": "catalog.vexworld.body-topologies.v1",
+  "topologies": [
+    {
+      "topologyRef": "topology.vexworld.biped-humanoid.reference.v1",
+      "topologyClass": "BIPED_HUMANOID",
+      "rootSemanticJointRef": "joint.vexworld.root",
+      "semanticJointRefs": [
+        "joint.vexworld.root",
+        "joint.vexworld.pelvis",
+        "joint.vexworld.spine.lower",
+        "joint.vexworld.spine.upper",
+        "joint.vexworld.head",
+        "joint.vexworld.manipulator.primary.left",
+        "joint.vexworld.manipulator.primary.right",
+        "joint.vexworld.locomotor.left",
+        "joint.vexworld.locomotor.right"
+      ],
+      "locomotionEffectorRefs": [
+        "joint.vexworld.locomotor.left",
+        "joint.vexworld.locomotor.right"
+      ],
+      "manipulationEffectorRefs": [
+        "joint.vexworld.manipulator.primary.left",
+        "joint.vexworld.manipulator.primary.right"
+      ],
+      "attachmentSocketRefs": [
+        "socket.vexworld.hand.primary.right",
+        "socket.vexworld.hand.secondary.left",
+        "socket.vexworld.back.center",
+        "socket.vexworld.head.accessory",
+        "socket.vexworld.waist.left"
+      ],
+      "capabilityCeilingRefs": [],
+      "unsupportedAssumptionRefs": [
+        "assumption.vexworld.gender-determines-capability",
+        "assumption.vexworld.humanoid-is-universal"
+      ]
+    },
+    {
+      "topologyRef": "topology.vexworld.floating-companion.reference.v1",
+      "topologyClass": "FLOATING_ORB",
+      "rootSemanticJointRef": "joint.vexworld.root",
+      "semanticJointRefs": [
+        "joint.vexworld.root",
+        "joint.vexworld.attention.primary",
+        "joint.vexworld.signal.left",
+        "joint.vexworld.signal.right"
+      ],
+      "locomotionEffectorRefs": ["joint.vexworld.root"],
+      "manipulationEffectorRefs": [],
+      "attachmentSocketRefs": [
+        "socket.vexworld.companion.perch",
+        "socket.vexworld.companion.accessory"
+      ],
+      "capabilityCeilingRefs": [],
+      "unsupportedAssumptionRefs": [
+        "assumption.vexworld.hands-required-for-agency",
+        "assumption.vexworld.small-body-means-low-capability"
+      ]
+    }
+  ]
+}
