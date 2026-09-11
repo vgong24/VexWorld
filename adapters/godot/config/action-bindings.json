@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "vexworld.godot-action-bindings/v1",
+  "bindings": [
+    {"actionRef":"action.vexworld.move.left","engineAction":"vw_move_left","keys":["KeyA","ArrowLeft"]},
+    {"actionRef":"action.vexworld.move.right","engineAction":"vw_move_right","keys":["KeyD","ArrowRight"]},
+    {"actionRef":"action.vexworld.jump","engineAction":"vw_jump","keys":["Space"]},
+    {"actionRef":"action.vexworld.attack.basic","engineAction":"vw_attack_basic","keys":["KeyJ"]},
+    {"actionRef":"action.vexworld.ability.arc-dash","engineAction":"vw_arc_dash","keys":["KeyK"]},
+    {"actionRef":"action.vexworld.interact","engineAction":"vw_interact","keys":["KeyF"]},
+    {"actionRef":"action.vexworld.status.open","engineAction":"vw_status","keys":["Tab","KeyI"]},
+    {"actionRef":"action.vexworld.pause","engineAction":"vw_pause","keys":["KeyP","Escape"]}
+  ],
+  "rule":"ACTION_REF != ENGINE_ACTION != INPUT_EVENT"
+}
