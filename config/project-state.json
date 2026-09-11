@@ -1,0 +1,161 @@
+{
+  "schemaVersion": "vexworld.project-state/v1",
+  "projectRef": "project.vextreme.vexworld",
+  "repositoryRef": "github.repo.vgong24.vexworld",
+  "projectLedgerRef": "github.issue.vexworld.3",
+  "programEpicRef": "github.issue.vexworld.6",
+  "crossRepoFoundationRef": "github.issue.vextreme-sdk.1299",
+  "currentVersionRef": "version.vexworld.v1",
+  "currentVersionPath": "versions/v1",
+  "activeStageRef": "stage.vexworld.vw-fwd-01a",
+  "activeStageIssueRef": "github.issue.vexworld.7",
+  "stageOrder": [
+    "stage.vexworld.vw-fwd-01a",
+    "stage.vexworld.vw-fwd-01b",
+    "stage.vexworld.vw-fwd-01c",
+    "stage.vexworld.vw-fwd-01d",
+    "stage.vexworld.vw-fwd-01e"
+  ],
+  "stages": [
+    {
+      "stageRef": "stage.vexworld.vw-fwd-01a",
+      "issueRef": "github.issue.vexworld.7",
+      "title": "Repository stability kernel, change-impact guard and fresh-instance handoff",
+      "state": "ACTIVE_SINGLE_FORWARD_LANE",
+      "predecessorStageRef": null,
+      "parentStageRefs": [],
+      "sourceChanging": true,
+      "meaningOwnerRef": "project.vextreme.vexworld",
+      "implementationOwnerRef": "role.vexworld.foundation-builder",
+      "reviewOwnerRef": "role.vexworld.fresh-independent-reviewer",
+      "ownedPathPatterns": [
+        ".github/**",
+        "README.md",
+        "CLAUDE.md",
+        "package.json",
+        "config/project-state.json",
+        "config/change-impact-map.json",
+        "config/technology-candidates.json",
+        "config/asset-intake-policy.json",
+        "docs/process/**",
+        "docs/architecture/ENGINE-AND-ASSET-ADAPTER-STRATEGY.md",
+        "docs/architecture/CHARACTER-VESSEL-ADAPTER.md",
+        "scripts/vexworld-health.mjs",
+        "scripts/vexworld-impact.mjs",
+        "scripts/vexworld-handoff.mjs",
+        "scripts/vexworld-selfplay.mjs",
+        "test/foundation-process.test.mjs"
+      ],
+      "allowedEffects": [
+        "PUBLIC_SOURCE_CANDIDATE",
+        "TEST_EXECUTION",
+        "GENERATED_NO_EFFECT_RECEIPT",
+        "DRAFT_PULL_REQUEST"
+      ],
+      "forbiddenEffects": [
+        "MODEL_TRAINING",
+        "PRODUCTION_NETWORK",
+        "PHYSICAL_ACTUATION",
+        "COMMERCE",
+        "PRIVATE_DATA_INGESTION",
+        "SILENT_MAIN_MUTATION"
+      ],
+      "requiredCommandRefs": [
+        "command.vexworld.orient",
+        "command.vexworld.health",
+        "command.vexworld.check",
+        "command.vexworld.impact",
+        "command.vexworld.handoff"
+      ],
+      "exitCriteriaRefs": [
+        "criterion.vexworld.one-active-stage",
+        "criterion.vexworld.all-source-paths-impact-mapped",
+        "criterion.vexworld.fresh-handoff-generated",
+        "criterion.vexworld.foundation-ci-cross-platform",
+        "criterion.vexworld.independent-exact-head-review"
+      ]
+    },
+    {
+      "stageRef": "stage.vexworld.vw-fwd-01b",
+      "issueRef": "github.issue.vexworld.8",
+      "title": "Godot world-package adapter and engine-boundary proof",
+      "state": "BLOCKED_BY_PREDECESSOR",
+      "predecessorStageRef": "stage.vexworld.vw-fwd-01a",
+      "parentStageRefs": ["stage.vexworld.vw-fwd-01a"],
+      "sourceChanging": false,
+      "meaningOwnerRef": "project.vextreme.vexworld",
+      "implementationOwnerRef": "role.vexworld.engine-adapter-builder",
+      "reviewOwnerRef": "role.vexworld.engine-boundary-reviewer",
+      "ownedPathPatterns": ["adapters/godot/**"],
+      "wakeTriggerRefs": ["receipt.vexworld.vw-fwd-01a.accepted-close"]
+    },
+    {
+      "stageRef": "stage.vexworld.vw-fwd-01c",
+      "issueRef": "github.issue.vexworld.9",
+      "title": "Character and vessel expression adapter with provenance-bound CC0 intake",
+      "state": "BLOCKED_BY_PREDECESSOR",
+      "predecessorStageRef": "stage.vexworld.vw-fwd-01b",
+      "parentStageRefs": ["stage.vexworld.vw-fwd-01b"],
+      "sourceChanging": false,
+      "meaningOwnerRef": "project.vextreme.vexworld",
+      "implementationOwnerRef": "role.vexworld.character-vessel-builder",
+      "reviewOwnerRef": "role.vexworld.asset-provenance-reviewer",
+      "ownedPathPatterns": ["adapters/characters/**", "assets/**"],
+      "wakeTriggerRefs": ["receipt.vexworld.vw-fwd-01b.accepted-close"]
+    },
+    {
+      "stageRef": "stage.vexworld.vw-fwd-01d",
+      "issueRef": "github.issue.vexworld.10",
+      "title": "First Grove environment, avatar readability and cooperative adventure expansion",
+      "state": "BLOCKED_BY_PREDECESSOR",
+      "predecessorStageRef": "stage.vexworld.vw-fwd-01c",
+      "parentStageRefs": ["stage.vexworld.vw-fwd-01c"],
+      "sourceChanging": false,
+      "meaningOwnerRef": "project.vextreme.vexworld",
+      "implementationOwnerRef": "role.vexworld.first-grove-builder",
+      "reviewOwnerRef": "role.vexworld.play-experience-reviewer",
+      "ownedPathPatterns": ["versions/v1/worlds/first-grove/**", "versions/v1/browser/**"],
+      "wakeTriggerRefs": ["receipt.vexworld.vw-fwd-01c.accepted-close"]
+    },
+    {
+      "stageRef": "stage.vexworld.vw-fwd-01e",
+      "issueRef": "github.issue.vexworld.11",
+      "title": "Real local companion bridge and trusted PC/Mac two-worker rehearsal",
+      "state": "BLOCKED_BY_PREDECESSOR",
+      "predecessorStageRef": "stage.vexworld.vw-fwd-01d",
+      "parentStageRefs": ["stage.vexworld.vw-fwd-01d"],
+      "sourceChanging": false,
+      "meaningOwnerRef": "project.vextreme.vexworld",
+      "implementationOwnerRef": "role.vexworld.local-companion-bridge-builder",
+      "reviewOwnerRef": "role.vexworld.lan-model-assurance-reviewer",
+      "ownedPathPatterns": ["versions/v1/src/companion/**", "versions/v1/scripts/**"],
+      "wakeTriggerRefs": ["receipt.vexworld.vw-fwd-01d.accepted-close"]
+    }
+  ],
+  "requiredReadOrder": [
+    "config/project-state.json",
+    "README.md",
+    "docs/process/ONE-LANE-FORWARD-PROTOCOL.md",
+    "config/change-impact-map.json",
+    "vexworld.manifest.json",
+    "config/current-version.json",
+    "github.issue.vexworld.7"
+  ],
+  "knownUnknownRefs": [
+    "unknown.vexworld.software-license",
+    "unknown.vexworld.godot-adoption-after-proof",
+    "unknown.vexworld.first-character-reference-pack",
+    "unknown.vexworld.first-grove-art-direction",
+    "unknown.vexworld.real-qwen-latency-and-behavior",
+    "unknown.vexworld.multiplayer-witness-privacy"
+  ],
+  "currentStrongestClaim": "VERSION_1_PUBLISHED__FORWARD_STABILITY_STAGE_ACTIVE",
+  "observedAt": "2026-09-10T00:00:00Z",
+  "effects": {
+    "modelTraining": false,
+    "productionNetwork": false,
+    "physicalActuation": false,
+    "commerce": false,
+    "privateDataIngestion": false
+  }
+}
