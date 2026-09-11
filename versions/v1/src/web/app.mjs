@@ -114,7 +114,8 @@ function updateSaveSummary() {
   }
   try {
     const saved = JSON.parse(raw);
-    ui.saved_summary.textContent = `Pair ${slot}: ${saved.environment?.replaceAll('_',' ')} • party ${saved.party?.members?.length || '?'} • ${Math.round((saved.nowMs || 0)/1000)}s explored`;
+    const region = saved.firstGrove?.currentRegionRef?.split('.').pop()?.replaceAll('-', ' ');
+    ui.saved_summary.textContent = `Pair ${slot}: ${saved.environment?.replaceAll('_',' ')} • party ${saved.party?.members?.length || '?'} • ${region || 'First Grove'} • ${Math.round((saved.nowMs || 0)/1000)}s explored`;
   } catch {
     ui.saved_summary.textContent = `Pair ${slot} contains an unreadable local save.`;
   }
@@ -280,6 +281,10 @@ function partyMemberHtml(member) {
   </div>`;
 }
 
+function currentRegion() {
+  return worldPackage?.map?.regions?.find((region) => region.regionRef === state?.firstGrove?.currentRegionRef) || null;
+}
+
 function renderStatus() {
   if (!state) return;
   const human = getHuman(state.party);
@@ -289,6 +294,8 @@ function renderStatus() {
   const facets = profiles.length
     ? profiles.map((profile) => `<b>${profile.participantRefs.map((ref)=>ref.split('.').pop()).join(' + ')}</b><br>${Object.entries(profile.facets).map(([name,value])=>`${name.replace(/([A-Z])/g,' $1')}: ${value.evidence.toFixed(1)}`).join('<br>')}`).join('<hr>')
     : 'No companion-pair resonance profile in this party.';
+  const region = currentRegion();
+  const journey = state.firstGrove || {};
   const remoteCommands = companions
     .filter((member) => member.controllerBinding.controllerClass.startsWith('REMOTE_'))
     .map((member, index) => {
@@ -303,6 +310,7 @@ function renderStatus() {
     <article class="status-card"><h3>Resources</h3><p>Energy: ${human.resources.energy.toFixed(1)} / ${human.resources.maxEnergy}</p><p>Return margin: ${human.resources.returnMargin.toFixed(1)}</p><p>${escapeHtml(human.resources.currentBand.replaceAll('_',' '))}</p></article>
     <article class="status-card"><h3>Practice</h3><p>${practices.length ? practices.map((p)=>`${escapeHtml(p.practiceRef.split('.').pop())}: ${escapeHtml(p.tier)} (${p.evidence.toFixed(1)})`).join('<br>') : 'Practice begins through meaningful use.'}</p></article>
     <article class="status-card"><h3>Bond resonance</h3><p>${facets}</p><p>No hidden affection or worth score.</p></article>
+    <article class="status-card"><h3>First Grove journey</h3><p><b>${escapeHtml(region?.title || 'First Grove')}</b></p><p>Home: <code>${escapeHtml(journey.homeAnchorRef || 'UNKNOWN')}</code></p><p>Regions visited: ${(journey.visitedRegionRefs || []).length} • discoveries: ${(journey.discoveredRefs || []).length}</p><p>Origin lesson: ${escapeHtml(journey.originContext?.earlyTraversalCue?.replaceAll('_',' ') || 'UNKNOWN')}</p><p>Potential ceiling effect: <b>${escapeHtml(journey.originContext?.potentialCeilingEffect || 'UNKNOWN')}</b></p></article>
     <article class="status-card"><h3>World / quest</h3><p>${escapeHtml(state.quest.progressText)}</p><p>Weather: ${escapeHtml(state.weather.state)}</p><p>Twin Horizon: ${state.quest.twinHorizonUnlocked ? 'LEARNED' : state.quest.twinHorizonTrial}</p></article>
     <article class="status-card"><h3>Session</h3><p>${escapeHtml(networkState)}</p><p><code>${escapeHtml(state.sessionRef)}</code></p>${remoteCommands.length ? `<p>Remote worker command${remoteCommands.length > 1 ? 's' : ''}:</p>${remoteCommands.join('')}` : '<p>All companions are local.</p>'}<p class="tiny-note">The token is a trusted-LAN development credential. Do not post it publicly.</p></article>`;
   ui.status_content.querySelectorAll('[data-copy-worker]').forEach((button) => {
@@ -319,9 +327,10 @@ function renderStatus() {
 
 function renderUi(force = false) {
   if (!state) return;
+  const region = currentRegion();
   ui.party_panel.innerHTML = state.party.members.map(partyMemberHtml).join('');
   ui.weather_label.textContent = state.weather.state.replaceAll('_',' ');
-  ui.world_label.textContent = `${state.environment.replaceAll('_',' ')} • ${networkState}`;
+  ui.world_label.textContent = `${region?.title || 'First Grove'} • ${state.environment.replaceAll('_',' ')} • ${networkState}`;
   ui.quest_panel.innerHTML = `<strong>${state.quest.twinHorizonTrial === 'ACTIVE' ? 'Resonance Trial' : 'Current path'}</strong>${escapeHtml(state.quest.progressText)}`;
   ui.message_panel.innerHTML = state.messages.slice(-3).map((message)=>`<div class="message"><b>${escapeHtml(message.speaker)}</b>${escapeHtml(message.text)}</div>`).join('');
   const signal = state.activeTechniqueSignal;
