@@ -20,6 +20,10 @@ export function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
 }
 
+export function canonicalSourceText(value) {
+  return String(value).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
 async function readJson(root, relativePath) {
   const text = await fs.readFile(path.join(root, relativePath), 'utf8');
   return { text, value: JSON.parse(text) };
@@ -85,8 +89,8 @@ export async function compileFirstGrove({ root = process.cwd() } = {}) {
   validateSource({ manifest, map, laws, expressions, catalogs, scenarios });
 
   const sourceEntries = [
-    ...Object.entries(records).map(([relativePath, record]) => ({ relativePath, sha256: sha256(record.text) })),
-    ...scenarioRecords.map((record) => ({ relativePath: record.relativePath, sha256: sha256(record.text) }))
+    ...Object.entries(records).map(([relativePath, record]) => ({ relativePath, sha256: sha256(canonicalSourceText(record.text)) })),
+    ...scenarioRecords.map((record) => ({ relativePath: record.relativePath, sha256: sha256(canonicalSourceText(record.text)) }))
   ].sort((a, b) => a.relativePath.localeCompare(b.relativePath));
 
   const packageBody = sortDeep({
