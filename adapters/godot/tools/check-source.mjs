@@ -17,7 +17,8 @@ const required = [
   'scripts/ci_probe.gd',
   'tools/build-adapter.mjs',
   'tools/bootstrap-godot.mjs',
-  'tools/run-godot.mjs'
+  'tools/run-godot.mjs',
+  'tools/verify-smoke.mjs'
 ];
 const forbiddenExtensions = new Set(['.png', '.jpg', '.jpeg', '.webp', '.svg', '.glb', '.gltf', '.fbx', '.blend', '.wav', '.ogg', '.mp3']);
 
