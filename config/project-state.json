@@ -7,9 +7,9 @@
   "crossRepoFoundationRef": "github.issue.vextreme-sdk.1299",
   "currentVersionRef": "version.vexworld.v1",
   "currentVersionPath": "versions/v1",
-  "lastAcceptedMainRef": "github.commit.vexworld.cad1e0120b945ffc888e304844659b3b13836965",
-  "activeStageRef": "stage.vexworld.vw-fwd-01c",
-  "activeStageIssueRef": "github.issue.vexworld.9",
+  "lastAcceptedMainRef": "github.commit.vexworld.30cc1ed2c8cf6b27241dd48aaf4a429132c9d498",
+  "activeStageRef": "stage.vexworld.vw-fwd-01d",
+  "activeStageIssueRef": "github.issue.vexworld.10",
   "stageOrder": [
     "stage.vexworld.vw-fwd-01a",
     "stage.vexworld.vw-fwd-01b",
@@ -44,43 +44,9 @@
         "config/technology-candidates.json",
         "config/asset-intake-policy.json",
         "docs/process/**",
-        "docs/architecture/ENGINE-AND-ASSET-ADAPTER-STRATEGY.md",
-        "docs/architecture/CHARACTER-VESSEL-ADAPTER.md",
         "scripts/vexworld-health.mjs",
         "scripts/vexworld-impact.mjs",
-        "scripts/vexworld-handoff.mjs",
-        "scripts/vexworld-selfplay.mjs",
-        "test/foundation-process.test.mjs",
-        "versions/v1/config/source-map.fragments/**",
-        "versions/v1/src/cli/validate.mjs"
-      ],
-      "allowedEffects": [
-        "PUBLIC_SOURCE_CANDIDATE",
-        "TEST_EXECUTION",
-        "GENERATED_NO_EFFECT_RECEIPT",
-        "DRAFT_PULL_REQUEST"
-      ],
-      "forbiddenEffects": [
-        "MODEL_TRAINING",
-        "PRODUCTION_NETWORK",
-        "PHYSICAL_ACTUATION",
-        "COMMERCE",
-        "PRIVATE_DATA_INGESTION",
-        "SILENT_MAIN_MUTATION"
-      ],
-      "requiredCommandRefs": [
-        "command.vexworld.orient",
-        "command.vexworld.health",
-        "command.vexworld.check",
-        "command.vexworld.impact",
-        "command.vexworld.handoff"
-      ],
-      "exitCriteriaRefs": [
-        "criterion.vexworld.one-active-stage",
-        "criterion.vexworld.all-source-paths-impact-mapped",
-        "criterion.vexworld.fresh-handoff-generated",
-        "criterion.vexworld.foundation-ci-cross-platform",
-        "criterion.vexworld.independent-exact-head-review"
+        "scripts/vexworld-handoff.mjs"
       ]
     },
     {
@@ -90,40 +56,89 @@
       "state": "ACCEPTED",
       "predecessorStageRef": "stage.vexworld.vw-fwd-01a",
       "parentStageRefs": ["stage.vexworld.vw-fwd-01a"],
-      "predecessorCloseReceiptRef": "github.issue.vexworld.7.comment.5630100512",
       "sourceChanging": false,
       "meaningOwnerRef": "project.vextreme.vexworld",
       "implementationOwnerRef": "role.vexworld.engine-adapter-builder",
       "reviewOwnerRef": "role.vexworld.engine-boundary-reviewer",
-      "engineCandidateRef": "technology.godot.4.7.2-stable",
       "acceptedCandidateHeadRef": "github.commit.vexworld.01657293f586f1921c8c804daa3acd44e83b1810",
       "acceptedCandidateTreeRef": "github.tree.vexworld.5cb3b468b40219bf8a89b1a690e983d3e00fd44f",
       "acceptedMainRef": "github.commit.vexworld.cad1e0120b945ffc888e304844659b3b13836965",
       "acceptedCloseReceiptRef": "github.issue.vexworld.8.comment.5630693465",
       "reviewReceiptRef": "github.issue.vexworld.15.comment.5630644415",
-      "postMergeFoundationRunRef": "github.actions.vexworld.34572043368",
       "ownedPathPatterns": [
         "adapters/godot/**",
         ".github/workflows/godot-adapter.yml",
         "test/godot-adapter.test.mjs",
-        "config/technology-candidates.json",
         "docs/architecture/GODOT-ADAPTER.md"
+      ]
+    },
+    {
+      "stageRef": "stage.vexworld.vw-fwd-01c",
+      "issueRef": "github.issue.vexworld.9",
+      "title": "Character and vessel expression adapter with provenance-bound CC0 intake",
+      "state": "ACCEPTED",
+      "predecessorStageRef": "stage.vexworld.vw-fwd-01b",
+      "parentStageRefs": ["stage.vexworld.vw-fwd-01b"],
+      "sourceChanging": false,
+      "meaningOwnerRef": "project.vextreme.vexworld",
+      "implementationOwnerRef": "role.vexworld.character-vessel-builder",
+      "reviewOwnerRef": "role.vexworld.character-asset-identity-reviewer",
+      "acceptedCandidateHeadRef": "github.commit.vexworld.63c0b0b9aaa996ea7692cc372c8c2de5cef31a2d",
+      "acceptedCandidateTreeRef": "github.tree.vexworld.2773397ca439dffdcd69e105505a76bad44cbd1f",
+      "acceptedMainRef": "github.commit.vexworld.30cc1ed2c8cf6b27241dd48aaf4a429132c9d498",
+      "acceptedCloseReceiptRef": "github.issue.vexworld.9.comment.5641777187",
+      "reviewReceiptRef": "github.issue.vexworld.20.comment.5641754975",
+      "assetResearchReceiptRef": "github.issue.vexworld.17.comment.5641466099",
+      "assetDisposition": "ORIGINAL_ONLY_FOR_STAGE_C_ACCEPTANCE",
+      "windowsInvestigationReceiptRef": "github.issue.vexworld.16.comment.5641520491",
+      "windowsRepairEvidenceRef": "github.issue.vexworld.16.comment.5641693965",
+      "foundationWorkflowRunRef": "github.actions.vexworld.34656985722",
+      "godotWorkflowRunRef": "github.actions.vexworld.34656985745",
+      "ownedPathPatterns": [
+        "adapters/characters/**",
+        "config/asset-intake-policy.json",
+        "docs/architecture/CHARACTER-ASSET-INTAKE.md",
+        "docs/architecture/CHARACTER-VESSEL-ADAPTER.md",
+        "test/character-vessel-adapter.test.mjs"
+      ]
+    },
+    {
+      "stageRef": "stage.vexworld.vw-fwd-01d",
+      "issueRef": "github.issue.vexworld.10",
+      "title": "First Grove environment, avatar readability and cooperative adventure expansion",
+      "state": "ACTIVE_SINGLE_FORWARD_LANE",
+      "predecessorStageRef": "stage.vexworld.vw-fwd-01c",
+      "parentStageRefs": ["stage.vexworld.vw-fwd-01c"],
+      "predecessorCloseReceiptRef": "github.issue.vexworld.9.comment.5641777187",
+      "startingMainRef": "github.commit.vexworld.30cc1ed2c8cf6b27241dd48aaf4a429132c9d498",
+      "sourceChanging": true,
+      "meaningOwnerRef": "project.vextreme.vexworld",
+      "implementationOwnerRef": "role.vexworld.first-grove-builder",
+      "reviewOwnerRef": "role.vexworld.play-experience-reviewer",
+      "ownedPathPatterns": [
+        "versions/v1/worlds/first-grove/**",
+        "versions/v1/src/web/**",
+        "test/first-grove-expansion.test.mjs"
       ],
       "allowedEffects": [
-        "ENGINE_ADAPTER_SOURCE_CANDIDATE",
-        "LOCAL_ENGINE_BOOTSTRAP_FOR_TEST",
+        "FIRST_GROVE_WORLD_SOURCE_CANDIDATE",
+        "BROWSER_EXPERIENCE_CANDIDATE",
         "TEST_EXECUTION",
+        "AUTOMATED_SELF_PLAY_EVIDENCE",
         "GENERATED_NO_EFFECT_RECEIPT",
         "DRAFT_PULL_REQUEST"
       ],
       "forbiddenEffects": [
-        "ENGINE_SEMANTIC_OWNERSHIP",
-        "EXTERNAL_CHARACTER_OR_ENVIRONMENT_ASSET_IMPORT",
+        "THIRD_PARTY_ASSET_ACCEPTANCE",
+        "PERMANENT_GODOT_ADOPTION",
+        "MODEL_INVOCATION",
         "MODEL_TRAINING",
         "PRODUCTION_NETWORK",
+        "PRIVATE_DATA_INGESTION",
+        "PHYSICAL_SENSING",
         "PHYSICAL_ACTUATION",
         "COMMERCE",
-        "PRIVATE_DATA_INGESTION",
+        "STAGE_E_ACTIVATION",
         "SILENT_MAIN_MUTATION"
       ],
       "requiredCommandRefs": [
@@ -132,90 +147,8 @@
         "command.vexworld.check",
         "command.vexworld.impact",
         "command.vexworld.handoff",
-        "command.vexworld.godot-adapter-check"
-      ],
-      "exitCriteriaRefs": [
-        "criterion.vexworld.godot-exact-version-and-license",
-        "criterion.vexworld.godot-source-generated-separation",
-        "criterion.vexworld.godot-windows-mac-bootstrap",
-        "criterion.vexworld.godot-headless-semantic-parity",
-        "criterion.vexworld.godot-visual-smoke-evidence",
-        "criterion.vexworld.godot-no-third-party-character-assets",
-        "criterion.vexworld.independent-exact-head-review"
+        "command.vexworld.selfplay"
       ]
-    },
-    {
-      "stageRef": "stage.vexworld.vw-fwd-01c",
-      "issueRef": "github.issue.vexworld.9",
-      "title": "Character and vessel expression adapter with provenance-bound CC0 intake",
-      "state": "ACTIVE_SINGLE_FORWARD_LANE",
-      "predecessorStageRef": "stage.vexworld.vw-fwd-01b",
-      "parentStageRefs": ["stage.vexworld.vw-fwd-01b"],
-      "predecessorCloseReceiptRef": "github.issue.vexworld.8.comment.5630693465",
-      "sourceChanging": true,
-      "meaningOwnerRef": "project.vextreme.vexworld",
-      "implementationOwnerRef": "role.vexworld.character-vessel-builder",
-      "reviewOwnerRef": "role.vexworld.asset-provenance-reviewer",
-      "ownedPathPatterns": [
-        "adapters/characters/**",
-        "assets/**",
-        "config/asset-intake-policy.json",
-        "docs/architecture/CHARACTER-ASSET-INTAKE.md",
-        "docs/architecture/CHARACTER-VESSEL-ADAPTER.md",
-        "test/character-vessel-adapter.test.mjs"
-      ],
-      "allowedEffects": [
-        "CHARACTER_ADAPTER_SOURCE_CANDIDATE",
-        "EXTERNAL_ASSET_RESEARCH",
-        "QUARANTINED_ASSET_DOWNLOAD",
-        "PROVENANCE_RECEIPT",
-        "TEST_EXECUTION",
-        "GENERATED_NO_EFFECT_RECEIPT",
-        "DRAFT_PULL_REQUEST"
-      ],
-      "forbiddenEffects": [
-        "UNVERIFIED_ASSET_ACCEPTANCE",
-        "PROPRIETARY_EXPRESSION_COPY",
-        "CANONICAL_IDENTITY_FROM_ASSET",
-        "MODEL_TRAINING",
-        "PRODUCTION_NETWORK",
-        "PHYSICAL_ACTUATION",
-        "COMMERCE",
-        "PRIVATE_DATA_INGESTION",
-        "SILENT_MAIN_MUTATION"
-      ],
-      "requiredCommandRefs": [
-        "command.vexworld.orient",
-        "command.vexworld.health",
-        "command.vexworld.check",
-        "command.vexworld.impact",
-        "command.vexworld.handoff"
-      ],
-      "exitCriteriaRefs": [
-        "criterion.vexworld.asset-intake-validator-real-candidate",
-        "criterion.vexworld.exact-open-asset-provenance-or-original-only-decision",
-        "criterion.vexworld.original-human-vessel-expression",
-        "criterion.vexworld.original-companion-vessel-expression",
-        "criterion.vexworld.animation-intent-not-clip-identity",
-        "criterion.vexworld.attachment-equipment-socket-proof",
-        "criterion.vexworld.expression-replacement-preserves-identity",
-        "criterion.vexworld.expression-portability-proof",
-        "criterion.vexworld.independent-asset-identity-review"
-      ]
-    },
-    {
-      "stageRef": "stage.vexworld.vw-fwd-01d",
-      "issueRef": "github.issue.vexworld.10",
-      "title": "First Grove environment, avatar readability and cooperative adventure expansion",
-      "state": "BLOCKED_BY_PREDECESSOR",
-      "predecessorStageRef": "stage.vexworld.vw-fwd-01c",
-      "parentStageRefs": ["stage.vexworld.vw-fwd-01c"],
-      "sourceChanging": false,
-      "meaningOwnerRef": "project.vextreme.vexworld",
-      "implementationOwnerRef": "role.vexworld.first-grove-builder",
-      "reviewOwnerRef": "role.vexworld.play-experience-reviewer",
-      "ownedPathPatterns": ["versions/v1/worlds/first-grove/**", "versions/v1/browser/**"],
-      "wakeTriggerRefs": ["receipt.vexworld.vw-fwd-01c.accepted-close"]
     },
     {
       "stageRef": "stage.vexworld.vw-fwd-01e",
@@ -228,7 +161,10 @@
       "meaningOwnerRef": "project.vextreme.vexworld",
       "implementationOwnerRef": "role.vexworld.local-companion-bridge-builder",
       "reviewOwnerRef": "role.vexworld.lan-model-assurance-reviewer",
-      "ownedPathPatterns": ["versions/v1/src/companion/**", "versions/v1/scripts/**"],
+      "ownedPathPatterns": [
+        "versions/v1/src/companion/**",
+        "versions/v1/scripts/**"
+      ],
       "wakeTriggerRefs": ["receipt.vexworld.vw-fwd-01d.accepted-close"]
     }
   ],
@@ -239,18 +175,18 @@
     "config/change-impact-map.json",
     "vexworld.manifest.json",
     "config/current-version.json",
-    "github.issue.vexworld.9"
+    "github.issue.vexworld.10"
   ],
   "knownUnknownRefs": [
     "unknown.vexworld.software-license",
     "unknown.vexworld.godot-adoption-after-proof",
-    "unknown.vexworld.first-character-reference-pack",
     "unknown.vexworld.first-grove-art-direction",
+    "unknown.vexworld.human-game-feel",
     "unknown.vexworld.real-qwen-latency-and-behavior",
     "unknown.vexworld.multiplayer-witness-privacy"
   ],
-  "currentStrongestClaim": "VW_FWD_01B_ACCEPTED__VW_FWD_01C_ACTIVE",
-  "observedAt": "2026-09-10T23:59:00-07:00",
+  "currentStrongestClaim": "VW_FWD_01C_ACCEPTED__VW_FWD_01D_ACTIVE",
+  "observedAt": "2026-09-11T23:24:20Z",
   "effects": {
     "modelTraining": false,
     "productionNetwork": false,
