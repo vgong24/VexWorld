@@ -38,14 +38,24 @@ function run(command, args, options = {}) {
   return result.stdout.trim();
 }
 
+function githubHeaders({ includeAuth = true } = {}) {
+  const headers = {
+    'User-Agent': 'VexWorld-Godot-Adapter',
+    'Accept': 'application/vnd.github+json'
+  };
+  const token = process.env.GITHUB_TOKEN;
+  if (includeAuth && token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
 async function fetchJson(url) {
-  const response = await fetch(url, { headers: { 'User-Agent': 'VexWorld-Godot-Adapter' } });
+  const response = await fetch(url, { headers: githubHeaders() });
   if (!response.ok) throw new Error(`GET ${url} -> ${response.status}`);
   return response.json();
 }
 
 async function download(url, target) {
-  const response = await fetch(url, { headers: { 'User-Agent': 'VexWorld-Godot-Adapter' }, redirect: 'follow' });
+  const response = await fetch(url, { headers: githubHeaders({ includeAuth: false }), redirect: 'follow' });
   if (!response.ok) throw new Error(`download ${url} -> ${response.status}`);
   const data = Buffer.from(await response.arrayBuffer());
   await fs.writeFile(target, data);
