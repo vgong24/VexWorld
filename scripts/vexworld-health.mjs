@@ -28,6 +28,38 @@ function unique(values) {
   return new Set(values).size === values.length;
 }
 
+function httpsUrl(value) {
+  if (!nonempty(value)) return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' && nonempty(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function validTimestamp(value) {
+  return nonempty(value) && Number.isFinite(Date.parse(value));
+}
+
+function exactArtifactIdentity(value) {
+  if (!nonempty(value)) return false;
+  return !/(^|[_\s-])(UNPINNED|UNSELECTED|UNKNOWN|UNRESOLVED|TBD|TODO|LATEST|CANDIDATE|VERIFY)([_\s-]|$)/i.test(value);
+}
+
+function exactLicenseIdentifier(value) {
+  if (!nonempty(value)) return false;
+  return !/(UNKNOWN|UNREVIEWED|UNRESOLVED|CANDIDATE|VERIFY|MIXED|PLACEHOLDER)/i.test(value);
+}
+
+function safeRelativePath(value) {
+  if (!nonempty(value)) return false;
+  const normalized = value.replaceAll('\\', '/');
+  return !normalized.startsWith('/') &&
+    !/^[A-Za-z]:\//.test(normalized) &&
+    !normalized.split('/').includes('..');
+}
+
 async function readJson(root, relative) {
   return JSON.parse(await fs.readFile(path.join(root, relative), 'utf8'));
 }
@@ -194,6 +226,10 @@ export function validateAssetPolicy(policy) {
   if (!Array.isArray(policy.intakeLifecycle) || !policy.intakeLifecycle.every(nonempty)) {
     errors.push('intakeLifecycle must be a string array');
   }
+  if (!isObject(policy.requiredReplacementProof) ||
+      !stringArray(policy.requiredReplacementProof.requiredFor)) {
+    errors.push('asset policy requires requiredReplacementProof.requiredFor');
+  }
   if (!Array.isArray(policy.candidateAssets)) {
     errors.push('candidateAssets must be an array');
     return errors;
@@ -225,18 +261,56 @@ export function validateAssetIntake(policy, intake) {
     if (!Object.hasOwn(intake, field)) errors.push(`asset intake missing ${field}`);
   }
 
-  const accepted = ['ACCEPTED_REFERENCE_STRUCTURE_ONLY', 'ACCEPTED_EXPRESSION_INPUT'].includes(intake.disposition);
+  const acceptedDispositions = new Set(
+    policy?.requiredReplacementProof?.requiredFor ?? [
+      'ACCEPTED_REFERENCE_STRUCTURE_ONLY',
+      'ACCEPTED_EXPRESSION_INPUT'
+    ]
+  );
+  const accepted = acceptedDispositions.has(intake.disposition);
+
   if (accepted) {
-    if (!nonempty(intake.downloadedAtOrNull)) errors.push('accepted asset requires downloadedAtOrNull');
+    for (const key of ['assetCandidateRef', 'displayName', 'assetClass', 'sourcePublisherRef', 'permittedUseSummary', 'attributionRequirement', 'intendedVexWorldUse']) {
+      if (!nonempty(intake[key])) errors.push(`accepted asset requires nonempty ${key}`);
+    }
+    if (!httpsUrl(intake.officialSourceUrl)) {
+      errors.push('accepted asset requires exact officialSourceUrl using https');
+    }
+    if (!exactArtifactIdentity(intake.artifactVersionOrRelease)) {
+      errors.push('accepted asset requires exact non-placeholder artifactVersionOrRelease');
+    }
+    if (!validTimestamp(intake.downloadedAtOrNull)) {
+      errors.push('accepted asset requires valid downloadedAtOrNull timestamp');
+    }
     if (!nonempty(intake.sha256OrNull) || !/^[a-f0-9]{64}$/i.test(intake.sha256OrNull)) {
       errors.push('accepted asset requires exact SHA-256');
     }
-    if (!nonempty(intake.localPathOrNull)) errors.push('accepted asset requires localPathOrNull');
-    if (!nonempty(intake.licenseSpdxOrExactIdentifier)) errors.push('accepted asset requires exact license identifier');
-    if (!nonempty(intake.licenseSourceUrl)) errors.push('accepted asset requires license source');
+    if (!exactLicenseIdentifier(intake.licenseSpdxOrExactIdentifier)) {
+      errors.push('accepted asset requires exact non-placeholder license identifier');
+    }
+    if (!httpsUrl(intake.licenseSourceUrl)) {
+      errors.push('accepted asset requires official license source using https');
+    }
+    if (!Array.isArray(intake.modificationRecordRefs) || intake.modificationRecordRefs.length === 0 || !intake.modificationRecordRefs.every(nonempty)) {
+      errors.push('accepted asset requires explicit modification/transformation record refs');
+    }
+    if (!safeRelativePath(intake.localPathOrNull)) {
+      errors.push('accepted asset requires safe repository-relative localPathOrNull');
+    }
+    if (!nonempty(intake.replacementProofRefOrNull)) {
+      errors.push('accepted asset requires replacementProofRefOrNull');
+    }
+
+    const friendly = policy.licenseClasses?.FRIENDLY_REFERENCE_AND_DERIVATION ?? [];
+    const reviewable = policy.licenseClasses?.REQUIRES_ATTRIBUTION_OR_COMPONENT_REVIEW ?? [];
     const blocked = policy.licenseClasses?.BLOCKED_UNTIL_SEPARATE_DECISION ?? [];
-    if (blocked.some((license) => intake.licenseSpdxOrExactIdentifier?.includes(license))) {
+    const exactLicense = intake.licenseSpdxOrExactIdentifier;
+
+    if (blocked.some((license) => exactLicense?.includes(license))) {
       errors.push('accepted asset uses a blocked or unresolved license class');
+    }
+    if (exactLicenseIdentifier(exactLicense) && !friendly.includes(exactLicense) && !reviewable.includes(exactLicense)) {
+      errors.push('accepted asset license is not in an accepted/reviewed license class');
     }
   }
   return errors;
