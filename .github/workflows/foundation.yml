@@ -50,10 +50,16 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          1..16 | ForEach-Object {
-            Write-Host "two-worker stress iteration $_ / 16"
-            node --test versions/v1/test/remote-workers.test.mjs
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Push-Location versions/v1
+          try {
+            1..16 | ForEach-Object {
+              Write-Host "two-worker stress iteration $_ / 16"
+              node --test test/remote-workers.test.mjs
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            }
+          }
+          finally {
+            Pop-Location
           }
 
       - name: Pull-request change impact
