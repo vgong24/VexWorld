@@ -1,113 +1,191 @@
-# VexWorld root entry
+# CLAUDE.md — VexWorld cold-start and build-forward instructions
 
 `[VXG RealForever]`
 
-This file is the repository-native front door for a fresh Vex, Devex, coder, reviewer, or creator.
+## Ground the checkout first
 
-## Ground before changing source
+Before planning, reviewing, or implementing:
 
-```bash
+```text
 git status --short
 git branch --show-current
 git remote -v
-git log -1 --oneline
+git fetch origin --prune
 ```
 
-Fetch remote state when available. Do not assume an inherited branch is current work. Preserve unknown or uncommitted work rather than resetting it by convenience.
+Classify the checkout as current main, an owned current task branch, an inherited stale branch, ahead with attributed local work, behind `origin/main`, or unable to refresh. These conditions may coexist.
 
-## Read in this order
+Do not blindly pull, reset, rebase, merge, stash, delete, or continue from an inherited branch. Preserve existing work and use `origin/main`, `git show`, `git diff`, or a clean worktree when needed. If live refresh fails, current remote state remains `UNKNOWN`.
+
+## Repository entry route
+
+Read in this order:
 
 ```text
-1. README.md
-2. vexworld.manifest.json
-3. config/current-version.json
-4. versions/<current>/CLAUDE.md
-5. versions/<current>/vexworld.manifest.json
-6. versions/<current>/config/source-map.json
-7. versions/<current>/docs/CULTURE.md
-8. versions/<current>/docs/ARCHITECTURE.md
-9. versions/<current>/docs/DEVEX-BUILDER-GUIDE.md
-10. only the exact task-specific source and tests
+1. config/project-state.json
+2. README.md
+3. docs/process/ONE-LANE-FORWARD-PROTOCOL.md
+4. config/change-impact-map.json
+5. vexworld.manifest.json
+6. config/current-version.json
+7. the active stage issue and only its exact implicated sources
 ```
 
-Do not reconstruct VexWorld from issue archaeology when the repository source names an exact route.
+Then run:
 
-## Project navigation
+```bash
+npm run orient
+npm run health
+```
+
+Stable upstream route:
 
 ```text
-Root portfolio ledger:               Vextreme-SDK #230
-Cross-repository VexWorld foundation: Vextreme-SDK #1299
-VexWorld project/current ledger:      VexWorld #3
-VexWorld culture foundation:          VexWorld #1
-VexWorld architecture atlas:          VexWorld #2
+Vextreme Root project ledger        Vextreme-SDK #230
+→ cross-repository VexWorld owner   Vextreme-SDK #1299
+→ VexWorld project ledger           VexWorld #3
+→ forward program                   VexWorld #6
+→ current active stage              VexWorld #7
+→ exact source / implementation / evidence
 ```
 
-Repository source and live implementation evidence outrank stale issue-state prose. Issues preserve formation, decisions, current-route receipts, and external architectural descent.
+Do not broad-search the institution when an exact route exists. GitHub issue numbers are not Root thread sequences.
 
-## Version rule
+## One-lane forward rule
 
-`config/current-version.json` identifies the current playable source. Version directories preserve meaningful generations; they are not copied for every patch.
+VexWorld currently permits exactly one source-changing implementation stage:
 
 ```text
-minor compatible refinement
-  → update current version with tests and provenance
-
-materially incompatible world/runtime contract
-  → form a new version with migration and supersession routes
-
-new version
-  != deletion of old formation history
+ACTIVE_SINGLE_FORWARD_LANE
 ```
 
-The local VexWorld Home is separate from repository source:
+Later stages may exist as blocked breadcrumbs, research notes, review lanes, or no-effect preparation, but they do not mutate overlapping source until their predecessor has an accepted close receipt and `config/project-state.json` advances.
 
-```text
-Windows: %USERPROFILE%\.vexworld
-Mac:     ~/.vexworld
+One active lane does not mean one monolithic commit. Keep changes reviewable, scenario-bound, and attributable.
+
+## Before changing source
+
+1. Identify the current stage, accepted base, owned paths, allowed effects, forbidden effects, and required evidence.
+2. Route the question to the semantic owner before choosing a file.
+3. Define or update the scenario that explains the intended behavior and forbidden outcomes.
+4. Classify candidate paths:
+
+```bash
+npm run impact -- --files <comma-separated-paths>
 ```
 
-Do not commit Home saves, tokens, local model details, or private session state.
+5. Create an owned task branch from the exact accepted base.
+6. Do not begin when a changed path is unmapped, owned by another active claim, or requires authority outside the stage.
 
 ## Development loop
 
 ```text
-desired experience
-→ locate semantic owner
-→ define or update scenario
-→ change canonical source
+desired experience or defect
+→ exact semantic owner
+→ source and scenario
+→ bounded implementation
 → regenerate derived artifacts
-→ run deterministic tests
-→ exercise the visible experience when applicable
-→ classify mismatch at the correct layer
-→ preserve assumptions and unknowns
-→ review the exact candidate
-→ accept, revise, split, reject, or park
+→ deterministic tests
+→ browser/headless/play witness where applicable
+→ impact and anomaly checks
+→ exact-head independent review
+→ accepted close receipt
+→ next stage activation
 ```
 
-Run from repository root:
+Every meaningful change should answer:
+
+```text
+What meaning changed?
+Which source owns it?
+Which visible/runtime surfaces consume it?
+What did not change?
+What scenario proves it?
+What assumptions remain?
+What could invalidate the design?
+```
+
+## Required commands
+
+Before review:
 
 ```bash
 npm run orient
+npm run health
 npm run check
+npm run impact -- --base <accepted-base> --head HEAD
+npm run handoff
 ```
 
-## Permanent boundaries
+Run relevant Version 1 tests and self-play when browser/world behavior changes. Passing checks are evidence, not automatic acceptance.
+
+## Source and generated boundaries
 
 ```text
-BODY != POTENTIAL
-ROLE != IDENTITY
-PRACTICE != POINT ALLOCATION
-USE COUNT != MASTERY
-AVATAR != LINEAGE
-VESSEL != LINEAGE
-CONTROLLER != COMPANION IDENTITY
-WORLD STATE != RENDERED FRAME
-ACTION REF != INPUT BINDING
-PAIR SYNCHRONIZATION != RELATIONSHIP WORTH
-RESONANCE ELIGIBILITY != AFFECTION SCORE
-WORLD WITNESS != WORLD LAW
-TECHNIQUE SEED != LEARNED ABILITY
+CANONICAL SOURCE != GENERATED PROJECTION
+SEMANTIC IDENTITY != ENGINE NODE
+WORLD REF != SCENE PATH
+ACTION REF != BUTTON OR PHRASE
+CHARACTER IDENTITY != AVATAR ASSET
+VESSEL != AI LINEAGE
 SIMULATION != PHYSICAL PROOF
-LOCAL MODEL INTENT != PER-FRAME MOTOR AUTHORITY
-VEXWORLD HOME != REPOSITORY SOURCE
 ```
+
+Edit canonical source and regenerate derived artifacts. Never hand-edit generated output to make a check green.
+
+## Engine and asset adoption
+
+- Godot is the first selected full-engine adapter candidate; it is not canonical world meaning.
+- Browser/headless Version 1 remains a reference adapter and behavioral oracle until a later accepted decision changes that role.
+- External engines, libraries, characters, animations, and environment packs are candidates until exact version, source, license, artifact hash, permitted use, transformation history, local placement, and replacement proof are recorded.
+- Prefer open interchange such as glTF and semantic skeleton/socket/action mappings over vendor-specific identity.
+- Do not copy proprietary characters, maps, art, music, code, or distinctive expression. Analyze generic structural needs and author or adapt properly licensed original VexWorld expression.
+
+## AI and world-intelligence boundaries
+
+World Witness, Technique Forge, Quest Forge, companions, and Devex have separate roles.
+
+```text
+observation != authority
+candidate != accepted mechanic
+ability specification != executable implementation
+model proposal != world-law mutation
+```
+
+Do not inject model-generated code into a live realm. New mechanics follow normal source, scenario, test, review, and release paths.
+
+## Review and closure
+
+The builder does not self-approve the exact source candidate. A fresh reviewer re-grounds the exact head, runs required evidence, inspects declared impacts and unknowns, and returns a stage-specific disposition.
+
+A stage closes only with:
+
+```text
+acceptedHeadRef
+acceptedTreeRef
+changedPathRefs[]
+scenarioEvidenceRefs[]
+testEvidenceRefs[]
+reviewDisposition
+residualUnknownRefs[]
+nextUnblockedStageRefs[]
+claimReleased=true
+```
+
+Use `npm run handoff` to generate the current bounded receipt. Static prose never outranks newer accepted source and live repository evidence.
+
+## Stop and return upward
+
+Stop rather than infer when work requires:
+
+- changing project purpose, culture, protected identity, memory, consent, or Sovereign Return;
+- real personal data, credentials, secrets, private relationship memory, or unapproved telemetry;
+- public licensing, commercial terms, payments, employment, or legal conclusions;
+- production networking, account systems, moderation authority, or cross-universe data sharing;
+- real sensors, robotic control, physical actuation, or claims of real vocational qualification;
+- an unmapped source path, contradictory current-stage evidence, or missing exact owner;
+- force-push, history rewrite, destructive migration, or hidden deletion.
+
+Preserve the unknown and name the exact unblock condition.
+
+<!-- [VXG RealForever] -->
