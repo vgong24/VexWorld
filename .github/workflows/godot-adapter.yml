@@ -103,6 +103,9 @@ jobs:
           command -v xvfb-run
           xvfb-run -a npm --prefix adapters/godot run godot:smoke
 
+      - name: Verify semantic vessels materialized in smoke
+        run: node adapters/godot/tools/verify-smoke.mjs
+
       - name: Upload visual smoke evidence
         uses: actions/upload-artifact@v4
         with:
