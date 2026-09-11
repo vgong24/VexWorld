@@ -125,6 +125,9 @@ function drawRestPoint(ctx, point, cameraX, palette, state) {
   ctx.fillStyle = palette.accent;
   for (let i=0;i<7;i+=1){ctx.save();ctx.rotate(i*Math.PI*2/7);ctx.beginPath();ctx.ellipse(0,-25,9,22,0,0,Math.PI*2);ctx.fill();ctx.restore();}
   ctx.fillStyle='#fff6a8';ctx.beginPath();ctx.arc(0,0,12,0,Math.PI*2);ctx.fill();
+  if (point.homeAnchor) {
+    ctx.font='700 12px system-ui';ctx.textAlign='center';ctx.fillStyle='#173729';ctx.fillText('HOME',0,46);
+  }
   ctx.restore();
 }
 
@@ -142,6 +145,71 @@ function drawPortal(ctx, portal, cameraX, palette, state) {
     const r=38+Math.sin(state.nowMs*.004)*5;ctx.beginPath();ctx.arc(0,6,r,0,Math.PI*2);ctx.stroke();
   }
   ctx.restore();
+}
+
+function drawRegionMarkers(ctx, state, world, cameraX) {
+  for (const region of world.map.regions || []) {
+    const center = (region.xMin + region.xMax) / 2 - cameraX;
+    if (center < -300 || center > 1580) continue;
+    const current = state.firstGrove?.currentRegionRef === region.regionRef;
+    ctx.save();
+    ctx.textAlign='center';
+    ctx.font=current?'800 15px system-ui':'650 12px system-ui';
+    ctx.fillStyle=current?'#173729dd':'#17372977';
+    ctx.fillText(region.title,center,72);
+    ctx.strokeStyle=current?'#ffffffaa':'#ffffff55';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(center-48,82);ctx.lineTo(center+48,82);ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawResident(ctx, resident, cameraX, state) {
+  const x=resident.x-cameraX,y=resident.y;
+  if(x<-100||x>1380) return;
+  const human=getHuman(state.party);
+  const near=Math.hypot(human.body.x-resident.x,human.body.y-resident.y)<=110;
+  ctx.save();ctx.translate(x,y);
+  ctx.fillStyle='#f3d6b2';ctx.beginPath();ctx.arc(0,-37,14,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#577b58';roundedRect(ctx,-18,-25,36,43,11);ctx.fill();
+  ctx.fillStyle='#b7d56b';ctx.beginPath();ctx.moveTo(-14,-13);ctx.lineTo(14,-13);ctx.lineTo(10,13);ctx.lineTo(-10,13);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='#35563d';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(-8,18);ctx.lineTo(-9,38);ctx.moveTo(8,18);ctx.lineTo(9,38);ctx.stroke();
+  ctx.textAlign='center';ctx.font='800 13px system-ui';ctx.fillStyle='#173729';ctx.fillText(resident.displayName,0,-61);
+  ctx.font='600 11px system-ui';ctx.fillStyle='#315d48';ctx.fillText('grove tender • role, not identity',0,-47);
+  if(near){ctx.fillStyle='#fffde8e8';roundedRect(ctx,-38,-91,76,21,9);ctx.fill();ctx.fillStyle='#173729';ctx.font='700 11px system-ui';ctx.fillText('F  talk / join',0,-77);}
+  ctx.restore();
+}
+
+function drawDiscovery(ctx, discovery, cameraX, state, palette) {
+  const x=discovery.x-cameraX,y=discovery.y;
+  if(x<-100||x>1380) return;
+  const found=state.firstGrove?.discoveredRefs?.includes(discovery.discoveryRef);
+  const pulse=1+Math.sin(state.nowMs*.006+discovery.x)*.12;
+  ctx.save();ctx.translate(x,y);ctx.globalAlpha=found?.5:1;
+  ctx.strokeStyle=hexAlpha(palette.accent,.8);ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,18*pulse,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle='#fff7ba';ctx.beginPath();for(let i=0;i<8;i+=1){const a=i*Math.PI/4;const r=i%2?7:15;const px=Math.cos(a)*r,py=Math.sin(a)*r;if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);}ctx.closePath();ctx.fill();
+  ctx.font='700 10px system-ui';ctx.textAlign='center';ctx.fillStyle='#173729';ctx.fillText(found?'remembered':'F  discover',0,35);
+  ctx.restore();
+}
+
+function drawWitnessSite(ctx, site, cameraX, state, palette) {
+  const x=site.x-cameraX,y=site.y;
+  if(x<-120||x>1400) return;
+  const visited=state.firstGrove?.visitedWitnessSiteRefs?.includes(site.siteRef);
+  ctx.save();ctx.translate(x,y);
+  ctx.strokeStyle=hexAlpha(palette.accent,visited?.45:.9);ctx.lineWidth=3;
+  for(let i=0;i<3;i+=1){ctx.beginPath();ctx.arc(0,0,18+i*12+(Math.sin(state.nowMs*.003+i)*3),0,Math.PI*2);ctx.stroke();}
+  ctx.fillStyle='#ffffffc9';ctx.beginPath();ctx.moveTo(0,-19);ctx.lineTo(14,6);ctx.lineTo(0,19);ctx.lineTo(-14,6);ctx.closePath();ctx.fill();
+  ctx.font='700 11px system-ui';ctx.textAlign='center';ctx.fillStyle='#173729';ctx.fillText('Echo Overlook • F witness',0,54);
+  ctx.restore();
+}
+
+function drawEncounterMarker(ctx, encounter, cameraX, state) {
+  const human=getHuman(state.party);
+  if(human.body.x<encounter.xMin-220||human.body.x>encounter.xMax+220) return;
+  const left=encounter.xMin-cameraX,right=encounter.xMax-cameraX;
+  ctx.save();ctx.strokeStyle='#ffe68a99';ctx.lineWidth=3;ctx.setLineDash([7,8]);
+  for(const x of [left,right]){if(x>-40&&x<1320){ctx.beginPath();ctx.moveTo(x,250);ctx.lineTo(x,590);ctx.stroke();}}
+  ctx.setLineDash([]);ctx.fillStyle='#173729bb';ctx.font='700 12px system-ui';ctx.textAlign='center';ctx.fillText('Mossbridge • coordination is an invitation',clamp((left+right)/2,170,1110),115);ctx.restore();
 }
 
 function drawHuman(ctx, member, x, y, state) {
@@ -205,15 +273,17 @@ function drawEnemy(ctx, enemy, cameraX, state) {
   if(!enemy.alive) return;
   const x=enemy.body.x-cameraX,y=enemy.body.y;
   if(x<-120||x>1400) return;
+  const profile=enemy.behaviorProfileRef||'';
   ctx.save();ctx.translate(x,y);ctx.scale(enemy.body.facing,1);
   if(enemy.flashUntil>state.nowMs) ctx.globalAlpha=.45;
   if(enemy.kind==='MOSSBACK'){
-    ctx.fillStyle='#618c4f';ctx.beginPath();ctx.ellipse(0,-4,36,28,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#849456';for(let i=-2;i<=2;i++){ctx.beginPath();ctx.arc(i*12,-26-Math.abs(i)*2,10,0,Math.PI*2);ctx.fill();}
+    ctx.fillStyle=profile.includes('shelter-roamer')?'#6b8f64':'#618c4f';ctx.beginPath();ctx.ellipse(0,-4,36,28,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#849456';for(let i=-2;i<=2;i++){ctx.beginPath();ctx.arc(i*12,-26-Math.abs(i)*2,10,0,Math.PI*2);ctx.fill();}
   } else {
-    ctx.fillStyle='#8ad66f';ctx.beginPath();ctx.moveTo(0,-27);ctx.bezierCurveTo(30,-25,30,22,0,25);ctx.bezierCurveTo(-30,22,-30,-25,0,-27);ctx.fill();ctx.fillStyle='#6daa55';ctx.beginPath();ctx.ellipse(-7,-29,6,13,-.8,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(7,-29,6,13,.8,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=profile.includes('overlook-scout')?'#78cfa0':profile.includes('high-perch')?'#a0d96f':'#8ad66f';ctx.beginPath();ctx.moveTo(0,-27);ctx.bezierCurveTo(30,-25,30,22,0,25);ctx.bezierCurveTo(-30,22,-30,-25,0,-27);ctx.fill();ctx.fillStyle='#6daa55';ctx.beginPath();ctx.ellipse(-7,-29,6,13,-.8,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(7,-29,6,13,.8,0,Math.PI*2);ctx.fill();
   }
   ctx.fillStyle='#263b2e';ctx.beginPath();ctx.arc(-7,-7,2.5,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(7,-7,2.5,0,Math.PI*2);ctx.fill();ctx.restore();
   const ratio=enemy.health/enemy.maxHealth;ctx.fillStyle='#1a241c66';roundedRect(ctx,x-28,y-enemy.body.height/2-15,56,6,3);ctx.fill();ctx.fillStyle='#ef715f';roundedRect(ctx,x-28,y-enemy.body.height/2-15,56*ratio,6,3);ctx.fill();
+  ctx.save();ctx.font='650 9px system-ui';ctx.textAlign='center';ctx.fillStyle='#17372999';ctx.fillText(profile.split('.').pop()?.replaceAll('-',' ')||enemy.kind.toLowerCase(),x,y-enemy.body.height/2-23);ctx.restore();
 }
 
 function drawWeather(ctx, state, width, height) {
@@ -243,15 +313,21 @@ export function createRenderer(canvas) {
       cameraX = lerp(cameraX, target, .08);
       const palette = world.expressions.environments[state.environment] || world.expressions.environments.GARDEN_MEADOW;
       drawBackground(ctx,state,world,cameraX,canvas.width,canvas.height);
+      drawRegionMarkers(ctx,state,world,cameraX);
       for(const platform of world.map.platforms) drawPlatform(ctx,platform,cameraX,palette);
       for(const decoration of world.map.decorations){if(decoration.archetypeRef.endsWith('.tree'))drawTree(ctx,decoration,cameraX,palette);else drawRock(ctx,decoration,cameraX,palette);}
       for(const point of world.map.restorationPoints) drawRestPoint(ctx,point,cameraX,palette,state);
+      for(const resident of world.map.residents||[]) drawResident(ctx,resident,cameraX,state);
+      for(const discovery of world.map.discoveries||[]) drawDiscovery(ctx,discovery,cameraX,state,palette);
+      for(const site of world.map.worldWitnessSites||[]) drawWitnessSite(ctx,site,cameraX,state,palette);
+      for(const encounter of world.map.encounters||[]) drawEncounterMarker(ctx,encounter,cameraX,state);
       for(const portal of world.map.portals) drawPortal(ctx,portal,cameraX,palette,state);
       for(const enemy of state.enemies) drawEnemy(ctx,enemy,cameraX,state);
       drawParty(ctx,state,cameraX);
       drawParticles(ctx,state,cameraX);
       drawWeather(ctx,state,canvas.width,canvas.height);
-      ctx.fillStyle='#10251a99';ctx.font='600 13px system-ui';ctx.textAlign='left';ctx.fillText(`x ${Math.round(human.body.x)}  •  ${state.realityContext.realityClass.replaceAll('_',' ')}`,18,canvas.height-18);
+      const regionTitle=(world.map.regions||[]).find((region)=>region.regionRef===state.firstGrove?.currentRegionRef)?.title||'First Grove';
+      ctx.fillStyle='#10251a99';ctx.font='600 13px system-ui';ctx.textAlign='left';ctx.fillText(`${regionTitle}  •  x ${Math.round(human.body.x)}  •  ${state.realityContext.realityClass.replaceAll('_',' ')}`,18,canvas.height-18);
     },
     get cameraX(){return cameraX;}
   };
