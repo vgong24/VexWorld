@@ -18,9 +18,18 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Checkout exact candidate
+      - name: Checkout exact pull-request head
+        if: github.event_name == 'pull_request'
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Checkout exact pushed commit
+        if: github.event_name == 'push'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
 
       - name: Use Node.js 22
@@ -40,7 +49,7 @@ jobs:
       - name: Pull-request change impact
         if: github.event_name == 'pull_request'
         shell: bash
-        run: npm run impact -- --base "${{ github.event.pull_request.base.sha }}" --head HEAD
+        run: npm run impact -- --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}"
 
       - name: Fresh-instance handoff generation
         run: npm run handoff
