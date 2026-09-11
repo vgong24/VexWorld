@@ -30,10 +30,19 @@
         "start-vexworld-lan.*",
         "selfplay-vexworld.*"
       ],
-      "capabilityRefs": ["capability.vexworld.repository-orientation", "capability.vexworld.setup-and-home"],
+      "capabilityRefs": [
+        "capability.vexworld.repository-orientation",
+        "capability.vexworld.setup-and-home"
+      ],
       "ownerRef": "role.vexworld.foundation-builder",
-      "requiredTestRefs": ["test.vexworld.root-route", "test.vexworld.current-version-binding"],
-      "anomalyRefs": ["anomaly.vexworld.entry-route-drift", "anomaly.vexworld.launcher-version-drift"]
+      "requiredTestRefs": [
+        "test.vexworld.root-route",
+        "test.vexworld.current-version-binding"
+      ],
+      "anomalyRefs": [
+        "anomaly.vexworld.entry-route-drift",
+        "anomaly.vexworld.launcher-version-drift"
+      ]
     },
     {
       "ruleRef": "impact.vexworld.foundation-control",
@@ -53,10 +62,21 @@
         "scripts/vexworld-selfplay.mjs",
         "test/**"
       ],
-      "capabilityRefs": ["capability.vexworld.foundation-control", "capability.vexworld.forward-lifecycle"],
+      "capabilityRefs": [
+        "capability.vexworld.foundation-control",
+        "capability.vexworld.forward-lifecycle"
+      ],
       "ownerRef": "role.vexworld.foundation-builder",
-      "requiredTestRefs": ["test.vexworld.foundation-health", "test.vexworld.impact-map", "test.vexworld.handoff"],
-      "anomalyRefs": ["anomaly.vexworld.multi-active-stage", "anomaly.vexworld.unmapped-source", "anomaly.vexworld.stale-handoff"]
+      "requiredTestRefs": [
+        "test.vexworld.foundation-health",
+        "test.vexworld.impact-map",
+        "test.vexworld.handoff"
+      ],
+      "anomalyRefs": [
+        "anomaly.vexworld.multi-active-stage",
+        "anomaly.vexworld.unmapped-source",
+        "anomaly.vexworld.stale-handoff"
+      ]
     },
     {
       "ruleRef": "impact.vexworld.version-foundation",
@@ -72,12 +92,42 @@
         "versions/*/docs/**",
         "versions/*/schemas/**",
         "versions/*/test/**",
-        "versions/*/tests/**"
+        "versions/*/tests/**",
+        "versions/*/src/cli/orient.mjs"
       ],
-      "capabilityRefs": ["capability.vexworld.version-foundation", "capability.vexworld.repository-native-school"],
+      "capabilityRefs": [
+        "capability.vexworld.version-foundation",
+        "capability.vexworld.repository-native-school"
+      ],
       "ownerRef": "role.vexworld.version-foundation-builder",
-      "requiredTestRefs": ["test.vexworld.version-check", "test.vexworld.source-map"],
-      "anomalyRefs": ["anomaly.vexworld.version-source-drift", "anomaly.vexworld.generated-source-map-stale"]
+      "requiredTestRefs": [
+        "test.vexworld.version-check",
+        "test.vexworld.source-map"
+      ],
+      "anomalyRefs": [
+        "anomaly.vexworld.version-source-drift",
+        "anomaly.vexworld.generated-source-map-stale"
+      ]
+    },
+    {
+      "ruleRef": "impact.vexworld.process-definitions",
+      "pathPatterns": [
+        "versions/*/process/**"
+      ],
+      "capabilityRefs": [
+        "capability.vexworld.process-definition",
+        "capability.vexworld.forward-lifecycle"
+      ],
+      "ownerRef": "role.vexworld.version-foundation-builder",
+      "requiredTestRefs": [
+        "test.vexworld.process-definition",
+        "test.vexworld.version-check"
+      ],
+      "anomalyRefs": [
+        "anomaly.vexworld.process-effect-owner-drift",
+        "anomaly.vexworld.process-authority-expansion",
+        "anomaly.vexworld.process-without-return-route"
+      ]
     },
     {
       "ruleRef": "impact.vexworld.compiler-and-schemas",
@@ -86,13 +136,26 @@
         "versions/*/src/compiler/**",
         "versions/*/src/schema/**",
         "versions/*/src/schemas/**",
+        "versions/*/src/cli/compile.mjs",
+        "versions/*/src/cli/validate.mjs",
         "versions/*/schemas/**",
         "versions/*/generated/**"
       ],
-      "capabilityRefs": ["capability.vexworld.world-compiler", "capability.vexworld.semantic-contracts"],
+      "capabilityRefs": [
+        "capability.vexworld.world-compiler",
+        "capability.vexworld.semantic-contracts"
+      ],
       "ownerRef": "role.vexworld.world-semantics-compiler-builder",
-      "requiredTestRefs": ["test.vexworld.compiler-determinism", "test.vexworld.schema-contracts", "test.vexworld.generated-currentness"],
-      "anomalyRefs": ["anomaly.vexworld.generated-edited-directly", "anomaly.vexworld.compiler-nondeterminism", "anomaly.vexworld.ref-owner-drift"]
+      "requiredTestRefs": [
+        "test.vexworld.compiler-determinism",
+        "test.vexworld.schema-contracts",
+        "test.vexworld.generated-currentness"
+      ],
+      "anomalyRefs": [
+        "anomaly.vexworld.generated-edited-directly",
+        "anomaly.vexworld.compiler-nondeterminism",
+        "anomaly.vexworld.ref-owner-drift"
+      ]
     },
     {
       "ruleRef": "impact.vexworld.world-source",
@@ -102,10 +165,41 @@
         "versions/*/fixtures/**",
         "versions/*/scenarios/**"
       ],
-      "capabilityRefs": ["capability.vexworld.semantic-world", "capability.vexworld.first-grove"],
+      "capabilityRefs": [
+        "capability.vexworld.semantic-world",
+        "capability.vexworld.first-grove"
+      ],
       "ownerRef": "role.vexworld.world-semantics-builder",
-      "requiredTestRefs": ["test.vexworld.scenario", "test.vexworld.world-package", "test.vexworld.reference-integrity"],
-      "anomalyRefs": ["anomaly.vexworld.world-law-without-scenario", "anomaly.vexworld.asset-as-semantic-owner"]
+      "requiredTestRefs": [
+        "test.vexworld.scenario",
+        "test.vexworld.world-package",
+        "test.vexworld.reference-integrity"
+      ],
+      "anomalyRefs": [
+        "anomaly.vexworld.world-law-without-scenario",
+        "anomaly.vexworld.asset-as-semantic-owner"
+      ]
+    },
+    {
+      "ruleRef": "impact.vexworld.semantic-runtime-core",
+      "pathPatterns": [
+        "versions/*/src/core/**"
+      ],
+      "capabilityRefs": [
+        "capability.vexworld.semantic-runtime-core",
+        "capability.vexworld.realm-state"
+      ],
+      "ownerRef": "role.vexworld.world-semantics-runtime-builder",
+      "requiredTestRefs": [
+        "test.vexworld.headless",
+        "test.vexworld.replay",
+        "test.vexworld.reference-integrity"
+      ],
+      "anomalyRefs": [
+        "anomaly.vexworld.core-semantic-owner-drift",
+        "anomaly.vexworld.renderer-owned-state",
+        "anomaly.vexworld.action-input-collapse"
+      ]
     },
     {
       "ruleRef": "impact.vexworld.headless-runtime",
@@ -113,12 +207,23 @@
         "versions/*/src/headless/**",
         "versions/*/src/runtime/**",
         "versions/*/src/realm/**",
-        "versions/*/src/lib/**"
+        "versions/*/src/lib/**",
+        "versions/*/src/cli/demo-headless.mjs"
       ],
-      "capabilityRefs": ["capability.vexworld.headless-realm", "capability.vexworld.realm-state"],
+      "capabilityRefs": [
+        "capability.vexworld.headless-realm",
+        "capability.vexworld.realm-state"
+      ],
       "ownerRef": "role.vexworld.runtime-builder",
-      "requiredTestRefs": ["test.vexworld.headless", "test.vexworld.replay", "test.vexworld.resource-stewardship"],
-      "anomalyRefs": ["anomaly.vexworld.renderer-owned-state", "anomaly.vexworld.nondeterministic-replay"]
+      "requiredTestRefs": [
+        "test.vexworld.headless",
+        "test.vexworld.replay",
+        "test.vexworld.resource-stewardship"
+      ],
+      "anomalyRefs": [
+        "anomaly.vexworld.renderer-owned-state",
+        "anomaly.vexworld.nondeterministic-replay"
+      ]
     },
     {
       "ruleRef": "impact.vexworld.browser-experience",
@@ -126,49 +231,89 @@
         "versions/*/browser/**",
         "versions/*/public/**",
         "versions/*/src/browser/**",
-        "versions/*/src/experience/**"
+        "versions/*/src/experience/**",
+        "versions/*/src/web/**"
       ],
-      "capabilityRefs": ["capability.vexworld.browser-experience", "capability.vexworld.player-ux"],
+      "capabilityRefs": [
+        "capability.vexworld.browser-experience",
+        "capability.vexworld.player-ux"
+      ],
       "ownerRef": "role.vexworld.experience-builder",
-      "requiredTestRefs": ["test.vexworld.browser-startup", "test.vexworld.self-play", "test.vexworld.accessibility"],
-      "anomalyRefs": ["anomaly.vexworld.semantic-action-bypassed", "anomaly.vexworld.status-or-return-unreachable"]
+      "requiredTestRefs": [
+        "test.vexworld.browser-startup",
+        "test.vexworld.self-play",
+        "test.vexworld.accessibility"
+      ],
+      "anomalyRefs": [
+        "anomaly.vexworld.semantic-action-bypassed",
+        "anomaly.vexworld.status-or-return-unreachable"
+      ]
     },
     {
       "ruleRef": "impact.vexworld.companion-and-network",
       "pathPatterns": [
+        "versions/*/src/agents/**",
         "versions/*/src/companion/**",
         "versions/*/src/network/**",
         "versions/*/src/server/**",
         "versions/*/scripts/**"
       ],
-      "capabilityRefs": ["capability.vexworld.companion-adapter", "capability.vexworld.trusted-lan-relay"],
+      "capabilityRefs": [
+        "capability.vexworld.companion-adapter",
+        "capability.vexworld.trusted-lan-relay"
+      ],
       "ownerRef": "role.vexworld.companion-bridge-builder",
-      "requiredTestRefs": ["test.vexworld.observer-relative-state", "test.vexworld.controller-binding", "test.vexworld.host-lease"],
-      "anomalyRefs": ["anomaly.vexworld.model-per-frame-control", "anomaly.vexworld.lineage-controller-collapse", "anomaly.vexworld.network-authority-expansion"]
+      "requiredTestRefs": [
+        "test.vexworld.observer-relative-state",
+        "test.vexworld.controller-binding",
+        "test.vexworld.host-lease"
+      ],
+      "anomalyRefs": [
+        "anomaly.vexworld.model-per-frame-control",
+        "anomaly.vexworld.lineage-controller-collapse",
+        "anomaly.vexworld.network-authority-expansion"
+      ]
     },
     {
       "ruleRef": "impact.vexworld.engine-adapters",
-      "pathPatterns": ["adapters/**", "engines/**"],
-      "capabilityRefs": ["capability.vexworld.engine-adapter", "capability.vexworld.expression-portability"],
+      "pathPatterns": [
+        "adapters/**",
+        "engines/**"
+      ],
+      "capabilityRefs": [
+        "capability.vexworld.engine-adapter",
+        "capability.vexworld.expression-portability"
+      ],
       "ownerRef": "role.vexworld.engine-adapter-builder",
-      "requiredTestRefs": ["test.vexworld.engine-boundary", "test.vexworld.cross-adapter-parity"],
-      "anomalyRefs": ["anomaly.vexworld.engine-became-semantic-owner", "anomaly.vexworld.adapter-parity-drift"]
+      "requiredTestRefs": [
+        "test.vexworld.engine-boundary",
+        "test.vexworld.cross-adapter-parity"
+      ],
+      "anomalyRefs": [
+        "anomaly.vexworld.engine-became-semantic-owner",
+        "anomaly.vexworld.adapter-parity-drift"
+      ]
     },
     {
       "ruleRef": "impact.vexworld.assets",
-      "pathPatterns": ["assets/**", "versions/*/assets/**"],
-      "capabilityRefs": ["capability.vexworld.asset-intake", "capability.vexworld.character-expression"],
+      "pathPatterns": [
+        "assets/**",
+        "versions/*/assets/**"
+      ],
+      "capabilityRefs": [
+        "capability.vexworld.asset-intake",
+        "capability.vexworld.character-expression"
+      ],
       "ownerRef": "role.vexworld.asset-provenance-builder",
-      "requiredTestRefs": ["test.vexworld.asset-provenance", "test.vexworld.asset-replacement"],
-      "anomalyRefs": ["anomaly.vexworld.unknown-license", "anomaly.vexworld.missing-asset-hash", "anomaly.vexworld.proprietary-expression-copy"]
-    },
-    {
-      "ruleRef": "impact.vexworld.version-runtime-fallback",
-      "pathPatterns": ["versions/*/src/**"],
-      "capabilityRefs": ["capability.vexworld.version-runtime"],
-      "ownerRef": "role.vexworld.version-runtime-builder",
-      "requiredTestRefs": ["test.vexworld.version-check"],
-      "anomalyRefs": ["anomaly.vexworld.runtime-source-unclassified"]
+      "requiredTestRefs": [
+        "test.vexworld.asset-provenance",
+        "test.vexworld.asset-replacement"
+      ],
+      "anomalyRefs": [
+        "anomaly.vexworld.unknown-license",
+        "anomaly.vexworld.missing-asset-hash",
+        "anomaly.vexworld.proprietary-expression-copy"
+      ]
     }
   ]
 }
