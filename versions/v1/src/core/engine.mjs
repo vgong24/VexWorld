@@ -7,6 +7,7 @@ import {
   expireTransientState,
   stepPartyPhysics,
   updateEnemies,
+  updateFirstGroveProgress,
   updateQuestCompletion,
   updateResources,
   updateWeather,
@@ -30,6 +31,7 @@ export function stepGame(state, input, worldPackage, { dtMs = FIXED_STEP_MS, ext
     updateCompanions(state, externalIntents, worldPackage, dt);
     updateEnemies(state, worldPackage, dt);
     stepPartyPhysics(state, worldPackage, dt);
+    updateFirstGroveProgress(state, worldPackage);
     updateResources(state, worldPackage, dt);
     updateWorldWitness(state, worldPackage);
     updateQuestCompletion(state);
