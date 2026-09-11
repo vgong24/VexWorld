@@ -22,20 +22,46 @@ async function walk(directory) {
   return results;
 }
 
+async function sourceMapEntries() {
+  const primary = JSON.parse(await fs.readFile('config/source-map.json', 'utf8'));
+  if (primary.schemaVersion !== 'vexworld.source-map/v1' || !Array.isArray(primary.entries)) {
+    throw new Error('config/source-map.json has invalid source-map schema');
+  }
+
+  const entries = [...primary.entries];
+  const fragmentDirectory = 'config/source-map.fragments';
+  try {
+    const fragmentFiles = (await fs.readdir(fragmentDirectory))
+      .filter((file) => file.endsWith('.json'))
+      .sort();
+    for (const file of fragmentFiles) {
+      const fragmentPath = `${fragmentDirectory}/${file}`;
+      const fragment = JSON.parse(await fs.readFile(fragmentPath, 'utf8'));
+      if (fragment.schemaVersion !== 'vexworld.source-map-fragment/v1' || !Array.isArray(fragment.entries)) {
+        throw new Error(`${fragmentPath} has invalid source-map fragment schema`);
+      }
+      entries.push(...fragment.entries);
+    }
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+  return entries;
+}
+
 try {
   for (const required of REQUIRED) await fs.access(required);
   const files = await walk('.');
   const jsonFiles = files.filter((file) => file.endsWith('.json'));
   for (const file of jsonFiles) JSON.parse(await fs.readFile(file, 'utf8'));
-  const sourceMap = JSON.parse(await fs.readFile('config/source-map.json', 'utf8'));
-  const mapped = new Set(sourceMap.entries.map((entry) => entry.path));
+  const entries = await sourceMapEntries();
+  const mapped = new Set(entries.map((entry) => entry.path));
   const sourceFiles = files.filter((file) => !file.startsWith('generated/') && !file.startsWith('.git/'));
   const missing = sourceFiles.filter((file) => !mapped.has(file));
   if (missing.length) throw new Error(`source-map missing ${missing.join(', ')}`);
-  const duplicatePaths = sourceMap.entries.map((entry) => entry.path).filter((value, index, values) => values.indexOf(value) !== index);
+  const duplicatePaths = entries.map((entry) => entry.path).filter((value, index, values) => values.indexOf(value) !== index);
   if (duplicatePaths.length) throw new Error(`source-map duplicate paths: ${duplicatePaths.join(', ')}`);
   await compileFirstGrove();
-  console.log(`VALID sourceFiles=${sourceFiles.length} jsonFiles=${jsonFiles.length}`);
+  console.log(`VALID sourceFiles=${sourceFiles.length} jsonFiles=${jsonFiles.length} sourceMapEntries=${entries.length}`);
 } catch (error) {
   console.error(error.stack || error.message);
   process.exitCode = 1;
