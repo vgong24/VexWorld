@@ -94,6 +94,10 @@ test('First Grove runtime consumes region resident discovery and Witness source 
   human.body.y = 250;
   updateFirstGroveProgress(state, world);
   assert.equal(state.firstGrove.currentRegionRef, 'region.first-grove.echo-overlook');
+  // Echo Petals overlaps the Witness landmark intentionally: the first explicit
+  // interaction discovers the place; a second explicit interaction asks it to witness.
+  assert.equal(interact(state, world), true);
+  assert.ok(state.firstGrove.discoveredRefs.includes('discovery.first-grove.echo-petals'));
   assert.equal(interact(state, world), true);
   assert.ok(state.firstGrove.visitedWitnessSiteRefs.includes('site.first-grove.echo-overlook'));
   assert.equal(state.quest.twinHorizonUnlocked, false);
