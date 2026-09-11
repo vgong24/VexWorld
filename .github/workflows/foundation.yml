@@ -46,6 +46,16 @@ jobs:
       - name: Full source and runtime checks
         run: npm run check
 
+      - name: Windows two-worker session-store stress
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          1..16 | ForEach-Object {
+            Write-Host "two-worker stress iteration $_ / 16"
+            node --test versions/v1/test/remote-workers.test.mjs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
       - name: Pull-request change impact
         if: github.event_name == 'pull_request'
         shell: bash
