@@ -8,11 +8,16 @@ import { updateResourceProjection } from '../../../versions/v1/src/core/resource
 const adapterRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = path.resolve(adapterRoot, '../..');
 const versionRoot = path.join(repoRoot, 'versions', 'v1');
+const characterAdapterRoot = path.join(repoRoot, 'adapters', 'characters');
 const generatedRoot = path.join(adapterRoot, 'generated');
 
 async function writeJson(name, value) {
   await fs.mkdir(generatedRoot, { recursive: true });
   await fs.writeFile(path.join(generatedRoot, name), `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+}
+
+async function readCharacterExpression(fileName) {
+  return JSON.parse(await fs.readFile(path.join(characterAdapterRoot, 'expressions', fileName), 'utf8'));
 }
 
 function referenceProjection(worldPackage, weather, fixture) {
@@ -52,6 +57,25 @@ export async function buildAdapter() {
     throw new Error('Version 1 committed generated-source fingerprint disagrees with canonical compile');
   }
 
+  const [humanExpression, companionExpression] = await Promise.all([
+    readCharacterExpression('original-human-reference.json'),
+    readCharacterExpression('original-companion-reference.json')
+  ]);
+  const characterExpressions = {
+    schemaVersion: 'vexworld.godot-character-expression-projection/v1',
+    semanticOwner: 'VEXWORLD_CHARACTER_VESSEL_ADAPTER',
+    engineRole: 'REPLACEABLE_REALIZATION_ADAPTER',
+    bindings: {
+      human: humanExpression,
+      companion: companionExpression
+    },
+    laws: [
+      'EXPRESSION_BINDING != PARTICIPANT_IDENTITY',
+      'VESSEL_REF != GODOT_NODE',
+      'ANIMATION_INTENT != CLIP_NAME'
+    ]
+  };
+
   const fixture = {
     companionEnergy: 38,
     restorationDistance: 620
@@ -76,10 +100,16 @@ export async function buildAdapter() {
     sourcePackageRef: worldPackage.packageRef,
     sourcePackageFingerprint: worldPackage.integrityFingerprint,
     canonicalMeaningOwner: 'VEXWORLD_WORLD_PACKAGE',
+    characterExpressionOwner: 'VEXWORLD_CHARACTER_VESSEL_ADAPTER',
     engineRole: 'REPLACEABLE_REALIZATION_ADAPTER',
+    characterExpressionRefs: [
+      humanExpression.expressionBindingRef,
+      companionExpression.expressionBindingRef
+    ],
     generatedFiles: [
       'generated/first-grove.world-package.json',
       'generated/reference-parity.json',
+      'generated/character-expressions.json',
       'generated/adapter-manifest.json'
     ],
     externalAssetRefs: [],
@@ -93,14 +123,15 @@ export async function buildAdapter() {
 
   await writeJson('first-grove.world-package.json', worldPackage);
   await writeJson('reference-parity.json', parity);
+  await writeJson('character-expressions.json', characterExpressions);
   await writeJson('adapter-manifest.json', adapterManifest);
-  return { worldPackage, parity, adapterManifest };
+  return { worldPackage, parity, characterExpressions, adapterManifest };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   buildAdapter()
     .then(({ adapterManifest }) => {
-      console.log(`BUILT ${adapterManifest.adapterRef} packageFingerprint=${adapterManifest.sourcePackageFingerprint}`);
+      console.log(`BUILT ${adapterManifest.adapterRef} packageFingerprint=${adapterManifest.sourcePackageFingerprint} characterExpressions=${adapterManifest.characterExpressionRefs.join(',')}`);
     })
     .catch((error) => {
       console.error(error.stack || error.message);
