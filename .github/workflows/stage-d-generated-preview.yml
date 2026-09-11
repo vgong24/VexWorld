@@ -1,6 +1,8 @@
 name: Stage D Generated Preview
 
 on:
+  push:
+    branches: [VXG-091126-vw-fwd-01d-first-grove]
   pull_request:
     branches: [main]
 
@@ -9,13 +11,13 @@ permissions:
 
 jobs:
   generated-source-map:
-    if: github.event.pull_request.head.ref == 'VXG-091126-vw-fwd-01d-first-grove'
+    if: github.event_name == 'push' || github.event.pull_request.head.ref == 'VXG-091126-vw-fwd-01d-first-grove'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout exact Stage D candidate
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
 
       - name: Use Node.js 22
