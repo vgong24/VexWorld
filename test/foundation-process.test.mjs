@@ -82,8 +82,14 @@ test('repository health inventories every checked-in source through an explicit 
 test('one-lane state rejects multiple active source-changing stages', async () => {
   const projectState = await readJson('config/project-state.json');
   const broken = clone(projectState);
-  broken.stages[1].state = 'ACTIVE_SINGLE_FORWARD_LANE';
-  broken.stages[1].sourceChanging = true;
+  const activeIndex = broken.stages.findIndex(
+    (stage) => stage.state === 'ACTIVE_SINGLE_FORWARD_LANE' && stage.sourceChanging === true
+  );
+  const secondIndex = broken.stages.findIndex((_, index) => index !== activeIndex);
+  assert.ok(activeIndex >= 0, 'fixture requires one active source-changing stage');
+  assert.ok(secondIndex >= 0, 'fixture requires at least two stages');
+  broken.stages[secondIndex].state = 'ACTIVE_SINGLE_FORWARD_LANE';
+  broken.stages[secondIndex].sourceChanging = true;
   const errors = validateProjectState(broken);
   assert.ok(errors.some((error) => error.includes('exactly one active source-changing stage')));
 });
