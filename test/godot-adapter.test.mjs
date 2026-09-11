@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { canonicalSourceText } from '../versions/v1/src/compiler/world-compiler.mjs';
 
 const root = process.cwd();
 const adapter = path.join(root, 'adapters', 'godot');
@@ -19,6 +20,13 @@ test('Godot adapter source boundary validates from repository root', () => {
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   const receipt = JSON.parse(result.stdout);
   assert.equal(receipt.disposition, 'SOURCE_BOUNDARY_VALID');
+});
+
+test('World Package source hashing is checkout line-ending invariant', () => {
+  const lf = '{\n  "meaning": "same"\n}\n';
+  const crlf = lf.replaceAll('\n', '\r\n');
+  assert.equal(canonicalSourceText(crlf), lf);
+  assert.equal(canonicalSourceText(lf), lf);
 });
 
 test('Godot adapter build preserves canonical World Package fingerprint', () => {
