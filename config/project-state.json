@@ -7,8 +7,9 @@
   "crossRepoFoundationRef": "github.issue.vextreme-sdk.1299",
   "currentVersionRef": "version.vexworld.v1",
   "currentVersionPath": "versions/v1",
-  "activeStageRef": "stage.vexworld.vw-fwd-01a",
-  "activeStageIssueRef": "github.issue.vexworld.7",
+  "lastAcceptedMainRef": "github.commit.vexworld.2aadfaf8d3ce19de0db431f189a0e1be67a8e558",
+  "activeStageRef": "stage.vexworld.vw-fwd-01b",
+  "activeStageIssueRef": "github.issue.vexworld.8",
   "stageOrder": [
     "stage.vexworld.vw-fwd-01a",
     "stage.vexworld.vw-fwd-01b",
@@ -21,13 +22,18 @@
       "stageRef": "stage.vexworld.vw-fwd-01a",
       "issueRef": "github.issue.vexworld.7",
       "title": "Repository stability kernel, change-impact guard and fresh-instance handoff",
-      "state": "ACTIVE_SINGLE_FORWARD_LANE",
+      "state": "ACCEPTED",
       "predecessorStageRef": null,
       "parentStageRefs": [],
-      "sourceChanging": true,
+      "sourceChanging": false,
       "meaningOwnerRef": "project.vextreme.vexworld",
       "implementationOwnerRef": "role.vexworld.foundation-builder",
       "reviewOwnerRef": "role.vexworld.fresh-independent-reviewer",
+      "acceptedCandidateHeadRef": "github.commit.vexworld.6a817f34d11fcd52dc7c690d246ecb67833faf02",
+      "acceptedCandidateTreeRef": "github.tree.vexworld.6be8720204904c39a84ba75b5de749da8cdbcacc",
+      "acceptedMainRef": "github.commit.vexworld.2aadfaf8d3ce19de0db431f189a0e1be67a8e558",
+      "acceptedCloseReceiptRef": "github.issue.vexworld.7.comment.5630100512",
+      "reviewReceiptRef": "github.issue.vexworld.13.comment.5629977914",
       "ownedPathPatterns": [
         ".github/**",
         "README.md",
@@ -81,15 +87,56 @@
       "stageRef": "stage.vexworld.vw-fwd-01b",
       "issueRef": "github.issue.vexworld.8",
       "title": "Godot world-package adapter and engine-boundary proof",
-      "state": "BLOCKED_BY_PREDECESSOR",
+      "state": "ACTIVE_SINGLE_FORWARD_LANE",
       "predecessorStageRef": "stage.vexworld.vw-fwd-01a",
       "parentStageRefs": ["stage.vexworld.vw-fwd-01a"],
-      "sourceChanging": false,
+      "predecessorCloseReceiptRef": "github.issue.vexworld.7.comment.5630100512",
+      "sourceChanging": true,
       "meaningOwnerRef": "project.vextreme.vexworld",
       "implementationOwnerRef": "role.vexworld.engine-adapter-builder",
       "reviewOwnerRef": "role.vexworld.engine-boundary-reviewer",
-      "ownedPathPatterns": ["adapters/godot/**"],
-      "wakeTriggerRefs": ["receipt.vexworld.vw-fwd-01a.accepted-close"]
+      "engineCandidateRef": "technology.godot.4.7.2-stable",
+      "ownedPathPatterns": [
+        "adapters/godot/**",
+        ".github/workflows/godot-adapter.yml",
+        "test/godot-adapter.test.mjs",
+        "config/technology-candidates.json",
+        "docs/architecture/GODOT-ADAPTER.md"
+      ],
+      "allowedEffects": [
+        "ENGINE_ADAPTER_SOURCE_CANDIDATE",
+        "LOCAL_ENGINE_BOOTSTRAP_FOR_TEST",
+        "TEST_EXECUTION",
+        "GENERATED_NO_EFFECT_RECEIPT",
+        "DRAFT_PULL_REQUEST"
+      ],
+      "forbiddenEffects": [
+        "ENGINE_SEMANTIC_OWNERSHIP",
+        "EXTERNAL_CHARACTER_OR_ENVIRONMENT_ASSET_IMPORT",
+        "MODEL_TRAINING",
+        "PRODUCTION_NETWORK",
+        "PHYSICAL_ACTUATION",
+        "COMMERCE",
+        "PRIVATE_DATA_INGESTION",
+        "SILENT_MAIN_MUTATION"
+      ],
+      "requiredCommandRefs": [
+        "command.vexworld.orient",
+        "command.vexworld.health",
+        "command.vexworld.check",
+        "command.vexworld.impact",
+        "command.vexworld.handoff",
+        "command.vexworld.godot-adapter-check"
+      ],
+      "exitCriteriaRefs": [
+        "criterion.vexworld.godot-exact-version-and-license",
+        "criterion.vexworld.godot-source-generated-separation",
+        "criterion.vexworld.godot-windows-mac-bootstrap",
+        "criterion.vexworld.godot-headless-semantic-parity",
+        "criterion.vexworld.godot-visual-smoke-evidence",
+        "criterion.vexworld.godot-no-third-party-character-assets",
+        "criterion.vexworld.independent-exact-head-review"
+      ]
     },
     {
       "stageRef": "stage.vexworld.vw-fwd-01c",
@@ -141,7 +188,7 @@
     "config/change-impact-map.json",
     "vexworld.manifest.json",
     "config/current-version.json",
-    "github.issue.vexworld.7"
+    "github.issue.vexworld.8"
   ],
   "knownUnknownRefs": [
     "unknown.vexworld.software-license",
@@ -151,8 +198,8 @@
     "unknown.vexworld.real-qwen-latency-and-behavior",
     "unknown.vexworld.multiplayer-witness-privacy"
   ],
-  "currentStrongestClaim": "VERSION_1_PUBLISHED__FORWARD_STABILITY_STAGE_ACTIVE",
-  "observedAt": "2026-09-10T21:00:00-07:00",
+  "currentStrongestClaim": "VW_FWD_01A_ACCEPTED__VW_FWD_01B_ACTIVE",
+  "observedAt": "2026-09-10T22:46:10-07:00",
   "effects": {
     "modelTraining": false,
     "productionNetwork": false,
