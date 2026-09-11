@@ -6,6 +6,7 @@
   "scripts": {
     "validate": "node tools/validate-character-adapter.mjs",
     "replacement:proof": "node tools/replacement-proof.mjs",
-    "check": "npm run validate && npm run replacement:proof"
+    "equipment:proof": "node tools/equipment-proof.mjs",
+    "check": "npm run validate && npm run replacement:proof && npm run equipment:proof"
   }
 }
