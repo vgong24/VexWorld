@@ -250,13 +250,71 @@
       ]
     },
     {
+      "ruleRef": "impact.vexworld.version-local-start-scripts",
+      "pathPatterns": [
+        "versions/*/scripts/start-mac.command",
+        "versions/*/scripts/start-windows.bat"
+      ],
+      "capabilityRefs": [
+        "capability.vexworld.version-runtime-start",
+        "capability.vexworld.browser-experience"
+      ],
+      "ownerRef": "role.vexworld.version-foundation-builder",
+      "requiredTestRefs": [
+        "test.vexworld.version-check",
+        "test.vexworld.server-http"
+      ],
+      "anomalyRefs": [
+        "anomaly.vexworld.launcher-version-drift",
+        "anomaly.vexworld.start-script-platform-drift"
+      ]
+    },
+    {
+      "ruleRef": "impact.vexworld.version-lan-start-scripts",
+      "pathPatterns": [
+        "versions/*/scripts/start-lan-mac.command",
+        "versions/*/scripts/start-lan-windows.bat"
+      ],
+      "capabilityRefs": [
+        "capability.vexworld.version-runtime-start",
+        "capability.vexworld.trusted-lan-relay"
+      ],
+      "ownerRef": "role.vexworld.companion-bridge-builder",
+      "requiredTestRefs": [
+        "test.vexworld.server-http",
+        "test.vexworld.host-lease"
+      ],
+      "anomalyRefs": [
+        "anomaly.vexworld.network-authority-expansion",
+        "anomaly.vexworld.start-script-platform-drift"
+      ]
+    },
+    {
+      "ruleRef": "impact.vexworld.version-selfplay-script",
+      "pathPatterns": [
+        "versions/*/scripts/vex-relay-self-play.mjs"
+      ],
+      "capabilityRefs": [
+        "capability.vexworld.self-play-evidence",
+        "capability.vexworld.browser-experience"
+      ],
+      "ownerRef": "role.vexworld.experience-builder",
+      "requiredTestRefs": [
+        "test.vexworld.self-play",
+        "test.vexworld.browser-startup"
+      ],
+      "anomalyRefs": [
+        "anomaly.vexworld.human-feel-false-claim",
+        "anomaly.vexworld.self-play-authority-expansion"
+      ]
+    },
+    {
       "ruleRef": "impact.vexworld.companion-and-network",
       "pathPatterns": [
         "versions/*/src/agents/**",
         "versions/*/src/companion/**",
         "versions/*/src/network/**",
-        "versions/*/src/server/**",
-        "versions/*/scripts/**"
+        "versions/*/src/server/**"
       ],
       "capabilityRefs": [
         "capability.vexworld.companion-adapter",
