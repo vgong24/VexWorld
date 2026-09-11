@@ -1,7 +1,7 @@
 {
   "schemaVersion": "vexworld.generated-source-map/v1",
   "packageRef": "package.vexworld.first-grove.prototype.v1",
-  "integrityFingerprint": "fe5754cccac19f60ea7aceb4db4b76adffa0771a7adf9c8e0d613820260bf7d2",
+  "integrityFingerprint": "ae9ed735e9e1174347160616c862bb0662050dcd16344f475cbba18983f8b09e",
   "sources": [
     {
       "relativePath": "world/abilities.json",
@@ -29,7 +29,7 @@
     },
     {
       "relativePath": "worlds/first-grove/expressions.json",
-      "sha256": "50e44286aeddc4a6ad13051756b76866200dec65f6037ae8a32723c7f338974f"
+      "sha256": "124780f11947556ee3b0188f10079091ecdfd3bfe774c1cd65c35b32187ad7e5"
     },
     {
       "relativePath": "worlds/first-grove/laws.json",
@@ -41,11 +41,27 @@
     },
     {
       "relativePath": "worlds/first-grove/map.json",
-      "sha256": "c9890d9e2754f00c10b98672eae2cca4626f78670a975069b1cf372195e90993"
+      "sha256": "4bf41b6c9964227e670eae34605d26af737cb13b6753ae2864a4416e410583c7"
+    },
+    {
+      "relativePath": "worlds/first-grove/scenarios/arrival-origin-consequence.json",
+      "sha256": "10ebdc62d222d4ca0288e26c24a371b0b4cf7d88a94684fc288b564d11a896dc"
+    },
+    {
+      "relativePath": "worlds/first-grove/scenarios/echo-overlook-witness.json",
+      "sha256": "8ae23e67ab71e70a7ffcf7174a2683fa08eb16fb6c61e6a9b526e361e026e077"
     },
     {
       "relativePath": "worlds/first-grove/scenarios/high-low-technique.json",
       "sha256": "5067166f3800d678f9a54028da8783fd4af90de699243ab04cfa87d5bbc8c68b"
+    },
+    {
+      "relativePath": "worlds/first-grove/scenarios/home-return-loop.json",
+      "sha256": "88ab5c13a6febf8c08bd913d5640cb863968b2e9bffa7e445dd3d155c3c9aa43"
+    },
+    {
+      "relativePath": "worlds/first-grove/scenarios/mossbridge-cooperation.json",
+      "sha256": "abfc5178bad1fd841df1991a8f65c2508ada9ec8dbf62a0311bd9651bc71eceb"
     },
     {
       "relativePath": "worlds/first-grove/scenarios/party-resume.json",
@@ -54,6 +70,10 @@
     {
       "relativePath": "worlds/first-grove/scenarios/rain-restoration.json",
       "sha256": "a6672c05867514530bfdb2f03f09e12e444ec79a17e7a42222881dbec3913035"
+    },
+    {
+      "relativePath": "worlds/first-grove/scenarios/resident-practice-route.json",
+      "sha256": "848192902959dea20215e1143aef6c8bf3bec3fb8b577b2acd96194275a98e20"
     },
     {
       "relativePath": "worlds/first-grove/scenarios/status-orientation.json",
