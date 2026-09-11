@@ -1,0 +1,52 @@
+name: Stage D Browser Self-Play
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  browser-self-play:
+    if: github.event.pull_request.head.ref == 'VXG-091126-vw-fwd-01d-first-grove'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact Stage D candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Resolve installed Chromium-family browser
+        shell: bash
+        run: |
+          BROWSER_PATH="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$BROWSER_PATH" ]; then
+            echo "No Chromium-family browser present on runner" >&2
+            exit 1
+          fi
+          echo "CHROME_BIN=$BROWSER_PATH" >> "$GITHUB_ENV"
+          echo "browser=$BROWSER_PATH"
+
+      - name: Compile current First Grove package
+        run: npm --prefix versions/v1 run compile
+
+      - name: Run Vex Relay browser self-play
+        shell: bash
+        run: npm run selfplay -- --out="${RUNNER_TEMP}/vexworld-stage-d-selfplay"
+
+      - name: Upload Stage D browser witness evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage-d-browser-selfplay
+          path: ${{ runner.temp }}/vexworld-stage-d-selfplay/**
+          if-no-files-found: error
+
+# Automated self-play is browser evidence, not human game-feel evidence.
+# [VXG RealForever]
