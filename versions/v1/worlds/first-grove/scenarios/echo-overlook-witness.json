@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "vexworld.scenario/v1",
+  "scenarioRef": "scenario.first-grove.echo-overlook-witness",
+  "purpose": "Prove Echo Overlook can witness bounded play and offer an optional discovery without becoming a world law, fact oracle or automatic ability grant.",
+  "given": ["The party reaches Echo Overlook after creating coordination, shared-practice or recovery evidence."],
+  "when": ["The World Witness site observes the bounded session evidence."],
+  "expected": [
+    "Only declared observable facets are considered.",
+    "Interpretation remains a candidate rather than fact.",
+    "No ability is automatically granted.",
+    "Any discovery or trial offer remains optional."
+  ],
+  "forbidden": [
+    "World Witness silently rewrites world law.",
+    "World Witness reads private relationship memory not projected into the world.",
+    "Observation becomes relationship-worth scoring."
+  ]
+}

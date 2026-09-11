@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "vexworld.scenario/v1",
+  "scenarioRef": "scenario.first-grove.home-return-loop",
+  "purpose": "Prove First Grove supports a legible outward journey with restoration and voluntary return rather than only forward combat progression.",
+  "given": ["The party begins at Sunbloom Hearth and can travel through several named regions."],
+  "when": ["The party travels outward, spends resources, discovers a route, and considers continuing or returning."],
+  "expected": [
+    "Sunbloom Hearth remains the primary homeAnchor.",
+    "Mossbridge Shelter can provide bounded restoration without becoming the party's identity owner.",
+    "Optional discoveries expose a return-or-continue choice.",
+    "Return remains available without interpreting retreat as relationship or moral failure."
+  ],
+  "forbidden": [
+    "Low resource margin manufactures existential panic.",
+    "Returning home deletes progress, relationship continuity or participant identity."
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "vexworld.scenario/v1",
+  "scenarioRef": "scenario.first-grove.resident-practice-route",
+  "purpose": "Prove a resident can offer a voluntary practice opportunity without turning role, work or practice into permanent identity.",
+  "given": ["Resident Ilex is present in Hushed Orchard as a grove tender."],
+  "when": ["The party encounters opportunity.first-grove.orchard-inspection."],
+  "expected": [
+    "The opportunity points to practice.vexworld.orchard-inspection.",
+    "Participation is voluntary and declining has no penalty.",
+    "The resident's role is explicitly not their permanent identity.",
+    "Completion evidence remains scenario/practice evidence rather than professional licensure."
+  ],
+  "forbidden": [
+    "The opportunity class-locks the human or companion.",
+    "Game competence is represented as unrestricted real-world professional authority."
+  ]
+}
