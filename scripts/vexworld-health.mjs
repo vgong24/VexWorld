@@ -243,12 +243,19 @@ export function validateAssetPolicy(policy) {
     }
     refs.push(candidate.assetCandidateRef);
     for (const field of policy.requiredIntakeFields ?? []) {
-      if (!Object.hasOwn(candidate, field)) errors.push(`${candidate.assetCandidateRef ?? 'asset candidate'} missing ${field}`);
+      if (!Object.hasOwn(candidate, field)) {
+        errors.push(`${candidate.assetCandidateRef ?? 'asset candidate'} missing ${field}`);
+      }
     }
     if (!nonempty(candidate.assetCandidateRef)) errors.push('asset candidate requires assetCandidateRef');
     if (!policy.intakeLifecycle.includes(candidate.disposition)) {
       errors.push(`${candidate.assetCandidateRef} has unsupported disposition ${candidate.disposition}`);
     }
+
+    // Health must enforce the actual intake contract for any checked-in candidate,
+    // especially when its disposition crosses into an ACCEPTED_* state.
+    const intakeErrors = validateAssetIntake(policy, candidate);
+    errors.push(...intakeErrors.map((error) => `${candidate.assetCandidateRef ?? 'asset candidate'}: ${error}`));
   }
   if (!unique(refs)) errors.push('assetCandidateRef values must be unique');
   return errors;
@@ -354,7 +361,11 @@ async function walkFiles(root) {
 }
 
 function gitValue(root, args) {
-  const result = spawnSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  const result = spawnSync('git', args, {
+    cwd: root,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore']
+  });
   return result.status === 0 ? result.stdout.trim() || null : null;
 }
 
