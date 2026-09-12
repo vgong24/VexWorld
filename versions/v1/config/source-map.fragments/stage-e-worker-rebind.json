@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "vexworld.source-map-fragment/v1",
+  "fragmentRef": "source-map-fragment.vexworld.v1.stage-e-worker-rebind",
+  "reason": "Register the Stage E fresh-process worker-rebind regression without rewriting the historical Version 1 base source map.",
+  "entries": [
+    {
+      "path": "config/source-map.fragments/stage-e-worker-rebind.json",
+      "category": "navigation-and-coverage",
+      "owner": "Companion Embodiment",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "test/worker-rebind-sequence.test.mjs",
+      "category": "test-evidence",
+      "owner": "Assurance",
+      "sourceClass": "EVIDENCE_SOURCE"
+    }
+  ]
+}

@@ -300,9 +300,10 @@ function renderStatus() {
     .filter((member) => member.controllerBinding.controllerClass.startsWith('REMOTE_'))
     .map((member, index) => {
       const mode = member.controllerBinding.controllerClass === 'REMOTE_OLLAMA' ? 'ollama' : 'deterministic';
-      const command = `npm run agent -- --server ${serverBase} --token ${serverToken || '<token>'} --session ${state.sessionRef} --companion ${member.participantRef} --mode ${mode}${mode === 'ollama' ? ' --model qwen3.5' : ''}`;
+      const command = `npm run agent -- --server ${serverBase} --token ${serverToken || '<token>'} --session ${state.sessionRef} --companion ${member.participantRef} --mode ${mode}`;
       return `<div class="worker-command"><code>${escapeHtml(command)}</code><button type="button" data-copy-worker="${index}">Copy</button></div>`;
     });
+  const hasRemoteOllama = companions.some((member) => member.controllerBinding.controllerClass === 'REMOTE_OLLAMA');
   ui.status_content.innerHTML = `
     <article class="status-card"><h3>Who am I here?</h3><p><b>${escapeHtml(human.displayName)}</b> — ${escapeHtml(human.avatarExpression.form)}</p><p>Participant: <code>${escapeHtml(human.participantRef)}</code></p><p>Vessel: <code>${escapeHtml(human.vesselRef)}</code></p></article>
     <article class="status-card"><h3>Party</h3><p>${state.party.members.map((m)=>escapeHtml(m.displayName)).join(' • ')}</p><p>${state.party.members.length} / ${state.party.capacity}</p></article>
@@ -312,13 +313,13 @@ function renderStatus() {
     <article class="status-card"><h3>Bond resonance</h3><p>${facets}</p><p>No hidden affection or worth score.</p></article>
     <article class="status-card"><h3>First Grove journey</h3><p><b>${escapeHtml(region?.title || 'First Grove')}</b></p><p>Home: <code>${escapeHtml(journey.homeAnchorRef || 'UNKNOWN')}</code></p><p>Regions visited: ${(journey.visitedRegionRefs || []).length} • discoveries: ${(journey.discoveredRefs || []).length}</p><p>Origin lesson: ${escapeHtml(journey.originContext?.earlyTraversalCue?.replaceAll('_',' ') || 'UNKNOWN')}</p><p>Potential ceiling effect: <b>${escapeHtml(journey.originContext?.potentialCeilingEffect || 'UNKNOWN')}</b></p></article>
     <article class="status-card"><h3>World / quest</h3><p>${escapeHtml(state.quest.progressText)}</p><p>Weather: ${escapeHtml(state.weather.state)}</p><p>Twin Horizon: ${state.quest.twinHorizonUnlocked ? 'LEARNED' : state.quest.twinHorizonTrial}</p></article>
-    <article class="status-card"><h3>Session</h3><p>${escapeHtml(networkState)}</p><p><code>${escapeHtml(state.sessionRef)}</code></p>${remoteCommands.length ? `<p>Remote worker command${remoteCommands.length > 1 ? 's' : ''}:</p>${remoteCommands.join('')}` : '<p>All companions are local.</p>'}<p class="tiny-note">The token is a trusted-LAN development credential. Do not post it publicly.</p></article>`;
+    <article class="status-card"><h3>Session</h3><p>${escapeHtml(networkState)}</p><p><code>${escapeHtml(state.sessionRef)}</code></p>${remoteCommands.length ? `<p>Remote worker command${remoteCommands.length > 1 ? 's' : ''}:</p>${remoteCommands.join('')}` : '<p>All companions are local.</p>'}${hasRemoteOllama ? '<p class="tiny-note">Ollama worker commands do not guess a model name. If exactly one model is installed it is observed and selected; if several are installed, add <code>--model &lt;exact-name-from-ollama-list&gt;</code>.</p>' : ''}<p class="tiny-note">The token is a trusted-LAN development credential. Do not post it publicly.</p></article>`;
   ui.status_content.querySelectorAll('[data-copy-worker]').forEach((button) => {
     button.addEventListener('click', () => {
       const member = companions.filter((candidate) => candidate.controllerBinding.controllerClass.startsWith('REMOTE_'))[Number(button.dataset.copyWorker)];
       if (!member) return;
       const mode = member.controllerBinding.controllerClass === 'REMOTE_OLLAMA' ? 'ollama' : 'deterministic';
-      const command = `npm run agent -- --server ${serverBase} --token ${serverToken || '<token>'} --session ${state.sessionRef} --companion ${member.participantRef} --mode ${mode}${mode === 'ollama' ? ' --model qwen3.5' : ''}`;
+      const command = `npm run agent -- --server ${serverBase} --token ${serverToken || '<token>'} --session ${state.sessionRef} --companion ${member.participantRef} --mode ${mode}`;
       copyText(command, `${member.displayName}'s worker command copied.`);
     });
   });
