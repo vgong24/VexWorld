@@ -68,6 +68,25 @@ export async function agentApi(options, route, init = {}) {
   return payload;
 }
 
+function asIntentSequenceFloor(value, label) {
+  const sequence = Number(value ?? 0);
+  if (!Number.isInteger(sequence) || sequence < 0) {
+    throw controllerError('RETAINED_INTENT_SEQUENCE_INVALID', `${label} must be a non-negative integer`);
+  }
+  return sequence;
+}
+
+export async function resolveAuthoritativeIntentSequence(options, localIntentSequence = 0) {
+  const localFloor = asIntentSequenceFloor(localIntentSequence, 'local intent sequence');
+  const record = await agentApi(
+    options,
+    `/api/v1/sessions/${encodeURIComponent(options.session)}`
+  );
+  const retained = record?.intents?.[options.companion];
+  const retainedFloor = asIntentSequenceFloor(retained?.sequence ?? 0, 'retained intent sequence');
+  return Math.max(localFloor, retainedFloor);
+}
+
 export function deterministicIntent(observation) {
   const self = observation.self;
   if (self.resourceBand === 'PROTECTIVE_RETURN_OR_HALT' || self.energy < 14) {
@@ -330,8 +349,14 @@ export async function runWorkerCycle(options, state = { lastObservationSequence:
     console.error(`controller error; deterministic fallback [${fallbackReason}]: ${modelError.message}`);
     proposed = deterministicIntent(observation);
   }
+
+  // Worker processes are replaceable. Intent sequence authority lives with the
+  // retained session record, not process-local memory. Resolve the sequence
+  // floor immediately before write so a fresh process continues from the latest
+  // accepted intent rather than restarting at sequence 1.
+  const sequenceFloor = await resolveAuthoritativeIntentSequence(options, state.intentSequence);
   const now = Date.now();
-  const intentSequence = state.intentSequence + 1;
+  const intentSequence = sequenceFloor + 1;
   const intent = {
     schemaVersion: 'vexworld.companion-intent/v1',
     participantRef: options.companion,
@@ -346,6 +371,7 @@ export async function runWorkerCycle(options, state = { lastObservationSequence:
     controllerEvidence: {
       requestedMode: options.mode,
       workerId: options.workerId,
+      sequenceFloor,
       modelIdentity: modelIdentity
         ? { model: modelIdentity.resolvedModel, digest: modelIdentity.digest }
         : null,
