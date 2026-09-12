@@ -161,6 +161,7 @@ test('full party labels occupy stable projection lanes without changing particip
     ]
   });
   assert.equal(state.party.members.length, 4);
+  const identityRefsBefore = state.party.members.map((member) => member.participantRef);
 
   const placements = state.party.members.map((member) => partyLabelPlacement(member));
   const coordinates = placements.map((placement) => `${placement.xOffset}:${placement.yOffset}`);
@@ -168,9 +169,9 @@ test('full party labels occupy stable projection lanes without changing particip
   assert.deepEqual(placements.map((placement) => placement.marker), ['YOU', '1', '2', '3']);
   assert.ok(partyFocusRing(state.party.members[0]).lineWidth > partyFocusRing(state.party.members[1]).lineWidth);
 
-  // Readability is projection only: forming placements does not alter identity or capacity.
+  // Readability is projection only: calculating it does not mutate identity or capacity.
   assert.equal(state.party.capacity, 4);
-  assert.equal(state.party.members[0].participantRef, 'participant.human.reference');
+  assert.deepEqual(state.party.members.map((member) => member.participantRef), identityRefsBefore);
 });
 
 test('full-party dialogue is visually bounded while the accessible log preserves expression', async () => {
