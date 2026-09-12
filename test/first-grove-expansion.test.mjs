@@ -7,6 +7,12 @@ import { compileFirstGrove } from '../versions/v1/src/compiler/world-compiler.mj
 import { createInitialGame } from '../versions/v1/src/core/runtime-state.mjs';
 import { getHuman } from '../versions/v1/src/core/party.mjs';
 import { interact, updateEnemies, updateFirstGroveProgress } from '../versions/v1/src/core/world-loop.mjs';
+import {
+  artDirectionDecision,
+  bubbleLayoutClass,
+  partyFocusRing,
+  partyLabelPlacement
+} from '../versions/v1/src/web/readability.mjs';
 
 const root = fileURLToPath(new URL('../versions/v1/', import.meta.url));
 
@@ -143,6 +149,52 @@ test('Garden browser entry and renderer expose ritual, resident, discovery, regi
   assert.match(renderer, /drawWitnessSite/);
   assert.match(renderer, /drawRegionMarkers/);
   assert.match(renderer, /coordination is an invitation/);
+});
+
+test('full party labels occupy stable projection lanes without changing participant semantics', async () => {
+  const world = await compileFirstGrove({ root });
+  const state = createInitialGame(world, {
+    companions: [
+      { displayName: 'Vex' },
+      { displayName: 'Mira' },
+      { displayName: 'Rowan' }
+    ]
+  });
+  assert.equal(state.party.members.length, 4);
+
+  const placements = state.party.members.map((member) => partyLabelPlacement(member));
+  const coordinates = placements.map((placement) => `${placement.xOffset}:${placement.yOffset}`);
+  assert.equal(new Set(coordinates).size, 4);
+  assert.deepEqual(placements.map((placement) => placement.marker), ['YOU', '1', '2', '3']);
+  assert.ok(partyFocusRing(state.party.members[0]).lineWidth > partyFocusRing(state.party.members[1]).lineWidth);
+
+  // Readability is projection only: forming placements does not alter identity or capacity.
+  assert.equal(state.party.capacity, 4);
+  assert.equal(state.party.members[0].participantRef, 'participant.human.reference');
+});
+
+test('full-party dialogue is visually bounded while the accessible log preserves expression', async () => {
+  const css = await readFile(new URL('../versions/v1/src/web/styles.css', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../versions/v1/src/web/index.html', import.meta.url), 'utf8');
+  assert.equal(bubbleLayoutClass(3), 'dialogue-density-full-party');
+  assert.match(css, /companion-bubble:nth-child\(3\)/);
+  assert.match(css, /-webkit-line-clamp:\s*3/);
+  assert.match(html, /id="dialogue-log"[^>]*role="log"/);
+  assert.match(html, /aria-live="polite"/);
+  assert.match(html, /aria-label="Recent companion dialogue"/);
+});
+
+test('Stage 02B art route remains original-first and imports no external identity by implication', async () => {
+  const decision = artDirectionDecision();
+  assert.equal(decision.route, 'ORIGINAL_PROCEDURAL_REFINEMENT');
+  assert.equal(decision.externalAssetAcceptance, 'NONE');
+  assert.ok(decision.referenceCandidatesHeld.includes('research-candidate.quaternius.universal-base-characters.2025-08'));
+  assert.ok(decision.referenceCandidatesHeld.includes('research-candidate.kaykit.adventurers.free.2.0'));
+
+  const registry = JSON.parse(await readFile(new URL('../adapters/characters/catalog/playability-art-direction.v1.json', import.meta.url), 'utf8'));
+  assert.equal(registry.assetDownloaded, false);
+  assert.equal(registry.assetAccepted, false);
+  assert.equal(registry.route, 'ORIGINAL_PROCEDURAL_REFINEMENT');
 });
 
 // [VXG RealForever]
