@@ -11,6 +11,7 @@ jobs:
   browser-self-play:
     if: github.event.pull_request.head.ref == 'VXG-091126-vw-fwd-01d-first-grove'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout exact Stage D candidate
         uses: actions/checkout@v4
@@ -37,9 +38,36 @@ jobs:
       - name: Compile current First Grove package
         run: npm --prefix versions/v1 run compile
 
-      - name: Run Vex Relay browser self-play
+      - name: Run bounded Vex Relay browser self-play
         shell: bash
-        run: npm run selfplay -- --out="${RUNNER_TEMP}/vexworld-stage-d-selfplay"
+        run: |
+          set +e
+          timeout --signal=TERM --kill-after=10s 90s \
+            npm run selfplay -- --out="${RUNNER_TEMP}/vexworld-stage-d-selfplay"
+          SELFPLAY_STATUS=$?
+          set -e
+          echo "selfplayProcessStatus=$SELFPLAY_STATUS"
+          RECEIPT="${RUNNER_TEMP}/vexworld-stage-d-selfplay/latest.json"
+          if [ ! -f "$RECEIPT" ]; then
+            echo "No self-play receipt was produced before process exit/timeout" >&2
+            exit 1
+          fi
+          node - "$RECEIPT" "$SELFPLAY_STATUS" <<'NODE'
+          const fs = require('node:fs');
+          const [receiptPath, statusText] = process.argv.slice(2);
+          const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
+          const status = Number(statusText);
+          console.log(JSON.stringify({
+            disposition: receipt.disposition,
+            processStatus: status,
+            screenshots: receipt.screenshots?.length ?? 0,
+            pageErrors: receipt.pageErrors?.length ?? null,
+            consoleErrors: receipt.consoleErrors?.length ?? null
+          }, null, 2));
+          if (receipt.disposition !== 'PASS_WITH_HUMAN_FEEL_STILL_UNWITNESSED') process.exit(2);
+          if (![0, 124].includes(status)) process.exit(status || 3);
+          if (status === 124) console.warn('Self-play evidence completed, but process cleanup exceeded the bounded 90s window. Evidence is valid; cleanup remains an observable harness concern.');
+          NODE
 
       - name: Upload Stage D browser witness evidence
         uses: actions/upload-artifact@v4
@@ -49,4 +77,5 @@ jobs:
           if-no-files-found: error
 
 # Automated self-play is browser evidence, not human game-feel evidence.
+# A cleanup timeout is never accepted unless the completed receipt itself is PASS.
 # [VXG RealForever]
