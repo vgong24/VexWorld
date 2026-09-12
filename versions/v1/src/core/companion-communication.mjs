@@ -31,6 +31,7 @@ const CONTROLLER_EVIDENCE_KEYS = new Set([
   'modelIdentity',
   'fallbackReason'
 ]);
+const MODEL_IDENTITY_KEYS = new Set(['model', 'digest']);
 
 function nonempty(value) {
   return typeof value === 'string' && value.trim().length > 0;
@@ -125,6 +126,22 @@ export function validateCompanionUtterance(utterance, { expectedParticipantRef =
   }
   if (!nonempty(utterance.controllerEvidence.workerId) || !nonempty(utterance.controllerEvidence.requestedMode)) {
     return { valid: false, reason: 'UTTERANCE_CONTROLLER_EVIDENCE_INCOMPLETE' };
+  }
+  const modelIdentity = utterance.controllerEvidence.modelIdentity;
+  if (modelIdentity !== null && modelIdentity !== undefined) {
+    if (typeof modelIdentity !== 'object' || Array.isArray(modelIdentity)) {
+      return { valid: false, reason: 'UTTERANCE_MODEL_IDENTITY_INVALID' };
+    }
+    if (Object.keys(modelIdentity).some((key) => !MODEL_IDENTITY_KEYS.has(key))) {
+      return { valid: false, reason: 'UTTERANCE_MODEL_IDENTITY_EXTRA_FIELDS' };
+    }
+    if (!nonempty(modelIdentity.model) || !nonempty(modelIdentity.digest)) {
+      return { valid: false, reason: 'UTTERANCE_MODEL_IDENTITY_INCOMPLETE' };
+    }
+  }
+  const fallbackReason = utterance.controllerEvidence.fallbackReason;
+  if (fallbackReason !== null && fallbackReason !== undefined && !nonempty(fallbackReason)) {
+    return { valid: false, reason: 'UTTERANCE_FALLBACK_REASON_INVALID' };
   }
   return { valid: true };
 }
