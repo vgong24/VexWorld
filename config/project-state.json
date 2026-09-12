@@ -7,9 +7,9 @@
   "crossRepoFoundationRef": "github.issue.vextreme-sdk.1299",
   "currentVersionRef": "version.vexworld.v1",
   "currentVersionPath": "versions/v1",
-  "lastAcceptedMainRef": "github.commit.vexworld.ec3399c1a42f3683fa0f76ec0c28c68b524d40a7",
-  "activeStageRef": "stage.vexworld.vw-fwd-02a",
-  "activeStageIssueRef": "github.issue.vexworld.33",
+  "lastAcceptedMainRef": "github.commit.vexworld.975bf64b9a5133054885748e903dc455d3035847",
+  "activeStageRef": "stage.vexworld.vw-fwd-02b",
+  "activeStageIssueRef": "github.issue.vexworld.34",
   "stageOrder": [
     "stage.vexworld.vw-fwd-01a",
     "stage.vexworld.vw-fwd-01b",
@@ -194,16 +194,28 @@
       "stageRef": "stage.vexworld.vw-fwd-02a",
       "issueRef": "github.issue.vexworld.33",
       "title": "In-world companion communication expression without motor/memory authority",
-      "state": "ACTIVE_SINGLE_FORWARD_LANE",
+      "state": "ACCEPTED",
       "predecessorStageRef": "stage.vexworld.vw-fwd-01e",
       "parentStageRefs": ["stage.vexworld.vw-fwd-01e"],
       "predecessorCloseReceiptRef": "github.issue.vexworld.11.comment.5649035967",
       "startingMainRef": "github.commit.vexworld.ec3399c1a42f3683fa0f76ec0c28c68b524d40a7",
-      "sourceChanging": true,
+      "sourceChanging": false,
       "meaningOwnerRef": "project.vextreme.vexworld",
       "implementationOwnerRef": "role.vexworld.companion-expression-builder",
       "reviewOwnerRef": "role.vexworld.communication-boundary-reviewer",
+      "acceptedCandidateHeadRef": "github.commit.vexworld.be8f7e737535cc3c63244fd96429e0d45e922d91",
+      "acceptedCandidateTreeRef": "github.tree.vexworld.54af9e027f10b13c2fc5f260ead1e16aa1cbba22",
+      "acceptedMainRef": "github.commit.vexworld.975bf64b9a5133054885748e903dc455d3035847",
+      "acceptedCloseReceiptRef": "github.issue.vexworld.33.comment.5649357060",
+      "reviewReceiptRef": "github.issue.vexworld.38.comment.5649272241",
+      "foundationWorkflowRunRef": "github.actions.vexworld.34723040149",
+      "a8WitnessReceiptRef": "github.issue.vexworld.37.comment.5649234836",
+      "assuranceDisposition": "APPROVE_EXACT_HEAD",
+      "nonBlockingDebtRefs": [
+        "github.issue.vexworld.37.comment.5649234836"
+      ],
       "ownedPathPatterns": [
+        "versions/v1/config/source-map.fragments/stage-02a-companion-communication.json",
         "versions/v1/src/agents/remote-worker.mjs",
         "versions/v1/src/core/controllers.mjs",
         "versions/v1/src/core/observation.mjs",
@@ -213,20 +225,23 @@
         "versions/v1/src/server/server.mjs",
         "versions/v1/src/server/session-store.mjs",
         "versions/v1/src/web/app.mjs",
+        "versions/v1/src/web/index.html",
+        "versions/v1/src/web/network-client.mjs",
         "versions/v1/src/web/renderer.mjs",
         "versions/v1/src/web/styles.css",
+        "versions/v1/test/browser-source.test.mjs",
         "versions/v1/test/remote-workers.test.mjs",
         "versions/v1/test/server-http.test.mjs",
         "versions/v1/test/session-store.test.mjs",
         "versions/v1/test/controllers.test.mjs",
-        "versions/v1/test/companion-communication.test.mjs"
+        "versions/v1/test/companion-communication.test.mjs",
+        "versions/v1/test/companion-communication-worker.test.mjs"
       ],
       "allowedEffects": [
         "BOUNDED_COMPANION_UTTERANCE_EVENTS",
         "TEXT_CAPTION_AND_SPEECH_BUBBLE_PROJECTION",
         "ATTRIBUTED_MODEL_OR_DETERMINISTIC_COMMUNICATION",
-        "TRUSTED_LAN_DEVELOPMENT_RELAY",
-        "SOURCE_CANDIDATE"
+        "TRUSTED_LAN_DEVELOPMENT_RELAY"
       ],
       "forbiddenEffects": [
         "MODEL_TRAINING",
@@ -246,14 +261,15 @@
       "stageRef": "stage.vexworld.vw-fwd-02b",
       "issueRef": "github.issue.vexworld.34",
       "title": "Party/world readability, art-direction convergence and expression legibility",
-      "state": "BLOCKED_BY_PREDECESSOR",
+      "state": "ACTIVE_SINGLE_FORWARD_LANE",
       "predecessorStageRef": "stage.vexworld.vw-fwd-02a",
       "parentStageRefs": ["stage.vexworld.vw-fwd-02a"],
-      "sourceChanging": false,
+      "predecessorCloseReceiptRef": "github.issue.vexworld.33.comment.5649357060",
+      "startingMainRef": "github.commit.vexworld.975bf64b9a5133054885748e903dc455d3035847",
+      "sourceChanging": true,
       "meaningOwnerRef": "project.vextreme.vexworld",
       "implementationOwnerRef": "role.vexworld.playability-expression-builder",
       "reviewOwnerRef": "role.vexworld.playability-readability-reviewer",
-      "wakeTriggerRefs": ["receipt.vexworld.vw-fwd-02a.accepted-close"],
       "ownedPathPatterns": [
         "versions/v1/src/web/**",
         "versions/v1/worlds/first-grove/**",
@@ -289,7 +305,7 @@
     "config/change-impact-map.json",
     "vexworld.manifest.json",
     "config/current-version.json",
-    "github.issue.vexworld.33"
+    "github.issue.vexworld.34"
   ],
   "knownUnknownRefs": [
     "unknown.vexworld.software-license",
@@ -300,10 +316,11 @@
     "debt.vexworld.party-density-readability",
     "debt.vexworld.selfplay-cleanup-timeout",
     "debt.vexworld.windows-root-launcher-spawn-einval",
-    "debt.vexworld.stage-e.resource-stale-divergence-characterization"
+    "debt.vexworld.stage-e.resource-stale-divergence-characterization",
+    "debt.vexworld.a8-browser-exitcode-ack-not-observed"
   ],
-  "currentStrongestClaim": "VW_FWD_01_ACCEPTED__VW_FWD_02A_ACTIVE_COMPANION_COMMUNICATION_EXPRESSION",
-  "observedAt": "2026-09-12T22:15:00Z",
+  "currentStrongestClaim": "VW_FWD_01_ACCEPTED__VW_FWD_02A_ACCEPTED__VW_FWD_02B_ACTIVE_PLAYABILITY_READABILITY_ART_CONVERGENCE",
+  "observedAt": "2026-09-12T23:20:24Z",
   "effects": {
     "modelTraining": false,
     "productionNetwork": false,
