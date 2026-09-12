@@ -46,6 +46,17 @@ test('formed utterance binds participant and sources but cannot encode world or 
   assert.equal('learnedAbility' in utterance, false);
 
   assert.equal(validateCompanionUtterance({ ...utterance, worldLaw: 'ALWAYS_OBEY' }).reason, 'UTTERANCE_EXTRA_FIELDS');
+  assert.equal(validateCompanionUtterance({
+    ...utterance,
+    controllerEvidence: { ...utterance.controllerEvidence, memoryWrite: 'secret' }
+  }).reason, 'UTTERANCE_CONTROLLER_EVIDENCE_EXTRA_FIELDS');
+  assert.equal(validateCompanionUtterance({
+    ...utterance,
+    controllerEvidence: {
+      ...utterance.controllerEvidence,
+      modelIdentity: { model: 'm', digest: 'd', worldLaw: 'ALWAYS_OBEY' }
+    }
+  }).reason, 'UTTERANCE_MODEL_IDENTITY_EXTRA_FIELDS');
   assert.equal(validateCompanionUtterance(utterance, { expectedParticipantRef: 'participant.companion.mira' }).reason, 'UTTERANCE_PARTICIPANT_MISMATCH');
 });
 
