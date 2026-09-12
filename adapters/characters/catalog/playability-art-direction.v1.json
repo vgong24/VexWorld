@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "vexworld.playability-art-direction/v1",
+  "decisionRef": "decision.vexworld.vw-fwd-02b.art-direction.v1",
+  "stageRef": "stage.vexworld.vw-fwd-02b",
+  "route": "ORIGINAL_PROCEDURAL_REFINEMENT",
+  "externalAssetAcceptance": "NONE",
+  "reason": "The active evidence identifies party clustering, label separation, dialogue crowding and world/entity contrast as projection-readability defects. Those defects can be corrected without importing third-party character identity or art expression.",
+  "referenceResearchRef": "github.issue.vexworld.17.comment.5641466099",
+  "referenceCandidatesHeld": [
+    {
+      "candidateRef": "research-candidate.quaternius.universal-base-characters.2025-08",
+      "researchDisposition": "recommendedForQuarantine",
+      "stage02BDisposition": "HELD_REFERENCE_ONLY_PENDING_EXACT_ARTIFACT_HASH_AND_INTAKE"
+    },
+    {
+      "candidateRef": "research-candidate.kaykit.adventurers.free.2.0",
+      "researchDisposition": "recommendedForQuarantine",
+      "stage02BDisposition": "HELD_REFERENCE_ONLY_PENDING_EXACT_ARTIFACT_HASH_AND_INTAKE"
+    }
+  ],
+  "boundaries": [
+    "PLAYER_READABILITY != CHARACTER_IDENTITY",
+    "REFERENCE_ASSET != VEXWORLD_IDENTITY",
+    "ART_DIRECTION != WORLD_LAW",
+    "SILHOUETTE != CAPABILITY_CEILING"
+  ],
+  "assetDownloaded": false,
+  "assetAccepted": false
+}
