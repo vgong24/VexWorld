@@ -1,6 +1,8 @@
 import { createInitialGame, makeParticipantObservation, serializeGameState, stepGame, validateGameState } from '../core/engine.mjs';
 import { getCompanions, getHuman } from '../core/party.mjs';
+import { chooseLocalCompanionIntent } from '../core/controllers.mjs';
 import { FIXED_STEP_MS } from '../core/constants.mjs';
+import { deterministicCommunicationProposal, formCompanionUtterance } from '../core/companion-communication.mjs';
 import { createInput } from './input.mjs';
 import { createRenderer } from './renderer.mjs';
 import { ServerSessionClient } from './network-client.mjs';
@@ -18,6 +20,7 @@ localStorage.setItem('vexworld.host-id', hostId);
 const ui = Object.fromEntries([
   'setup-panel','setup-error','save-slot','environment','human-name','human-form','human-color','companion-count','companion-setup',
   'continue-button','begin-button','saved-summary','server-options','use-server','session-id','party-panel','quest-panel','message-panel',
+  'companion-bubbles','dialogue-log','dialogue-items',
   'weather-label','world-label','combo-panel','combo-speaker','timing-marker','status-panel','status-content','status-button','status-close',
   'copy-session-button','release-session-button','pause-panel','resume-button','pause-setup-button'
 ].map((id) => [id.replaceAll('-', '_'), document.querySelector(`#${id}`)]));
@@ -30,8 +33,14 @@ let accumulator = 0;
 let activeClient = null;
 let networkState = 'LOCAL_ONLY';
 let remoteIntents = {};
+let activeUtterances = {};
+let lastSeenUtteranceSequences = {};
+let recentDialogue = [];
+let localCommunicationState = new Map();
 let lastNetworkObservationAt = 0;
 let lastNetworkIntentAt = 0;
+let lastNetworkUtteranceAt = 0;
+let lastLocalCommunicationScanAt = 0;
 let lastSaveAt = 0;
 let lastLeaseRenewAt = 0;
 let lastStatusRenderAt = 0;
@@ -104,6 +113,91 @@ function collectSetup() {
   };
 }
 
+function resetCommunicationExpression() {
+  activeUtterances = {};
+  lastSeenUtteranceSequences = {};
+  recentDialogue = [];
+  localCommunicationState = new Map();
+  if (ui.companion_bubbles) ui.companion_bubbles.replaceChildren();
+  if (ui.dialogue_items) ui.dialogue_items.replaceChildren();
+  if (ui.dialogue_log) ui.dialogue_log.classList.add('hidden');
+}
+
+function memberForParticipant(participantRef) {
+  return state?.party?.members?.find((member) => member.participantRef === participantRef) || null;
+}
+
+function recordUtterance(utterance) {
+  if (!utterance || !Number.isInteger(utterance.sequence) || utterance.expiresAt < Date.now()) return;
+  const prior = Number(lastSeenUtteranceSequences[utterance.participantRef] || 0);
+  if (utterance.sequence <= prior) return;
+  lastSeenUtteranceSequences[utterance.participantRef] = utterance.sequence;
+  activeUtterances[utterance.participantRef] = utterance;
+  recentDialogue.push(utterance);
+  recentDialogue = recentDialogue.slice(-8);
+}
+
+function renderCommunication() {
+  if (!state || !ui.companion_bubbles || !ui.dialogue_items) return;
+  const now = Date.now();
+  const live = Object.values(activeUtterances).filter((utterance) => utterance.expiresAt >= now);
+  for (const [participantRef, utterance] of Object.entries(activeUtterances)) {
+    if (utterance.expiresAt < now) delete activeUtterances[participantRef];
+  }
+  ui.companion_bubbles.innerHTML = live.map((utterance) => {
+    const member = memberForParticipant(utterance.participantRef);
+    const name = member?.displayName || utterance.participantRef.split('.').pop() || 'Companion';
+    const color = member?.avatarExpression?.color || '#94f1c8';
+    const source = utterance.controllerDisposition === 'OLLAMA' ? 'local model' : utterance.controllerDisposition === 'DETERMINISTIC_FALLBACK' ? 'fallback' : 'companion';
+    return `<article class="companion-bubble" style="--speaker-accent:${escapeHtml(color)}"><strong>${escapeHtml(name)}</strong><span>${escapeHtml(utterance.text)}</span><small>${escapeHtml(source)}</small></article>`;
+  }).join('');
+
+  ui.dialogue_items.innerHTML = recentDialogue.slice(-5).map((utterance) => {
+    const member = memberForParticipant(utterance.participantRef);
+    const name = member?.displayName || utterance.participantRef.split('.').pop() || 'Companion';
+    return `<div class="dialogue-line"><b>${escapeHtml(name)}</b><span>${escapeHtml(utterance.text)}</span></div>`;
+  }).join('');
+  ui.dialogue_log.classList.toggle('hidden', recentDialogue.length === 0);
+}
+
+function maybeEmitLocalCommunication(nowPerformance) {
+  if (!state || nowPerformance - lastLocalCommunicationScanAt < 500) return;
+  lastLocalCommunicationScanAt = nowPerformance;
+  const human = getHuman(state.party);
+  for (const companion of getCompanions(state.party).filter((member) => member.controllerBinding.controllerClass === 'LOCAL_DETERMINISTIC')) {
+    const prior = localCommunicationState.get(companion.participantRef) || { sequence: 0, lastAt: 0, lastIntentType: null };
+    const intent = chooseLocalCompanionIntent({
+      companion,
+      human,
+      enemies: state.enemies,
+      world: worldPackage,
+      nowMs: state.nowMs,
+      activeTechniqueSignal: state.activeTechniqueSignal
+    });
+    const now = Date.now();
+    if (prior.lastIntentType === intent.intentType && now - prior.lastAt < 6500) continue;
+    const sequence = prior.sequence + 1;
+    const observation = makeParticipantObservation(state, companion.participantRef, worldPackage);
+    const utterance = formCompanionUtterance({
+      participantRef: companion.participantRef,
+      sequence,
+      formedAt: now,
+      sourceObservationRef: observation.observationRef,
+      sourceIntentRef: `intent-expression.${companion.participantRef}.${state.tick}`,
+      proposal: deterministicCommunicationProposal(intent),
+      controllerDisposition: 'LOCAL_DETERMINISTIC',
+      controllerEvidence: {
+        requestedMode: 'deterministic',
+        workerId: 'browser.local-expression',
+        modelIdentity: null,
+        fallbackReason: null
+      }
+    });
+    recordUtterance(utterance);
+    localCommunicationState.set(companion.participantRef, { sequence, lastAt: now, lastIntentType: intent.intentType });
+  }
+}
+
 function updateSaveSummary() {
   const slot = Number(ui.save_slot.value);
   const raw = localStorage.getItem(saveKey(slot));
@@ -159,6 +253,7 @@ async function begin({ continueExisting = false } = {}) {
     }
     state = loaded || createInitialGame(worldPackage, setup);
     if (loaded && state.sessionRef !== setup.sessionRef && activeClient) state.sessionRef = setup.sessionRef;
+    resetCommunicationExpression();
     ui.setup_panel.classList.add('hidden');
     running = true;
     canvas.focus();
@@ -236,6 +331,7 @@ async function saveReleaseAndReturnToGarden() {
   }
   running = false;
   remoteIntents = {};
+  resetCommunicationExpression();
   ui.status_panel.classList.add('hidden');
   ui.pause_panel.classList.add('hidden');
   ui.setup_panel.classList.remove('hidden');
@@ -265,6 +361,15 @@ async function networkTick() {
       try {
         const intent = await activeClient.pollIntent(member.participantRef);
         if (intent) remoteIntents[member.participantRef] = intent;
+      } catch {}
+    }));
+  }
+  if (now - lastNetworkUtteranceAt > 300) {
+    lastNetworkUtteranceAt = now;
+    await Promise.all(remoteCompanions.map(async (member) => {
+      try {
+        const utterance = await activeClient.pollUtterance(member.participantRef);
+        if (utterance) recordUtterance(utterance);
       } catch {}
     }));
   }
@@ -304,6 +409,9 @@ function renderStatus() {
       return `<div class="worker-command"><code>${escapeHtml(command)}</code><button type="button" data-copy-worker="${index}">Copy</button></div>`;
     });
   const hasRemoteOllama = companions.some((member) => member.controllerBinding.controllerClass === 'REMOTE_OLLAMA');
+  const dialogueSummary = recentDialogue.length
+    ? recentDialogue.slice(-4).map((utterance) => `${escapeHtml(memberForParticipant(utterance.participantRef)?.displayName || 'Companion')}: ${escapeHtml(utterance.text)}`).join('<br>')
+    : 'No recent companion expression.';
   ui.status_content.innerHTML = `
     <article class="status-card"><h3>Who am I here?</h3><p><b>${escapeHtml(human.displayName)}</b> — ${escapeHtml(human.avatarExpression.form)}</p><p>Participant: <code>${escapeHtml(human.participantRef)}</code></p><p>Vessel: <code>${escapeHtml(human.vesselRef)}</code></p></article>
     <article class="status-card"><h3>Party</h3><p>${state.party.members.map((m)=>escapeHtml(m.displayName)).join(' • ')}</p><p>${state.party.members.length} / ${state.party.capacity}</p></article>
@@ -313,6 +421,7 @@ function renderStatus() {
     <article class="status-card"><h3>Bond resonance</h3><p>${facets}</p><p>No hidden affection or worth score.</p></article>
     <article class="status-card"><h3>First Grove journey</h3><p><b>${escapeHtml(region?.title || 'First Grove')}</b></p><p>Home: <code>${escapeHtml(journey.homeAnchorRef || 'UNKNOWN')}</code></p><p>Regions visited: ${(journey.visitedRegionRefs || []).length} • discoveries: ${(journey.discoveredRefs || []).length}</p><p>Origin lesson: ${escapeHtml(journey.originContext?.earlyTraversalCue?.replaceAll('_',' ') || 'UNKNOWN')}</p><p>Potential ceiling effect: <b>${escapeHtml(journey.originContext?.potentialCeilingEffect || 'UNKNOWN')}</b></p></article>
     <article class="status-card"><h3>World / quest</h3><p>${escapeHtml(state.quest.progressText)}</p><p>Weather: ${escapeHtml(state.weather.state)}</p><p>Twin Horizon: ${state.quest.twinHorizonUnlocked ? 'LEARNED' : state.quest.twinHorizonTrial}</p></article>
+    <article class="status-card"><h3>Recent companion expression</h3><p>${dialogueSummary}</p><p class="tiny-note">Ephemeral expression only — not canonical memory, world law, relationship worth, or motor authority.</p></article>
     <article class="status-card"><h3>Session</h3><p>${escapeHtml(networkState)}</p><p><code>${escapeHtml(state.sessionRef)}</code></p>${remoteCommands.length ? `<p>Remote worker command${remoteCommands.length > 1 ? 's' : ''}:</p>${remoteCommands.join('')}` : '<p>All companions are local.</p>'}${hasRemoteOllama ? '<p class="tiny-note">Ollama worker commands do not guess a model name. If exactly one model is installed it is observed and selected; if several are installed, add <code>--model &lt;exact-name-from-ollama-list&gt;</code>.</p>' : ''}<p class="tiny-note">The token is a trusted-LAN development credential. Do not post it publicly.</p></article>`;
   ui.status_content.querySelectorAll('[data-copy-worker]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -334,6 +443,7 @@ function renderUi(force = false) {
   ui.world_label.textContent = `${region?.title || 'First Grove'} • ${state.environment.replaceAll('_',' ')} • ${networkState}`;
   ui.quest_panel.innerHTML = `<strong>${state.quest.twinHorizonTrial === 'ACTIVE' ? 'Resonance Trial' : 'Current path'}</strong>${escapeHtml(state.quest.progressText)}`;
   ui.message_panel.innerHTML = state.messages.slice(-3).map((message)=>`<div class="message"><b>${escapeHtml(message.speaker)}</b>${escapeHtml(message.text)}</div>`).join('');
+  renderCommunication();
   const signal = state.activeTechniqueSignal;
   if (signal) {
     ui.combo_panel.classList.remove('hidden');
@@ -363,6 +473,7 @@ function frame(timestamp) {
     accumulator -= FIXED_STEP_MS;
   }
   renderer.render(state, worldPackage);
+  maybeEmitLocalCommunication(timestamp);
   renderUi();
   saveCurrentState();
   networkTick();
@@ -395,6 +506,7 @@ try {
   }
   makeCompanionRows();
   updateSaveSummary();
+  resetCommunicationExpression();
   requestAnimationFrame(frame);
 } catch (error) {
   ui.setup_error.textContent = error.message;
