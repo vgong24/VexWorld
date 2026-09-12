@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "vexworld.source-map-fragment/v1",
+  "fragmentRef": "source-map-fragment.vexworld.v1.stage-02a-companion-communication",
+  "reason": "Register the VW-FWD-02A companion communication contract and direct regression evidence without rewriting the historical Version 1 base source map.",
+  "entries": [
+    {
+      "path": "config/source-map.fragments/stage-02a-companion-communication.json",
+      "category": "navigation-and-coverage",
+      "owner": "Companion Expression",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "src/core/companion-communication.mjs",
+      "category": "companion-communication-contract",
+      "owner": "Companion Expression",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "test/companion-communication.test.mjs",
+      "category": "test-evidence",
+      "owner": "Assurance",
+      "sourceClass": "EVIDENCE_SOURCE"
+    },
+    {
+      "path": "test/companion-communication-worker.test.mjs",
+      "category": "test-evidence",
+      "owner": "Assurance",
+      "sourceClass": "EVIDENCE_SOURCE"
+    }
+  ]
+}

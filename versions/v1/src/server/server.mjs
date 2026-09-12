@@ -5,6 +5,7 @@ import { promises as fs } from 'node:fs';
 import { homedir, networkInterfaces } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateCompanionUtterance } from '../core/companion-communication.mjs';
 import { SessionStore } from './session-store.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -158,6 +159,19 @@ export function createVexWorldServer({ host = '127.0.0.1', port = 4173, token, d
               return sendJson(response, result.accepted ? 200 : 409, result);
             }
           }
+          if (resource === 'utterance') {
+            if (request.method === 'GET') {
+              const record = await store.read(sessionRef);
+              return sendJson(response, 200, record.utterances[participantRef] || null);
+            }
+            if (request.method === 'PUT') {
+              const utterance = await readJson(request);
+              const validation = validateCompanionUtterance(utterance, { expectedParticipantRef: participantRef });
+              if (!validation.valid) return sendJson(response, 400, { error: validation.reason });
+              const result = await store.putUtterance(sessionRef, participantRef, utterance);
+              return sendJson(response, result.accepted ? 200 : 409, result);
+            }
+          }
           if (resource === 'heartbeat' && request.method === 'PUT') {
             const result = await store.heartbeat(sessionRef, participantRef, await readJson(request));
             return sendJson(response, 200, result);
@@ -166,10 +180,6 @@ export function createVexWorldServer({ host = '127.0.0.1', port = 4173, token, d
         return sendJson(response, 404, { error: 'API_ROUTE_NOT_FOUND' });
       }
 
-      // Root is an entry pointer, not a second static-root namespace. Redirecting
-      // preserves the token while making the browser's relative CSS/module URLs
-      // resolve beneath /src/web/ instead of incorrectly probing /styles.css,
-      // /app.mjs, and /origin-ritual.mjs.
       if (url.pathname === '/') {
         response.writeHead(302, {
           location: `/src/web/index.html${url.search}`,
@@ -178,8 +188,6 @@ export function createVexWorldServer({ host = '127.0.0.1', port = 4173, token, d
         return response.end();
       }
 
-      // Browsers may probe this implicitly. It is intentionally empty rather than
-      // a missing-resource error so browser evidence is not polluted by chrome.
       if (url.pathname === '/favicon.ico') {
         response.writeHead(204, { 'cache-control': 'no-store' });
         return response.end();

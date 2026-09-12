@@ -31,14 +31,43 @@ test('session store enforces one host lease and optimistic state version', async
   }
 });
 
-test('observations and intents preserve monotonic sequence', async () => {
+test('observations, intents, and utterances preserve independent monotonic sequences', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'vexworld-relay-'));
   try {
     const store = new SessionStore(directory);
     assert.equal((await store.putObservation('s', 'participant.vex', { sequence: 2 })).accepted, true);
     assert.equal((await store.putObservation('s', 'participant.vex', { sequence: 1 })).accepted, false);
-    assert.equal((await store.putIntent('s', 'participant.vex', { sequence: 1 })).accepted, true);
-    assert.equal((await store.putIntent('s', 'participant.vex', { sequence: 1 })).accepted, false);
+    assert.equal((await store.putIntent('s', 'participant.vex', { sequence: 4 })).accepted, true);
+    assert.equal((await store.putIntent('s', 'participant.vex', { sequence: 4 })).accepted, false);
+    assert.equal((await store.putUtterance('s', 'participant.vex', { sequence: 1, text: 'hello' })).accepted, true);
+    assert.equal((await store.putUtterance('s', 'participant.vex', { sequence: 1, text: 'stale' })).accepted, false);
+    assert.equal((await store.putUtterance('s', 'participant.vex', { sequence: 2, text: 'next' })).accepted, true);
+    const record = await store.read('s');
+    assert.equal(record.intents['participant.vex'].sequence, 4);
+    assert.equal(record.utterances['participant.vex'].sequence, 2);
+    assert.equal(record.utterances['participant.vex'].text, 'next');
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('legacy session records are read with an empty utterance collection without rewriting them', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'vexworld-session-legacy-'));
+  try {
+    const store = new SessionStore(directory);
+    await store.write({
+      schemaVersion: 'vexworld.session/v1',
+      sessionRef: 'legacy',
+      stateVersion: 0,
+      checkpoint: null,
+      hostLease: null,
+      observations: {},
+      intents: {},
+      workers: {},
+      updatedAt: 1
+    });
+    const record = await store.read('legacy');
+    assert.deepEqual(record.utterances, {});
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

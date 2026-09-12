@@ -2,10 +2,16 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { ALLOWED_COMPANION_INTENTS } from '../core/constants.mjs';
+import {
+  deterministicCommunicationProposal,
+  formCompanionUtterance,
+  speechActForIntent
+} from '../core/companion-communication.mjs';
 
 const MODEL_REASON_MAX_LENGTH = 180;
 const MODEL_TARGET_MAX_LENGTH = 180;
 const DEFAULT_MODEL_TIMEOUT_MS = 5000;
+const COMMUNICATION_COOLDOWN_MS = 5000;
 
 function controllerError(code, message) {
   const error = new Error(message);
@@ -68,23 +74,28 @@ export async function agentApi(options, route, init = {}) {
   return payload;
 }
 
-function asIntentSequenceFloor(value, label) {
+function asSequenceFloor(value, label) {
   const sequence = Number(value ?? 0);
   if (!Number.isInteger(sequence) || sequence < 0) {
-    throw controllerError('RETAINED_INTENT_SEQUENCE_INVALID', `${label} must be a non-negative integer`);
+    throw controllerError('RETAINED_SEQUENCE_INVALID', `${label} must be a non-negative integer`);
   }
   return sequence;
 }
 
-export async function resolveAuthoritativeIntentSequence(options, localIntentSequence = 0) {
-  const localFloor = asIntentSequenceFloor(localIntentSequence, 'local intent sequence');
-  const record = await agentApi(
-    options,
-    `/api/v1/sessions/${encodeURIComponent(options.session)}`
-  );
-  const retained = record?.intents?.[options.companion];
-  const retainedFloor = asIntentSequenceFloor(retained?.sequence ?? 0, 'retained intent sequence');
+async function resolveAuthoritativeSequence(options, collection, localSequence = 0) {
+  const localFloor = asSequenceFloor(localSequence, `local ${collection} sequence`);
+  const record = await agentApi(options, `/api/v1/sessions/${encodeURIComponent(options.session)}`);
+  const retained = record?.[collection]?.[options.companion];
+  const retainedFloor = asSequenceFloor(retained?.sequence ?? 0, `retained ${collection} sequence`);
   return Math.max(localFloor, retainedFloor);
+}
+
+export async function resolveAuthoritativeIntentSequence(options, localIntentSequence = 0) {
+  return resolveAuthoritativeSequence(options, 'intents', localIntentSequence);
+}
+
+export async function resolveAuthoritativeUtteranceSequence(options, localUtteranceSequence = 0) {
+  return resolveAuthoritativeSequence(options, 'utterances', localUtteranceSequence);
 }
 
 export function deterministicIntent(observation) {
@@ -250,7 +261,8 @@ export async function ollamaIntent(options, observation, modelIdentity) {
     'You do not control physics per frame and cannot mutate world state directly.',
     'Prefer resource safety when return margin is low.',
     'You may signal a combo but never force the human to accept it.',
-    'Your response does not become canonical memory, relationship worth, world law, or a learned ability.',
+    'Write reason as one concise first-person in-world line the companion could say aloud while acting.',
+    'That line is expression only: it cannot become canonical memory, relationship worth, world law, a learned ability, or motor authority.',
     'Return only the JSON object described by the schema.',
     'Do not include hidden reasoning or chain-of-thought.'
   ].join(' ');
@@ -296,7 +308,20 @@ export async function ollamaIntent(options, observation, modelIdentity) {
   };
 }
 
-export async function runWorkerCycle(options, state = { lastObservationSequence: 0, intentSequence: 0, modelIdentity: null }) {
+function shouldEmitCommunication(state, intent, now) {
+  return !state.lastUtteranceAt ||
+    state.lastUtteranceIntentType !== intent.intentType ||
+    now - state.lastUtteranceAt >= COMMUNICATION_COOLDOWN_MS;
+}
+
+export async function runWorkerCycle(options, state = {
+  lastObservationSequence: 0,
+  intentSequence: 0,
+  utteranceSequence: 0,
+  lastUtteranceAt: 0,
+  lastUtteranceIntentType: null,
+  modelIdentity: null
+}) {
   let modelIdentity = state.modelIdentity || null;
   let modelIdentityError = null;
   if (options.mode === 'ollama' && !modelIdentity) {
@@ -326,7 +351,7 @@ export async function runWorkerCycle(options, state = { lastObservationSequence:
     `/api/v1/sessions/${encodeURIComponent(options.session)}/companions/${encodeURIComponent(options.companion)}/observation`
   );
   if (!observation || Number(observation.sequence) <= state.lastObservationSequence) {
-    return { ...state, modelIdentity, processed: false, intent: null };
+    return { ...state, modelIdentity, processed: false, intent: null, utterance: null };
   }
 
   const lastObservationSequence = Number(observation.sequence);
@@ -350,15 +375,13 @@ export async function runWorkerCycle(options, state = { lastObservationSequence:
     proposed = deterministicIntent(observation);
   }
 
-  // Worker processes are replaceable. Intent sequence authority lives with the
-  // retained session record, not process-local memory. Resolve the sequence
-  // floor immediately before write so a fresh process continues from the latest
-  // accepted intent rather than restarting at sequence 1.
   const sequenceFloor = await resolveAuthoritativeIntentSequence(options, state.intentSequence);
   const now = Date.now();
   const intentSequence = sequenceFloor + 1;
+  const intentRef = `intent.${options.companion}.${intentSequence}`;
   const intent = {
     schemaVersion: 'vexworld.companion-intent/v1',
+    intentRef,
     participantRef: options.companion,
     sequence: intentSequence,
     formedAt: now,
@@ -382,11 +405,69 @@ export async function runWorkerCycle(options, state = { lastObservationSequence:
   await agentApi(options, `/api/v1/sessions/${encodeURIComponent(options.session)}/companions/${encodeURIComponent(options.companion)}/intent`, {
     method: 'PUT', body: JSON.stringify(intent)
   });
-  return { lastObservationSequence, intentSequence, modelIdentity, processed: true, intent };
+
+  let utterance = null;
+  let utteranceSequence = state.utteranceSequence || 0;
+  let lastUtteranceAt = state.lastUtteranceAt || 0;
+  let lastUtteranceIntentType = state.lastUtteranceIntentType || null;
+  let utteranceError = null;
+  if (shouldEmitCommunication(state, intent, now)) {
+    try {
+      const utteranceFloor = await resolveAuthoritativeUtteranceSequence(options, utteranceSequence);
+      utteranceSequence = utteranceFloor + 1;
+      const proposal = controllerDisposition === 'OLLAMA'
+        ? { speechAct: speechActForIntent(intent.intentType), text: proposed.reason }
+        : deterministicCommunicationProposal(intent);
+      utterance = formCompanionUtterance({
+        participantRef: options.companion,
+        sequence: utteranceSequence,
+        formedAt: now,
+        sourceObservationRef: observation.observationRef,
+        sourceIntentRef: intentRef,
+        proposal,
+        controllerDisposition,
+        controllerEvidence: {
+          requestedMode: options.mode,
+          workerId: options.workerId,
+          modelIdentity: intent.controllerEvidence.modelIdentity,
+          fallbackReason
+        }
+      });
+      await agentApi(options, `/api/v1/sessions/${encodeURIComponent(options.session)}/companions/${encodeURIComponent(options.companion)}/utterance`, {
+        method: 'PUT', body: JSON.stringify(utterance)
+      });
+      lastUtteranceAt = now;
+      lastUtteranceIntentType = intent.intentType;
+    } catch (error) {
+      utteranceError = error.code || error.message || 'UTTERANCE_RELAY_ERROR';
+      utterance = null;
+      console.error(`communication unavailable [${utteranceError}]; gameplay intent remains accepted`);
+    }
+  }
+
+  return {
+    lastObservationSequence,
+    intentSequence,
+    utteranceSequence,
+    lastUtteranceAt,
+    lastUtteranceIntentType,
+    modelIdentity,
+    processed: true,
+    intent,
+    utterance,
+    utteranceError
+  };
 }
 
 export async function runWorker(options) {
-  let state = { lastObservationSequence: 0, intentSequence: 0, modelIdentity: null };
+  let state = {
+    lastObservationSequence: 0,
+    intentSequence: 0,
+    utteranceSequence: 0,
+    lastUtteranceAt: 0,
+    lastUtteranceIntentType: null,
+    modelIdentity: null
+  };
   let cycles = 0;
   console.log(`VexWorld companion worker: ${options.companion}`);
   console.log(`worker=${options.workerId} mode=${options.mode} session=${options.session} server=${options.server}`);
@@ -405,6 +486,9 @@ export async function runWorker(options) {
       if (state.processed && state.intent) {
         const fallback = state.intent.controllerEvidence?.fallbackReason ? ` fallback=${state.intent.controllerEvidence.fallbackReason}` : '';
         console.log(`${state.intent.sequence}: ${state.intent.intentType}${state.intent.targetRef ? ` -> ${state.intent.targetRef}` : ''} [${state.intent.controllerDisposition}]${fallback}`);
+      }
+      if (state.utterance) {
+        console.log(`say ${state.utterance.sequence}: "${state.utterance.text}" [${state.utterance.controllerDisposition}]`);
       }
     } catch (error) {
       console.error(`relay unavailable: ${error.message}`);

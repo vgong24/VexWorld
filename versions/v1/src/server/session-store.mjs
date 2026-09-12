@@ -19,9 +19,18 @@ function emptyRecord(sessionRef) {
     hostLease: null,
     observations: {},
     intents: {},
+    utterances: {},
     workers: {},
     updatedAt: Date.now()
   };
+}
+
+function normalizeRecord(record) {
+  if (!record.observations || typeof record.observations !== 'object') record.observations = {};
+  if (!record.intents || typeof record.intents !== 'object') record.intents = {};
+  if (!record.utterances || typeof record.utterances !== 'object') record.utterances = {};
+  if (!record.workers || typeof record.workers !== 'object') record.workers = {};
+  return record;
 }
 
 function defaultSleep(ms) {
@@ -68,7 +77,7 @@ export class SessionStore {
   async read(sessionRef) {
     const file = this.sessionPath(sessionRef);
     try {
-      return JSON.parse(await fs.readFile(file, 'utf8'));
+      return normalizeRecord(JSON.parse(await fs.readFile(file, 'utf8')));
     } catch (error) {
       if (error.code === 'ENOENT') return emptyRecord(sessionRef);
       throw error;
@@ -186,6 +195,19 @@ export class SessionStore {
       record.updatedAt = now;
       await this.write(record);
       return { accepted: true, sequence: intent.sequence };
+    });
+  }
+
+  async putUtterance(sessionRef, participantRef, utterance, { now = Date.now() } = {}) {
+    assertId(participantRef, PARTICIPANT_ID, 'participantRef');
+    return this.withLock(sessionRef, async () => {
+      const record = await this.read(sessionRef);
+      const prior = record.utterances[participantRef];
+      if (prior && Number(utterance.sequence) <= Number(prior.sequence)) return { accepted: false, reason: 'STALE_SEQUENCE' };
+      record.utterances[participantRef] = { ...utterance, relayedAt: now };
+      record.updatedAt = now;
+      await this.write(record);
+      return { accepted: true, sequence: utterance.sequence };
     });
   }
 

@@ -31,7 +31,9 @@ test('browser root redirects into the source-owned web directory and preserves t
     const html = await fetch(`${base}${entry.headers.get('location')}`);
     assert.equal(html.status, 200);
     assert.match(html.headers.get('content-type') || '', /^text\/html/);
-    assert.match(await html.text(), /Vextory: First Grove/);
+    const htmlText = await html.text();
+    assert.match(htmlText, /Vextory: First Grove/);
+    assert.match(htmlText, /Recent companion dialogue/);
 
     for (const assetPath of [
       '/src/web/styles.css',
@@ -47,7 +49,7 @@ test('browser root redirects into the source-owned web directory and preserves t
   });
 });
 
-test('LAN development API supports lease, checkpoint, observation, and intent relay', async () => {
+test('LAN development API supports lease, checkpoint, observation, intent, and independent utterance relay', async () => {
   await withServer(async ({ base, token }) => {
     const headers = { 'content-type': 'application/json', authorization: `Bearer ${token}` };
     const health = await fetch(`${base}/api/v1/health`, { headers });
@@ -60,8 +62,55 @@ test('LAN development API supports lease, checkpoint, observation, and intent re
     assert.equal(observation.status, 200);
     const intent = await fetch(`${base}/api/v1/sessions/demo/companions/participant.vex/intent`, { method: 'PUT', headers, body: JSON.stringify({ sequence: 1, intentType: 'FOLLOW_HUMAN' }) });
     assert.equal(intent.status, 200);
+    const utteranceBody = {
+      schemaVersion: 'vexworld.companion-utterance/v1',
+      utteranceRef: 'utterance.participant.vex.1',
+      participantRef: 'participant.vex',
+      sequence: 1,
+      formedAt: 1000,
+      expiresAt: 7500,
+      sourceObservationRef: 'observation.participant.vex.1',
+      sourceIntentRef: 'intent.participant.vex.1',
+      speechAct: 'COHESION',
+      text: "I'm with you.",
+      controllerDisposition: 'DETERMINISTIC',
+      controllerEvidence: { requestedMode: 'deterministic', workerId: 'worker.test', modelIdentity: null, fallbackReason: null }
+    };
+    const utterance = await fetch(`${base}/api/v1/sessions/demo/companions/participant.vex/utterance`, { method: 'PUT', headers, body: JSON.stringify(utteranceBody) });
+    assert.equal(utterance.status, 200);
+    const polled = await fetch(`${base}/api/v1/sessions/demo/companions/participant.vex/utterance`, { headers }).then((response) => response.json());
+    assert.equal(polled.text, "I'm with you.");
     const record = await fetch(`${base}/api/v1/sessions/demo`, { headers }).then((response) => response.json());
     assert.equal(record.stateVersion, 1);
     assert.equal(record.observations['participant.vex'].hello, 'vex');
+    assert.equal(record.utterances['participant.vex'].sequence, 1);
+  });
+});
+
+test('utterance endpoint rejects authority-shaped or participant-mismatched records', async () => {
+  await withServer(async ({ base, token }) => {
+    const headers = { 'content-type': 'application/json', authorization: `Bearer ${token}` };
+    const baseUtterance = {
+      schemaVersion: 'vexworld.companion-utterance/v1',
+      utteranceRef: 'utterance.participant.vex.1',
+      participantRef: 'participant.vex',
+      sequence: 1,
+      formedAt: 1000,
+      expiresAt: 7500,
+      sourceObservationRef: 'observation.participant.vex.1',
+      sourceIntentRef: 'intent.participant.vex.1',
+      speechAct: 'STATUS',
+      text: 'I am here.',
+      controllerDisposition: 'DETERMINISTIC',
+      controllerEvidence: { requestedMode: 'deterministic', workerId: 'worker.test', modelIdentity: null, fallbackReason: null }
+    };
+    const authority = await fetch(`${base}/api/v1/sessions/demo/companions/participant.vex/utterance`, {
+      method: 'PUT', headers, body: JSON.stringify({ ...baseUtterance, memoryWrite: 'secret' })
+    });
+    assert.equal(authority.status, 400);
+    const mismatch = await fetch(`${base}/api/v1/sessions/demo/companions/participant.mira/utterance`, {
+      method: 'PUT', headers, body: JSON.stringify(baseUtterance)
+    });
+    assert.equal(mismatch.status, 400);
   });
 });
