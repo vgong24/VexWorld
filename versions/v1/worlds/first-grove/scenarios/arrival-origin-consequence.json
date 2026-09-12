@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "vexworld.scenario/v1",
+  "scenarioRef": "scenario.first-grove.arrival-origin-consequence",
+  "purpose": "Prove the Garden of Arrival is a welcome ritual and origins alter early context without constraining long-term potential.",
+  "given": ["A human and one or more companions are forming a new Adventure Pair journey."],
+  "when": ["The party chooses or receives an origin and enters First Grove."],
+  "expected": [
+    "The origin exposes one distinct early traversal cue and discovery route.",
+    "The party enters with a known home/return anchor.",
+    "Companion first forms remain mutable expressions.",
+    "Every origin explicitly reports potentialCeilingEffect=NONE."
+  ],
+  "forbidden": [
+    "Origin permanently locks a profession, body capability, practice ceiling or relationship role.",
+    "Choosing a companion first form creates a new lineage or resets relationship continuity."
+  ]
+}

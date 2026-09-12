@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "vexworld.source-map-fragment/v1",
+  "fragmentRef": "source-map-fragment.vexworld.v1.stage-d-first-grove",
+  "reason": "Register Stage D First Grove scenario and Garden ritual sources added after the original Version 1 source-map formation without rewriting that historical base map.",
+  "entries": [
+    {
+      "path": "config/source-map.fragments/stage-d-first-grove.json",
+      "category": "navigation-and-coverage",
+      "owner": "First Grove Experience",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "src/web/origin-ritual.mjs",
+      "category": "browser-experience",
+      "owner": "First Grove Experience",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "worlds/first-grove/scenarios/arrival-origin-consequence.json",
+      "category": "scenario-source",
+      "owner": "First Grove Experience",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "worlds/first-grove/scenarios/echo-overlook-witness.json",
+      "category": "scenario-source",
+      "owner": "First Grove Experience",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "worlds/first-grove/scenarios/home-return-loop.json",
+      "category": "scenario-source",
+      "owner": "First Grove Experience",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "worlds/first-grove/scenarios/mossbridge-cooperation.json",
+      "category": "scenario-source",
+      "owner": "First Grove Experience",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "worlds/first-grove/scenarios/resident-practice-route.json",
+      "category": "scenario-source",
+      "owner": "First Grove Experience",
+      "sourceClass": "CANONICAL_SOURCE"
+    }
+  ]
+}

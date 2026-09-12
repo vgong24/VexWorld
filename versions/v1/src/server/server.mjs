@@ -65,8 +65,7 @@ function requireToken(request, token) {
 }
 
 function safeStaticPath(urlPath) {
-  const requested = urlPath === '/' ? '/src/web/index.html' : urlPath;
-  const decoded = decodeURIComponent(requested).replace(/\\/g, '/');
+  const decoded = decodeURIComponent(urlPath).replace(/\\/g, '/');
   const absolute = path.resolve(projectRoot, `.${decoded}`);
   if (!absolute.startsWith(projectRoot + path.sep)) return null;
   return absolute;
@@ -165,6 +164,25 @@ export function createVexWorldServer({ host = '127.0.0.1', port = 4173, token, d
           }
         }
         return sendJson(response, 404, { error: 'API_ROUTE_NOT_FOUND' });
+      }
+
+      // Root is an entry pointer, not a second static-root namespace. Redirecting
+      // preserves the token while making the browser's relative CSS/module URLs
+      // resolve beneath /src/web/ instead of incorrectly probing /styles.css,
+      // /app.mjs, and /origin-ritual.mjs.
+      if (url.pathname === '/') {
+        response.writeHead(302, {
+          location: `/src/web/index.html${url.search}`,
+          'cache-control': 'no-store'
+        });
+        return response.end();
+      }
+
+      // Browsers may probe this implicitly. It is intentionally empty rather than
+      // a missing-resource error so browser evidence is not polluted by chrome.
+      if (url.pathname === '/favicon.ico') {
+        response.writeHead(204, { 'cache-control': 'no-store' });
+        return response.end();
       }
 
       const file = safeStaticPath(url.pathname);

@@ -9,6 +9,7 @@ export function createEnemy(source) {
   return {
     entityRef: source.entityRef,
     kind: source.kind,
+    behaviorProfileRef: source.behaviorProfileRef || `behavior.first-grove.${String(source.kind || 'creature').toLowerCase()}.default`,
     spawn: { x: source.x, y: source.y },
     body: {
       x: source.x,
@@ -38,6 +39,29 @@ function defaultSetup() {
     companions: [
       { displayName: 'Vex', avatarForm: 'WISP', color: '#94f1c8', controllerClass: 'LOCAL_DETERMINISTIC' }
     ]
+  };
+}
+
+function initialFirstGroveJourney(worldPackage, environment) {
+  const firstRegion = worldPackage.map.regions?.[0] || null;
+  const home = worldPackage.map.restorationPoints?.find((point) => point.homeAnchor) || worldPackage.map.restorationPoints?.[0] || null;
+  const origin = worldPackage.map.originConsequences?.[environment] || null;
+  return {
+    schemaVersion: 'vexworld.first-grove-journey/v1',
+    currentRegionRef: firstRegion?.regionRef || null,
+    visitedRegionRefs: firstRegion ? [firstRegion.regionRef] : [],
+    discoveredRefs: [],
+    acceptedOpportunityRefs: [],
+    completedOpportunityRefs: [],
+    visitedWitnessSiteRefs: [],
+    homeAnchorRef: home?.entityRef || null,
+    originContext: origin ? {
+      environment,
+      earlyTraversalCue: origin.earlyTraversalCue,
+      earlyDiscoveryRef: origin.earlyDiscoveryRef,
+      potentialCeilingEffect: origin.potentialCeilingEffect
+    } : null,
+    lastRegionChangedAt: 0
   };
 }
 
@@ -90,6 +114,7 @@ export function createInitialGame(worldPackage, incomingSetup = {}) {
     },
     party,
     enemies: worldPackage.map.enemies.map(createEnemy),
+    firstGrove: initialFirstGroveJourney(worldPackage, environment),
     activeTechniqueSignal: null,
     techniqueHistory: [],
     resonanceProfiles,

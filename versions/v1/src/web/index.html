@@ -11,10 +11,7 @@
     <canvas id="game" width="1280" height="720" tabindex="0" aria-label="Playable First Grove world"></canvas>
 
     <section id="top-hud" class="hud-panel">
-      <div>
-        <strong>Vextory</strong>
-        <span id="world-label">First Grove</span>
-      </div>
+      <div><strong>Vextory</strong><span id="world-label">First Grove</span></div>
       <div id="weather-label">Clear</div>
       <button id="status-button" class="small-button" type="button">Status <kbd>Tab</kbd></button>
     </section>
@@ -23,8 +20,7 @@
     <section id="quest-panel" class="hud-panel" aria-live="polite"></section>
     <section id="message-panel" aria-live="polite"></section>
     <section id="combo-panel" class="hidden" aria-live="assertive">
-      <div id="combo-speaker"></div>
-      <div class="combo-title">HIGH / LOW</div>
+      <div id="combo-speaker"></div><div class="combo-title">HIGH / LOW</div>
       <div class="timing-track"><div id="timing-marker"></div><div class="timing-critical"></div></div>
       <div>Press <kbd>E</kbd> near the center</div>
     </section>
@@ -53,48 +49,21 @@
         <div>
           <p class="eyebrow">Garden of Arrival</p>
           <h1 id="setup-title">Choose how you begin together</h1>
-          <p class="lede">The beginning gives you somewhere to stand. It does not decide where you can go.</p>
+          <p class="lede">A beginning gives you somewhere to stand. It never decides what you may become.</p>
+          <div class="saved-summary" aria-label="Arrival ritual">
+            <strong>Arrival ritual</strong>
+            <span>Choose your current expression → welcome your companions → choose or receive an origin → enter knowing the way home.</span>
+          </div>
+          <p id="origin-note" class="lede" aria-live="polite">Rain beads on the grass. The Hearth is close, and the grove opens gently beyond it.</p>
         </div>
 
         <div class="setup-grid">
-          <label>Adventure Pair save
-            <select id="save-slot">
-              <option value="1">Pair 1</option>
-              <option value="2">Pair 2</option>
-              <option value="3">Pair 3</option>
-            </select>
-          </label>
-          <label>Origin environment
-            <select id="environment">
-              <option value="GARDEN_MEADOW">Garden Meadow</option>
-              <option value="COAST">Coast</option>
-              <option value="MOUNTAIN">Mountain</option>
-              <option value="ISLAND">Island</option>
-              <option value="DESERT">Desert</option>
-              <option value="SNOWLAND">Snowland</option>
-              <option value="RANDOM">Surprise me</option>
-            </select>
-          </label>
-          <label>Your name
-            <input id="human-name" value="Victor" maxlength="28">
-          </label>
-          <label>Your form
-            <select id="human-form">
-              <option value="WANDERER">Wanderer</option>
-              <option value="BLOOMKIN">Bloomkin</option>
-              <option value="STARLING">Starling</option>
-            </select>
-          </label>
-          <label>Your accent
-            <input id="human-color" type="color" value="#ffcf66">
-          </label>
-          <label>Companions in this party
-            <select id="companion-count">
-              <option value="1">1 companion</option>
-              <option value="2">2 companions</option>
-              <option value="3">3 companions — full party</option>
-            </select>
-          </label>
+          <label>Adventure Pair save<select id="save-slot"><option value="1">Pair 1</option><option value="2">Pair 2</option><option value="3">Pair 3</option></select></label>
+          <label>Origin environment<select id="environment"><option value="GARDEN_MEADOW">Garden Meadow</option><option value="COAST">Coast</option><option value="MOUNTAIN">Mountain</option><option value="ISLAND">Island</option><option value="DESERT">Desert</option><option value="SNOWLAND">Snowland</option><option value="RANDOM">Surprise me</option></select></label>
+          <label>Your name<input id="human-name" value="Victor" maxlength="28"></label>
+          <label>Your form<select id="human-form"><option value="WANDERER">Wanderer</option><option value="BLOOMKIN">Bloomkin</option><option value="STARLING">Starling</option></select></label>
+          <label>Your accent<input id="human-color" type="color" value="#ffcf66"></label>
+          <label>Companions in this party<select id="companion-count"><option value="1">1 companion</option><option value="2">2 companions</option><option value="3">3 companions — full party</option></select></label>
         </div>
 
         <div id="companion-setup" class="companion-setup"></div>
@@ -107,10 +76,7 @@
         </fieldset>
 
         <div id="saved-summary" class="saved-summary"></div>
-        <div class="setup-actions">
-          <button id="continue-button" type="button" class="secondary">Continue saved journey</button>
-          <button id="begin-button" type="button">Begin a new journey</button>
-        </div>
+        <div class="setup-actions"><button id="continue-button" type="button" class="secondary">Continue saved journey</button><button id="begin-button" type="button">Enter First Grove</button></div>
         <p id="setup-error" class="error" role="alert"></p>
       </div>
     </section>
@@ -121,6 +87,7 @@
     </section>
   </main>
 
+  <script type="module" src="./origin-ritual.mjs"></script>
   <script type="module" src="./app.mjs"></script>
 </body>
 </html>

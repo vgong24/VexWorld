@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "vexworld.scenario/v1",
+  "scenarioRef": "scenario.first-grove.mossbridge-cooperation",
+  "purpose": "Prove one encounter creates a cooperative opening without converting a signal or relationship history into forced execution or hidden worth scoring.",
+  "given": ["At least two party members enter Mossbridge and a coordination opening exists."],
+  "when": ["One participant signals the High/Low team technique."],
+  "expected": [
+    "The signal is an invitation.",
+    "Another participant may accept, miss, decline or adapt.",
+    "Synchronization outcome depends on coordination evidence.",
+    "The encounter has relationshipWorthEffect=NONE."
+  ],
+  "forbidden": [
+    "Signal guarantees execution.",
+    "Pair synchronization becomes a hidden affection, obedience, morality or dignity score."
+  ]
+}

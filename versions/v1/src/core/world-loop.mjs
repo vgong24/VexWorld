@@ -1,10 +1,62 @@
 import { clamp, distance } from './utils.mjs';
 import { getCompanions, getHuman } from './party.mjs';
 import { updateResourceProjection } from './resource-state.mjs';
+import { recordPractice } from './practice.mjs';
 import { recordResonanceEvent } from './resonance.mjs';
 import { maybeFormTwinHorizonSeed } from './world-witness.mjs';
 import { addMessage, addReceipt, createEnemy, getPairResonance } from './runtime-state.mjs';
 import { stepPhysicsBody } from './physics.mjs';
+
+function ensureFirstGroveJourney(state, worldPackage) {
+  if (state.firstGrove) return state.firstGrove;
+  const firstRegion = worldPackage.map.regions?.[0] || null;
+  const home = worldPackage.map.restorationPoints?.find((point) => point.homeAnchor) || worldPackage.map.restorationPoints?.[0] || null;
+  const origin = worldPackage.map.originConsequences?.[state.environment] || null;
+  state.firstGrove = {
+    schemaVersion: 'vexworld.first-grove-journey/v1',
+    currentRegionRef: firstRegion?.regionRef || null,
+    visitedRegionRefs: firstRegion ? [firstRegion.regionRef] : [],
+    discoveredRefs: [],
+    acceptedOpportunityRefs: [],
+    completedOpportunityRefs: [],
+    visitedWitnessSiteRefs: [],
+    homeAnchorRef: home?.entityRef || null,
+    originContext: origin ? {
+      environment: state.environment,
+      earlyTraversalCue: origin.earlyTraversalCue,
+      earlyDiscoveryRef: origin.earlyDiscoveryRef,
+      potentialCeilingEffect: origin.potentialCeilingEffect
+    } : null,
+    lastRegionChangedAt: state.nowMs
+  };
+  return state.firstGrove;
+}
+
+export function updateFirstGroveProgress(state, worldPackage) {
+  const journey = ensureFirstGroveJourney(state, worldPackage);
+  const human = getHuman(state.party);
+  const region = worldPackage.map.regions?.find((entry) => human.body.x >= entry.xMin && human.body.x <= entry.xMax) || null;
+  if (!region || region.regionRef === journey.currentRegionRef) return journey;
+
+  journey.currentRegionRef = region.regionRef;
+  journey.lastRegionChangedAt = state.nowMs;
+  const firstVisit = !journey.visitedRegionRefs.includes(region.regionRef);
+  if (firstVisit) journey.visitedRegionRefs.push(region.regionRef);
+
+  addMessage(
+    state,
+    region.title || 'First Grove',
+    firstVisit ? `You enter ${region.title}. The way home remains behind you.` : `You return to ${region.title}.`,
+    'WORLD',
+    4200
+  );
+  addReceipt(state, 'REGION_ENTERED', {
+    regionRef: region.regionRef,
+    firstVisit,
+    homeAnchorRef: journey.homeAnchorRef
+  });
+  return journey;
+}
 
 export function updateWorldWitness(state, worldPackage) {
   if (state.quest.techniqueSeedState !== 'NONE') return;
@@ -30,6 +82,7 @@ export function updateWorldWitness(state, worldPackage) {
 
 export function interact(state, worldPackage) {
   const human = getHuman(state.party);
+  const journey = ensureFirstGroveJourney(state, worldPackage);
   const rest = worldPackage.map.restorationPoints.find((point) => distance(human.body, point) <= point.radius);
   if (rest) {
     human.flags.resting = true;
@@ -44,10 +97,81 @@ export function interact(state, worldPackage) {
         });
       }
     }
-    addMessage(state, rest.title, 'You rest together. Energy returns without urgency.', 'REST', 3500);
-    addReceipt(state, 'REST_STARTED', { restorationPointRef: rest.entityRef });
+    addMessage(state, rest.title, rest.homeAnchor ? 'You are home for now. You rest together; the outward route will still be there.' : 'You shelter together. Energy returns without urgency.', 'REST', 4000);
+    addReceipt(state, 'REST_STARTED', { restorationPointRef: rest.entityRef, homeAnchor: Boolean(rest.homeAnchor) });
     return true;
   }
+
+  const resident = worldPackage.map.residents?.find((entry) => distance(human.body, entry) <= 95);
+  if (resident) {
+    const opportunity = worldPackage.map.opportunities?.find((entry) => entry.offeredByRef === resident.residentRef) || null;
+    if (!opportunity) {
+      addMessage(state, resident.displayName || 'Resident', 'The grove is quiet here.', 'RESIDENT', 3500);
+      return true;
+    }
+    if (!journey.acceptedOpportunityRefs.includes(opportunity.opportunityRef)) {
+      journey.acceptedOpportunityRefs.push(opportunity.opportunityRef);
+      const practice = recordPractice(human, opportunity.practiceRef, {
+        success: true,
+        difficulty: 0.25,
+        novel: true,
+        targetRef: resident.residentRef,
+        contextRef: journey.currentRegionRef || 'region.first-grove.unknown'
+      });
+      addMessage(state, resident.displayName, `You choose to ${opportunity.title.toLowerCase()}. This is practice, not a class or permanent role.`, 'OPPORTUNITY', 6500);
+      addReceipt(state, 'VOLUNTARY_OPPORTUNITY_ACCEPTED', {
+        opportunityRef: opportunity.opportunityRef,
+        residentRef: resident.residentRef,
+        practiceRef: opportunity.practiceRef,
+        practiceEvidence: practice.evidence,
+        completionAuthority: opportunity.completionAuthority
+      });
+    } else {
+      addMessage(state, resident.displayName, 'There is no rush. Walk, notice, return, or do something else.', 'OPPORTUNITY', 4500);
+    }
+    return true;
+  }
+
+  const discovery = worldPackage.map.discoveries?.find((entry) => distance(human.body, entry) <= 100);
+  if (discovery) {
+    const firstDiscovery = !journey.discoveredRefs.includes(discovery.discoveryRef);
+    if (firstDiscovery) journey.discoveredRefs.push(discovery.discoveryRef);
+    const label = discovery.discoveryRef.split('.').pop().replaceAll('-', ' ');
+    addMessage(state, 'First Grove', firstDiscovery ? `You notice ${label}. You may keep going or turn home.` : `${label} is still here. Nothing requires you to continue.`, 'DISCOVERY', 5200);
+    addReceipt(state, firstDiscovery ? 'DISCOVERY_FOUND' : 'DISCOVERY_REVISITED', {
+      discoveryRef: discovery.discoveryRef,
+      optional: discovery.optional,
+      returnPromptRef: discovery.returnPromptRef
+    });
+    return true;
+  }
+
+  const witnessSite = worldPackage.map.worldWitnessSites?.find((entry) => distance(human.body, entry) <= 120);
+  if (witnessSite) {
+    const firstVisit = !journey.visitedWitnessSiteRefs.includes(witnessSite.siteRef);
+    if (firstVisit) journey.visitedWitnessSiteRefs.push(witnessSite.siteRef);
+    const candidateCount = state.worldWitness?.candidateSeeds?.length || 0;
+    addMessage(
+      state,
+      'Echo Overlook',
+      candidateCount > 0
+        ? 'The overlook can reflect a pattern you already demonstrated. It does not decide what is true about you.'
+        : 'The overlook notices only bounded play that happens here. It grants nothing by observation alone.',
+      'WORLD_WITNESS',
+      6500
+    );
+    addReceipt(state, 'WORLD_WITNESS_SITE_VISITED', {
+      siteRef: witnessSite.siteRef,
+      firstVisit,
+      observedFacetRefs: [...witnessSite.observesOnly],
+      candidateSeedCount: candidateCount,
+      automaticFactPromotion: witnessSite.automaticFactPromotion,
+      automaticAbilityGrant: witnessSite.automaticAbilityGrant,
+      relationshipWorthScoring: witnessSite.relationshipWorthScoring
+    });
+    return true;
+  }
+
   const gate = worldPackage.map.portals.find((portal) => distance(human.body, portal) <= portal.radius);
   if (gate && state.quest.echoGateState === 'REVEALED') {
     if (state.quest.twinHorizonTrial === 'AVAILABLE') {
@@ -55,7 +179,7 @@ export function interact(state, worldPackage) {
       state.quest.progressText = 'Earn an EXCELLENT or SYNCHRONIZED CRITICAL High/Low against the Echo Warden.';
       let warden = state.enemies.find((enemy) => enemy.entityRef === 'entity.first-grove.echo-warden');
       if (!warden) {
-        warden = createEnemy({ entityRef: 'entity.first-grove.echo-warden', kind: 'MOSSBACK', x: gate.x - 220, y: 520, health: 140 });
+        warden = createEnemy({ entityRef: 'entity.first-grove.echo-warden', kind: 'MOSSBACK', behaviorProfileRef: 'behavior.first-grove.mossback-echo-warden', x: gate.x - 220, y: 520, health: 140 });
         state.enemies.push(warden);
       } else {
         warden.alive = true;
@@ -102,6 +226,21 @@ export function toggleCarry(state) {
   return false;
 }
 
+function behaviorTuning(enemy) {
+  const profile = enemy.behaviorProfileRef || '';
+  if (profile.includes('curious')) return { aggressionRange: 145, pursuitSpeed: 72, hopInterval: 1900, patrolSpeed: 24, patrolRate: 0.65 };
+  if (profile.includes('hop-guard')) return { aggressionRange: 220, pursuitSpeed: 112, hopInterval: 980, patrolSpeed: 18, patrolRate: 0.8 };
+  if (profile.includes('high-perch')) return { aggressionRange: 175, pursuitSpeed: 64, hopInterval: 820, patrolSpeed: 0, patrolRate: 0.5 };
+  if (profile.includes('orchard-loop')) return { aggressionRange: 195, pursuitSpeed: 88, hopInterval: 1450, patrolSpeed: 42, patrolRate: 0.9 };
+  if (profile.includes('bridge-guard')) return { aggressionRange: 340, pursuitSpeed: 62, hopInterval: 2200, patrolSpeed: 12, patrolRate: 0.45 };
+  if (profile.includes('shelter-roamer')) return { aggressionRange: 260, pursuitSpeed: 78, hopInterval: 2100, patrolSpeed: 28, patrolRate: 0.55 };
+  if (profile.includes('overlook-scout')) return { aggressionRange: 245, pursuitSpeed: 122, hopInterval: 760, patrolSpeed: 35, patrolRate: 1.0 };
+  if (profile.includes('echo-warden')) return { aggressionRange: 360, pursuitSpeed: 72, hopInterval: 1900, patrolSpeed: 0, patrolRate: 0.4 };
+  return enemy.kind === 'MOSSBACK'
+    ? { aggressionRange: 260, pursuitSpeed: 80, hopInterval: 1800, patrolSpeed: 14, patrolRate: 0.5 }
+    : { aggressionRange: 180, pursuitSpeed: 115, hopInterval: 1300, patrolSpeed: 18, patrolRate: 0.7 };
+}
+
 export function updateEnemies(state, worldPackage, dt) {
   const activeMembers = state.party.members.filter((member) => !member.body.carriedBy);
   for (const enemy of state.enemies) {
@@ -116,31 +255,42 @@ export function updateEnemies(state, worldPackage, dt) {
       }
       continue;
     }
+    const tuning = behaviorTuning(enemy);
     const closest = activeMembers
       .map((member) => ({ member, d: distance(enemy.body, member.body) }))
       .sort((a, b) => a.d - b.d)[0];
     if (!closest) continue;
-    const aggressionRange = enemy.kind === 'MOSSBACK' ? 260 : 180;
-    if (closest.d <= aggressionRange) {
+    if (closest.d <= tuning.aggressionRange) {
       enemy.body.facing = Math.sign(closest.member.body.x - enemy.body.x) || enemy.body.facing;
-      if (closest.d > 45) enemy.body.vx += enemy.body.facing * (enemy.kind === 'MOSSBACK' ? 80 : 115) * dt * 6;
+      if (closest.d > 45) enemy.body.vx += enemy.body.facing * tuning.pursuitSpeed * dt * 6;
       if (closest.d <= 48 && state.nowMs >= enemy.attackReadyAt && state.nowMs >= closest.member.body.invulnerableUntil) {
         enemy.attackReadyAt = state.nowMs + (enemy.kind === 'MOSSBACK' ? 1400 : 1100);
         closest.member.body.invulnerableUntil = state.nowMs + worldPackage.laws.combat.invulnerabilityMs;
         closest.member.resources.energy -= worldPackage.laws.combat.contactEnergyDamage * (enemy.kind === 'MOSSBACK' ? 1.4 : 1);
         closest.member.body.vx += -enemy.body.facing * 240;
-        addReceipt(state, 'PARTICIPANT_CHALLENGED', { participantRef: closest.member.participantRef, enemyRef: enemy.entityRef });
+        addReceipt(state, 'PARTICIPANT_CHALLENGED', { participantRef: closest.member.participantRef, enemyRef: enemy.entityRef, behaviorProfileRef: enemy.behaviorProfileRef });
       }
       if (enemy.kind !== 'MOSSBACK' && state.nowMs >= enemy.hopReadyAt && enemy.body.onGround) {
         enemy.body.vy = -420;
-        enemy.hopReadyAt = state.nowMs + 1300 + (state.eventSequence % 4) * 240;
+        enemy.hopReadyAt = state.nowMs + tuning.hopInterval + (state.eventSequence % 4) * 120;
       }
+    } else if (tuning.patrolSpeed > 0) {
+      const phase = Math.sin((state.nowMs / 1000) * tuning.patrolRate + enemy.spawn.x * 0.01);
+      const patrolDirection = phase >= 0 ? 1 : -1;
+      enemy.body.facing = patrolDirection;
+      enemy.body.vx = moveToward(enemy.body.vx, patrolDirection * tuning.patrolSpeed, tuning.patrolSpeed * 3 * dt);
     } else {
-      enemy.body.vx *= 0.9;
+      enemy.body.vx *= 0.86;
     }
     enemy.body.vx = clamp(enemy.body.vx, -140, 140);
     stepPhysicsBody(enemy.body, worldPackage, dt);
   }
+}
+
+function moveToward(current, target, delta) {
+  if (current < target) return Math.min(current + delta, target);
+  if (current > target) return Math.max(current - delta, target);
+  return target;
 }
 
 export function setWeather(state, nextState) {

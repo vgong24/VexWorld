@@ -7,6 +7,7 @@ import { canonicalSourceText } from '../versions/v1/src/compiler/world-compiler.
 
 const root = process.cwd();
 const adapter = path.join(root, 'adapters', 'godot');
+const generatedSourceMap = path.join(root, 'versions', 'v1', 'generated', 'first-grove.source-map.json');
 
 function runNode(relative, args = []) {
   return spawnSync(process.execPath, [path.join(adapter, relative), ...args], {
@@ -29,10 +30,11 @@ test('World Package source hashing is checkout line-ending invariant', () => {
   assert.equal(canonicalSourceText(lf), lf);
 });
 
-test('Godot adapter build preserves canonical World Package fingerprint', () => {
+test('Godot adapter build preserves the current canonical World Package fingerprint', async () => {
+  const sourceMap = JSON.parse(await fs.readFile(generatedSourceMap, 'utf8'));
   const result = runNode('tools/build-adapter.mjs');
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stdout, /fe5754cccac19f60ea7aceb4db4b76adffa0771a7adf9c8e0d613820260bf7d2/);
+  assert.match(result.stdout, new RegExp(sourceMap.integrityFingerprint));
 });
 
 test('Godot engine receipt pins an official exact proof version without vendoring', async () => {

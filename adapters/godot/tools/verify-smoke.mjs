@@ -6,18 +6,27 @@ import { fileURLToPath } from 'node:url';
 const adapterRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const receiptPath = path.join(adapterRoot, 'artifacts', 'visual-smoke-receipt.json');
 const screenshotPath = path.join(adapterRoot, 'artifacts', 'first-grove-smoke.png');
+const manifestPath = path.join(adapterRoot, 'generated', 'adapter-manifest.json');
+const packagePath = path.join(adapterRoot, 'generated', 'first-grove.world-package.json');
 
 const receipt = JSON.parse(await fs.readFile(receiptPath, 'utf8'));
+const adapterManifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+const worldPackage = JSON.parse(await fs.readFile(packagePath, 'utf8'));
 const screenshot = await fs.stat(screenshotPath);
 const errors = [];
 
 if (receipt.schemaVersion !== 'vexworld.godot-visual-smoke/v1') errors.push('unexpected smoke receipt schema');
 if (receipt.packageRef !== 'package.vexworld.first-grove.prototype.v1') errors.push('unexpected World Package ref');
-if (receipt.integrityFingerprint !== 'fe5754cccac19f60ea7aceb4db4b76adffa0771a7adf9c8e0d613820260bf7d2') errors.push('unexpected World Package fingerprint');
+if (receipt.integrityFingerprint !== adapterManifest.sourcePackageFingerprint) errors.push('smoke fingerprint disagrees with current adapter manifest');
+if (receipt.integrityFingerprint !== worldPackage.integrityFingerprint) errors.push('smoke fingerprint disagrees with current generated World Package');
 if (receipt.humanSemanticRef !== 'vessel.first-grove.human.reference') errors.push(`human vessel did not materialize: ${receipt.humanSemanticRef}`);
 if (receipt.companionSemanticRef !== 'vessel.first-grove.companion.reference') errors.push(`companion vessel did not materialize: ${receipt.companionSemanticRef}`);
 if (receipt.humanExpressionBindingRef !== 'expression.vexworld.original-human-reference.v1') errors.push(`human expression did not materialize: ${receipt.humanExpressionBindingRef}`);
 if (receipt.companionExpressionBindingRef !== 'expression.vexworld.original-companion-reference.v1') errors.push(`companion expression did not materialize: ${receipt.companionExpressionBindingRef}`);
+if (!receipt.residentSemanticRefs?.includes('resident.first-grove.ilex')) errors.push('Ilex resident ref did not materialize from World Package');
+if (!receipt.discoverySemanticRefs?.includes('discovery.first-grove.sunshower-bell')) errors.push('Sunshower Bell discovery ref did not materialize from World Package');
+if (!receipt.discoverySemanticRefs?.includes('discovery.first-grove.echo-petals')) errors.push('Echo Petals discovery ref did not materialize from World Package');
+if (!receipt.worldWitnessSiteSemanticRefs?.includes('site.first-grove.echo-overlook')) errors.push('Echo Overlook World Witness site did not materialize from World Package');
 if (receipt.characterExpressionSemanticOwner !== 'VEXWORLD_CHARACTER_VESSEL_ADAPTER') errors.push('character expression semantic owner leaked into Godot');
 if (receipt.semanticOwner !== 'VEXWORLD_WORLD_PACKAGE') errors.push('world semantic owner leaked away from World Package');
 if (receipt.engineRole !== 'REPLACEABLE_REALIZATION_ADAPTER') errors.push('Godot adapter role changed');

@@ -12,6 +12,7 @@ var status_panel: PanelContainer
 var status_label: Label
 var smoke_mode := false
 var smoke_frames := 0
+var materialized_entity_refs: Dictionary = {}
 
 func _ready() -> void:
     process_mode = Node.PROCESS_MODE_ALWAYS
@@ -101,6 +102,15 @@ func _build_world() -> void:
     for point in map_data.get("restorationPoints", []):
         _add_world_entity(point, "REST_POINT", palette)
 
+    for resident in map_data.get("residents", []):
+        _add_world_entity(resident, "RESIDENT", palette)
+
+    for discovery in map_data.get("discoveries", []):
+        _add_world_entity(discovery, "DISCOVERY", palette)
+
+    for site in map_data.get("worldWitnessSites", []):
+        _add_world_entity(site, "WITNESS_SITE", palette)
+
     for portal in map_data.get("portals", []):
         _add_world_entity(portal, "PORTAL", palette)
 
@@ -165,6 +175,13 @@ func _add_platform(data: Dictionary, color: Color) -> void:
     body.add_child(polygon)
     add_child(body)
 
+func _semantic_ref(data: Dictionary) -> String:
+    for key in ["entityRef", "residentRef", "discoveryRef", "siteRef", "id"]:
+        var value := str(data.get(key, ""))
+        if not value.is_empty():
+            return value
+    return "UNKNOWN"
+
 func _add_world_entity(data: Dictionary, kind: String, palette: Dictionary) -> void:
     var entity := WorldEntity.new()
     entity.position = _point(data)
@@ -173,15 +190,22 @@ func _add_world_entity(data: Dictionary, kind: String, palette: Dictionary) -> v
     if kind == "REST_POINT": color = str(palette.get("accent", "#ffd95a"))
     if kind == "PORTAL": color = "#b68cff"
     if kind == "CREATURE": color = "#8ed081"
+    if kind == "RESIDENT": color = "#b7d56b"
+    if kind == "DISCOVERY": color = "#ffe98a"
+    if kind == "WITNESS_SITE": color = "#b68cff"
+    var semantic_ref := _semantic_ref(data)
     entity.configure({
-        "semanticRef": str(data.get("entityRef", data.get("id", ""))),
+        "semanticRef": semantic_ref,
         "kind": kind,
         "color": color,
         "scale": float(data.get("scale", 1.0)),
-        "title": str(data.get("title", ""))
+        "title": str(data.get("title", data.get("displayName", "")))
     })
     entity.scale = Vector2.ONE * float(data.get("scale", 1.0))
     add_child(entity)
+    if not materialized_entity_refs.has(kind):
+        materialized_entity_refs[kind] = []
+    materialized_entity_refs[kind].append(semantic_ref)
 
 func _point(data) -> Vector2:
     if data is Dictionary:
@@ -237,6 +261,9 @@ func _capture_smoke() -> void:
         "humanExpressionBindingRef": human.get_meta("expression_binding_ref", "UNKNOWN") if human else "UNKNOWN",
         "companionSemanticRef": companion.get_meta("vexworld_ref", "UNKNOWN") if companion else "UNKNOWN",
         "companionExpressionBindingRef": companion.get_meta("expression_binding_ref", "UNKNOWN") if companion else "UNKNOWN",
+        "residentSemanticRefs": materialized_entity_refs.get("RESIDENT", []),
+        "discoverySemanticRefs": materialized_entity_refs.get("DISCOVERY", []),
+        "worldWitnessSiteSemanticRefs": materialized_entity_refs.get("WITNESS_SITE", []),
         "characterExpressionSemanticOwner": character_expressions.get("semanticOwner", "UNKNOWN"),
         "semanticOwner": "VEXWORLD_WORLD_PACKAGE",
         "engineRole": "REPLACEABLE_REALIZATION_ADAPTER"
