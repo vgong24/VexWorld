@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "vexworld.source-map-fragment/v1",
+  "fragmentRef": "source-map-fragment.vexworld.v1.stage-02b-playability-readability",
+  "reason": "Register the Stage 02B projection-only readability grammar without rewriting the historical Version 1 base source map.",
+  "entries": [
+    {
+      "path": "config/source-map.fragments/stage-02b-playability-readability.json",
+      "category": "navigation-and-coverage",
+      "owner": "Playability Expression",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "src/web/readability.mjs",
+      "category": "projection-readability",
+      "owner": "Playability Expression",
+      "sourceClass": "CANONICAL_SOURCE"
+    }
+  ]
+}
