@@ -75,4 +75,8 @@ export class ServerSessionClient {
   async pollIntent(participantRef) {
     return this.request(`/api/v1/sessions/${encodeURIComponent(this.sessionRef)}/companions/${encodeURIComponent(participantRef)}/intent`);
   }
+
+  async pollUtterance(participantRef) {
+    return this.request(`/api/v1/sessions/${encodeURIComponent(this.sessionRef)}/companions/${encodeURIComponent(participantRef)}/utterance`);
+  }
 }
