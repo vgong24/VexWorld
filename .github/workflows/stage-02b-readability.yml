@@ -1,0 +1,101 @@
+name: Stage 02B Browser Readability
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  browser-readability:
+    if: github.event.pull_request.head.ref == 'VXG-091226-vw-fwd-02b-playability-readability'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact Stage 02B candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Resolve installed Chromium-family browser
+        shell: bash
+        run: |
+          BROWSER_PATH="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$BROWSER_PATH" ]; then
+            echo "No Chromium-family browser present on runner" >&2
+            exit 1
+          fi
+          echo "CHROME_BIN=$BROWSER_PATH" >> "$GITHUB_ENV"
+          echo "browser=$BROWSER_PATH"
+
+      - name: Compile current First Grove package
+        run: npm --prefix versions/v1 run compile
+
+      - name: Run bounded full-party browser self-play
+        id: selfplay
+        shell: bash
+        continue-on-error: true
+        run: |
+          set +e
+          timeout --signal=TERM --kill-after=10s 90s \
+            npm run selfplay -- --out="${RUNNER_TEMP}/vexworld-stage-02b-readability"
+          SELFPLAY_STATUS=$?
+          set -e
+          echo "process_status=$SELFPLAY_STATUS" >> "$GITHUB_OUTPUT"
+          echo "selfplayProcessStatus=$SELFPLAY_STATUS"
+
+      - name: Verify Stage 02B readability predicates
+        if: always()
+        shell: bash
+        run: |
+          RECEIPT="${RUNNER_TEMP}/vexworld-stage-02b-readability/latest.json"
+          if [ ! -f "$RECEIPT" ]; then
+            echo "Missing browser receipt" >&2
+            exit 1
+          fi
+          node - "$RECEIPT" "${{ steps.selfplay.outputs.process_status }}" <<'NODE'
+          const fs = require('node:fs');
+          const [receiptPath, statusText] = process.argv.slice(2);
+          const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
+          const status = Number(statusText);
+          const statusObservation = (receipt.observations || []).find((entry) => entry.stage === 'STATUS') || {};
+          const statusBody = String(statusObservation.bodyText || '');
+          const screenshots = receipt.screenshots || [];
+          const result = {
+            disposition: receipt.disposition,
+            processStatus: status,
+            screenshotCount: screenshots.length,
+            distinctScreenshotHashes: new Set(screenshots.map((entry) => entry.sha256)).size,
+            pageErrors: receipt.pageErrors || [],
+            consoleErrors: receipt.consoleErrors || [],
+            fullPartyVisible: /4\s*\/\s*4/.test(statusBody),
+            companionExpressionVisible: /recent companion (expression|dialogue)/i.test(statusBody),
+            humanGameFeel: 'UNPROVEN'
+          };
+          console.log(JSON.stringify(result, null, 2));
+          if (receipt.disposition !== 'PASS_WITH_HUMAN_FEEL_STILL_UNWITNESSED') process.exit(2);
+          if (![0, 124].includes(status)) process.exit(status || 3);
+          if (screenshots.length < 7 || result.distinctScreenshotHashes < 4) process.exit(4);
+          if (result.pageErrors.length || result.consoleErrors.length) process.exit(5);
+          if (!result.fullPartyVisible) process.exit(6);
+          if (!result.companionExpressionVisible) process.exit(7);
+          NODE
+
+      - name: Upload Stage 02B readability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage-02b-browser-readability
+          path: ${{ runner.temp }}/vexworld-stage-02b-readability/**
+          if-no-files-found: error
+
+# This workflow proves bounded browser readability predicates only.
+# AUTOMATED_VISUAL_EVIDENCE != HUMAN_GAME_FEEL.
+# [VXG RealForever]
