@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "vexworld.source-map-fragment/v1",
+  "fragmentRef": "source-map-fragment.vexworld.v1.stage-03a-headless-realm",
+  "reason": "Register the VW-FWD-03A headless realm host and exact regression evidence without rewriting the historical Version 1 base source map.",
+  "entries": [
+    {
+      "path": "config/source-map.fragments/stage-03a-headless-realm.json",
+      "category": "navigation-and-coverage",
+      "owner": "Headless Realm",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "src/server/headless-realm-host.mjs",
+      "category": "headless-realm-host",
+      "owner": "Headless Realm",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "test/headless-realm-host.test.mjs",
+      "category": "test-evidence",
+      "owner": "Assurance",
+      "sourceClass": "EVIDENCE_SOURCE"
+    }
+  ]
+}
