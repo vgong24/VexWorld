@@ -1,8 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { once } from 'node:events';
 
-import { buildReturnReconciliation } from '../src/web/network-client.mjs';
+import { createVexWorldServer } from '../src/server/server.mjs';
+import { buildReturnReconciliation, ServerSessionClient } from '../src/web/network-client.mjs';
+
+async function withReturnServer(t) {
+  const directory = await mkdtemp(path.join(tmpdir(), 'vexworld-return-browser-'));
+  const token = 'return-browser-test-token';
+  const { server } = createVexWorldServer({ host: '127.0.0.1', port: 0, token, dataDirectory: directory });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const address = server.address();
+  t.after(async () => {
+    if (server.listening) await new Promise((resolve) => server.close(resolve));
+    await rm(directory, { recursive: true, force: true });
+  });
+  return { baseUrl: `http://127.0.0.1:${address.port}`, token };
+}
 
 test('browser entry exposes setup, game canvas, status, party, communication, and explicit return surfaces', async () => {
   const html=await readFile('src/web/index.html','utf8');
@@ -138,4 +156,61 @@ test('return reconciliation permits claim after expiry and ignores a foreign loc
   assert.deepEqual(projection.recentCanonicalReceipts, [
     { receiptRef: 'receipt.canonical.0007', type: 'CANONICAL_EVENT', at: 4100 }
   ]);
+});
+
+test('real SessionStore handoff blocks a browser behind a live headless lease and reloads the canonical checkpoint after release', async (t) => {
+  const { baseUrl, token } = await withReturnServer(t);
+  const sessionRef = 'realm.return-handoff';
+  const headless = new ServerSessionClient({
+    baseUrl,
+    token,
+    sessionRef,
+    hostId: 'host.headless.return-handoff'
+  });
+  const browser = new ServerSessionClient({
+    baseUrl,
+    token,
+    sessionRef,
+    hostId: 'host.browser.return-handoff'
+  });
+
+  await headless.health();
+  await headless.load();
+  await headless.claimLease();
+  const canonicalCheckpoint = {
+    sessionRef,
+    tick: 21,
+    nowMs: 2100,
+    firstGrove: { currentRegionRef: 'region.first-grove.return-test' },
+    receipts: [{ receiptRef: 'receipt.return.0021', type: 'HEADLESS_EVENT', at: 2050 }]
+  };
+  await headless.save(canonicalCheckpoint);
+
+  const blockedRecord = await browser.load();
+  const blockedProjection = buildReturnReconciliation(blockedRecord, null, {
+    hostId: browser.hostId,
+    now: Date.now()
+  });
+  assert.equal(blockedProjection.takeoverState, 'WAIT_FOR_RELEASE_OR_EXPIRY');
+  await assert.rejects(
+    browser.claimLease(),
+    (error) => error?.status === 409 && error?.payload?.reason === 'LEASE_HELD'
+  );
+
+  await headless.releaseLease();
+  const releasedRecord = await browser.load();
+  assert.equal(releasedRecord.stateVersion, 1);
+  assert.equal(releasedRecord.hostLease, null);
+  assert.deepEqual(releasedRecord.checkpoint, canonicalCheckpoint);
+
+  const claim = await browser.claimLease();
+  assert.equal(claim.accepted, true);
+  assert.equal(claim.lease.hostId, browser.hostId);
+  assert.equal(claim.stateVersion, 1);
+
+  const postClaim = await browser.load();
+  assert.equal(postClaim.stateVersion, 1);
+  assert.equal(postClaim.hostLease.hostId, browser.hostId);
+  assert.deepEqual(postClaim.checkpoint, canonicalCheckpoint);
+  await browser.releaseLease();
 });
