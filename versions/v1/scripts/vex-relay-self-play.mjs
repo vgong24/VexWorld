@@ -6,7 +6,7 @@
  * authority, call a model, publish evidence, or intentionally mutate saves.
  *
  * Runtime-resilience rules:
- * - retry initial CDP readiness inside one bounded total window;
+ * - retry CDP readiness across a bounded number of browser launch attempts;
  * - spawn Vextory directly through Node (no npm wrapper child);
  * - close CDP and reap the browser process group + server deterministically;
  * - remove the temporary browser profile with bounded retry;
@@ -31,11 +31,11 @@ const HEADED = argv.has('--headed');
 const KEEP = argv.has('--keep');
 const OUT_ARG = process.argv.find((value) => value.startsWith('--out='));
 const OUTPUT_ROOT = resolve(
-  OUT_ARG
-    ? OUT_ARG.slice('--out='.length)
-    : join(homedir(), '.vexworld', 'evidence', 'self-play'),
+  OUT_ARG ? OUT_ARG.slice('--out='.length) : join(homedir(), '.vexworld', 'evidence', 'self-play'),
 );
 const RUN_REF = `selfplay.vexworld.v1.${randomUUID()}`;
+const MAX_BROWSER_LAUNCH_ATTEMPTS = 2;
+const CDP_ATTEMPT_TIMEOUT_MS = 15000;
 
 function sha256(buffer) {
   return createHash('sha256').update(buffer).digest('hex');
@@ -62,12 +62,8 @@ function browserCandidates() {
   return [
     process.env.CHROME_BIN,
     process.env.EDGE_BIN,
-    process.platform === 'win32'
-      ? join(process.env.PROGRAMFILES || 'C:\\Program Files', 'Google', 'Chrome', 'Application', 'chrome.exe')
-      : null,
-    process.platform === 'win32'
-      ? join(process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)', 'Microsoft', 'Edge', 'Application', 'msedge.exe')
-      : null,
+    process.platform === 'win32' ? join(process.env.PROGRAMFILES || 'C:\\Program Files', 'Google', 'Chrome', 'Application', 'chrome.exe') : null,
+    process.platform === 'win32' ? join(process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)', 'Microsoft', 'Edge', 'Application', 'msedge.exe') : null,
     process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : null,
     process.platform === 'darwin' ? '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge' : null,
     '/usr/bin/chromium',
@@ -128,21 +124,15 @@ function signalChild(child, signal, { processGroup = false } = {}) {
   }
 }
 
-export async function terminateChild(child, {
-  termMs = 1500,
-  killMs = 1500,
-  processGroup = false
-} = {}) {
+export async function terminateChild(child, { termMs = 1500, killMs = 1500, processGroup = false } = {}) {
   if (!child) return { present: false, exited: true, forced: false, exitCode: null, signalCode: null };
   if (child.exitCode !== null || child.signalCode !== null) {
     return { present: true, exited: true, forced: false, exitCode: child.exitCode, signalCode: child.signalCode };
   }
-
   signalChild(child, 'SIGTERM', { processGroup });
   if (await waitForChildExit(child, termMs)) {
     return { present: true, exited: true, forced: false, exitCode: child.exitCode, signalCode: child.signalCode };
   }
-
   signalChild(child, 'SIGKILL', { processGroup });
   const exited = await waitForChildExit(child, killMs);
   return { present: true, exited, forced: true, exitCode: child.exitCode, signalCode: child.signalCode };
@@ -152,12 +142,7 @@ async function removeTemporaryProfile(directory, { attempts = 6, retryDelayMs = 
   let lastError = null;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      await rm(directory, {
-        recursive: true,
-        force: true,
-        maxRetries: 3,
-        retryDelay: retryDelayMs,
-      });
+      await rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: retryDelayMs });
       if (!existsSync(directory)) return { removed: true, attempts: attempt, error: null };
     } catch (error) {
       lastError = error;
@@ -208,12 +193,7 @@ class CdpClient {
   }
 
   async evaluate(expression) {
-    const result = await this.send('Runtime.evaluate', {
-      expression,
-      awaitPromise: true,
-      returnByValue: true,
-      userGesture: true,
-    });
+    const result = await this.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true, userGesture: true });
     if (result.exceptionDetails) throw new Error(result.exceptionDetails.text || 'Browser evaluation failed');
     return result.result?.value;
   }
@@ -268,18 +248,14 @@ async function waitForServerUrl(child, timeoutMs = 20000) {
   });
 }
 
-export async function waitForPageTarget(debugPort, timeoutMs = 15000) {
+export async function waitForPageTarget(debugPort, timeoutMs = CDP_ATTEMPT_TIMEOUT_MS) {
   const started = Date.now();
   let lastError = null;
   while (Date.now() - started < timeoutMs) {
     const remaining = timeoutMs - (Date.now() - started);
     try {
-      const targets = await waitForJson(
-        `http://127.0.0.1:${debugPort}/json/list`,
-        Math.max(250, Math.min(1200, remaining)),
-      );
-      const target = targets.find((entry) => entry.type === 'page' && entry.url.startsWith('http')) ||
-        targets.find((entry) => entry.type === 'page');
+      const targets = await waitForJson(`http://127.0.0.1:${debugPort}/json/list`, Math.max(250, Math.min(1200, remaining)));
+      const target = targets.find((entry) => entry.type === 'page' && entry.url.startsWith('http')) || targets.find((entry) => entry.type === 'page');
       if (target?.webSocketDebuggerUrl) return target;
       lastError = new Error('Chrome debug endpoint is reachable but no page target exists yet');
     } catch (error) {
@@ -300,9 +276,7 @@ async function waitForCondition(client, expression, timeoutMs = 15000) {
 }
 
 async function screenshot(client, path) {
-  const result = await client.send('Page.captureScreenshot', {
-    format: 'png', captureBeyondViewport: false, fromSurface: true,
-  });
+  const result = await client.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false, fromSurface: true });
   const buffer = Buffer.from(result.data, 'base64');
   await writeFile(path, buffer);
   return { path, bytes: buffer.length, sha256: sha256(buffer) };
@@ -329,11 +303,7 @@ const FORM_PARTY_AND_BEGIN = `(() => {
   }
   const begin = document.querySelector('#begin-button');
   begin?.click();
-  return {
-    requestedCompanionCount: select?.value || null,
-    began: Boolean(begin),
-    bodyText: document.body.innerText.slice(0, 5000),
-  };
+  return { requestedCompanionCount: select?.value || null, began: Boolean(begin), bodyText: document.body.innerText.slice(0, 5000) };
 })()`;
 
 async function persistReceipt(receipt, runDir) {
@@ -342,11 +312,63 @@ async function persistReceipt(receipt, runDir) {
   await writeFile(join(OUTPUT_ROOT, 'LATEST_RUN'), `${basename(runDir)}\n`);
 }
 
+function browserArgs({ debugPort, profilePath, url }) {
+  return [
+    `--remote-debugging-port=${debugPort}`,
+    `--user-data-dir=${profilePath}`,
+    '--disable-background-networking',
+    '--disable-component-update',
+    '--disable-default-apps',
+    '--disable-extensions',
+    '--disable-sync',
+    '--disable-dev-shm-usage',
+    '--metrics-recording-only',
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--window-size=1440,960',
+    '--force-device-scale-factor=1',
+    '--no-sandbox',
+    ...(HEADED ? [] : ['--headless=new', '--hide-scrollbars']),
+    url,
+  ];
+}
+
+async function launchBrowserTarget({ browserPath, debugPort, profileRoot, url, receipt }) {
+  const processGroup = process.platform !== 'win32';
+  receipt.harness = { browserUsesProcessGroup: processGroup, browserLaunchAttempts: [] };
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= MAX_BROWSER_LAUNCH_ATTEMPTS; attempt += 1) {
+    const profilePath = join(profileRoot, `attempt-${attempt}`);
+    const browser = spawn(
+      browserPath,
+      browserArgs({ debugPort, profilePath, url }),
+      { stdio: 'ignore', detached: processGroup },
+    );
+    const attemptRecord = { attempt, startedAt: new Date().toISOString(), targetReady: false };
+    receipt.harness.browserLaunchAttempts.push(attemptRecord);
+    try {
+      const target = await waitForPageTarget(debugPort, CDP_ATTEMPT_TIMEOUT_MS);
+      attemptRecord.targetReady = true;
+      attemptRecord.finishedAt = new Date().toISOString();
+      return { browser, target, processGroup };
+    } catch (error) {
+      lastError = error;
+      attemptRecord.error = error.message;
+      attemptRecord.finishedAt = new Date().toISOString();
+      attemptRecord.cleanup = await terminateChild(browser, { processGroup });
+      if (attempt < MAX_BROWSER_LAUNCH_ATTEMPTS) await delay(500);
+    }
+  }
+
+  throw new Error(`Browser CDP readiness failed after ${MAX_BROWSER_LAUNCH_ATTEMPTS} bounded launch attempts: ${lastError?.message || 'unknown error'}`);
+}
+
 async function main() {
   await mkdir(OUTPUT_ROOT, { recursive: true });
   const runDir = join(OUTPUT_ROOT, RUN_REF.replaceAll(':', '-'));
   await mkdir(runDir, { recursive: true });
-  const profileDir = await mkdtemp(join(tmpdir(), 'vexworld-selfplay-'));
+  const profileRoot = await mkdtemp(join(tmpdir(), 'vexworld-selfplay-'));
   const browserPath = findBrowser();
   const debugPort = await freePort();
   const serverScript = resolve(VERSION_ROOT, 'src', 'server', 'server.mjs');
@@ -357,6 +379,7 @@ async function main() {
   });
 
   let browser;
+  let browserProcessGroup = false;
   let client;
   const receipt = {
     schemaVersion: 'vexworld.vex-relay-self-play-receipt/v1',
@@ -368,57 +391,21 @@ async function main() {
     screenshots: [],
     consoleErrors: [],
     pageErrors: [],
-    effects: {
-      modelCalled: false,
-      networkBeyondLoopback: false,
-      sourceMutatedByRun: false,
-      physicalActuation: false,
-      publication: false,
-    },
+    effects: { modelCalled: false, networkBeyondLoopback: false, sourceMutatedByRun: false, physicalActuation: false, publication: false },
   };
 
   try {
     const discovered = await waitForServerUrl(server);
     receipt.serverUrl = discovered.url;
 
-    const browserUsesProcessGroup = process.platform !== 'win32';
-    browser = spawn(browserPath, [
-      `--remote-debugging-port=${debugPort}`,
-      `--user-data-dir=${profileDir}`,
-      '--disable-background-networking',
-      '--disable-component-update',
-      '--disable-default-apps',
-      '--disable-extensions',
-      '--disable-sync',
-      '--disable-dev-shm-usage',
-      '--metrics-recording-only',
-      '--no-first-run',
-      '--no-default-browser-check',
-      '--window-size=1440,960',
-      '--force-device-scale-factor=1',
-      '--no-sandbox',
-      ...(HEADED ? [] : ['--headless=new', '--hide-scrollbars']),
-      discovered.url,
-    ], { stdio: 'ignore', detached: browserUsesProcessGroup });
+    const launched = await launchBrowserTarget({ browserPath, debugPort, profileRoot, url: discovered.url, receipt });
+    browser = launched.browser;
+    browserProcessGroup = launched.processGroup;
+    client = await CdpClient.connect(launched.target.webSocketDebuggerUrl);
+    await Promise.all([client.send('Page.enable'), client.send('Runtime.enable'), client.send('Log.enable'), client.send('Network.enable')]);
+    await client.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 960, deviceScaleFactor: 1, mobile: false });
 
-    receipt.harness = { browserUsesProcessGroup };
-    const target = await waitForPageTarget(debugPort, 15000);
-    client = await CdpClient.connect(target.webSocketDebuggerUrl);
-    await Promise.all([
-      client.send('Page.enable'),
-      client.send('Runtime.enable'),
-      client.send('Log.enable'),
-      client.send('Network.enable'),
-    ]);
-    await client.send('Emulation.setDeviceMetricsOverride', {
-      width: 1440, height: 960, deviceScaleFactor: 1, mobile: false,
-    });
-
-    const ready = await waitForCondition(
-      client,
-      `document.readyState === 'complete' && document.body && document.body.innerText.length > 0`,
-      20000,
-    );
+    const ready = await waitForCondition(client, `document.readyState === 'complete' && document.body && document.body.innerText.length > 0`, 20000);
     if (!ready) throw new Error('Page did not become ready');
 
     receipt.observations.push({ stage: 'ARRIVAL', bodyText: await client.evaluate('document.body.innerText.slice(0, 6000)') });
@@ -429,11 +416,7 @@ async function main() {
     await delay(1800);
     receipt.screenshots.push(await screenshot(client, join(runDir, '01-world-entry.png')));
 
-    await client.evaluate(`(() => {
-      const target = document.querySelector('canvas') || document.querySelector('[tabindex]') || document.body;
-      target?.focus?.(); target?.click?.(); return document.activeElement?.tagName || null;
-    })()`);
-
+    await client.evaluate(`(() => { const target = document.querySelector('canvas') || document.querySelector('[tabindex]') || document.body; target?.focus?.(); target?.click?.(); return document.activeElement?.tagName || null; })()`);
     await hold(client, 'd', 'KeyD', 900);
     receipt.observations.push({ stage: 'MOVE_RIGHT', at: new Date().toISOString() });
     receipt.screenshots.push(await screenshot(client, join(runDir, '02-move-right.png')));
@@ -462,15 +445,7 @@ async function main() {
     receipt.observations.push({
       stage: 'STATUS',
       bodyText: await client.evaluate('document.body.innerText.slice(0, 12000)'),
-      elementSummary: await client.evaluate(`(() => ({
-        buttons: document.querySelectorAll('button').length,
-        canvases: [...document.querySelectorAll('canvas')].map((canvas) => ({ width: canvas.width, height: canvas.height })),
-        participantLike: document.querySelectorAll('[data-participant-ref], [class*=participant], [class*=companion], [class*=party]').length,
-        visibleDialogs: [...document.querySelectorAll('[role=dialog], dialog')].filter((el) => {
-          const rect = el.getBoundingClientRect(); const style = getComputedStyle(el);
-          return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
-        }).length,
-      }))()`),
+      elementSummary: await client.evaluate(`(() => ({ buttons: document.querySelectorAll('button').length, canvases: [...document.querySelectorAll('canvas')].map((canvas) => ({ width: canvas.width, height: canvas.height })), participantLike: document.querySelectorAll('[data-participant-ref], [class*=participant], [class*=companion], [class*=party]').length, visibleDialogs: [...document.querySelectorAll('[role=dialog], dialog')].filter((el) => { const rect = el.getBoundingClientRect(); const style = getComputedStyle(el); return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden'; }).length }))()`),
     });
     receipt.screenshots.push(await screenshot(client, join(runDir, '06-status.png')));
 
@@ -489,24 +464,20 @@ async function main() {
       noConsoleErrors: receipt.consoleErrors.length === 0,
     };
     receipt.finishedAt = new Date().toISOString();
-    receipt.disposition = Object.values(receipt.assertions).every(Boolean)
-      ? 'PASS_WITH_HUMAN_FEEL_STILL_UNWITNESSED'
-      : 'ATTENTION_REQUIRED';
+    receipt.disposition = Object.values(receipt.assertions).every(Boolean) ? 'PASS_WITH_HUMAN_FEEL_STILL_UNWITNESSED' : 'ATTENTION_REQUIRED';
     receipt.humanGameFeel = 'UNPROVEN';
     await persistReceipt(receipt, runDir);
 
     const markdown = `# Vex Relay self-play receipt\n\n\`[VXG RealForever]\`\n\n- Run: \`${receipt.runRef}\`\n- Disposition: **${receipt.disposition}**\n- Browser: \`${browserPath}\`\n- Started: ${receipt.startedAt}\n- Finished: ${receipt.finishedAt}\n- Screenshots: ${receipt.screenshots.length}\n- Distinct screenshot hashes: ${distinctHashes.size}\n- Page errors: ${receipt.pageErrors.length}\n- Console errors: ${receipt.consoleErrors.length}\n\nThis scripted evidence proves browser reachability and observable state changes. It does not prove fun, final aesthetic quality, real-model behavior, production networking, or human game feel.\n`;
     await writeFile(join(runDir, 'README.md'), markdown);
-
     if (receipt.disposition !== 'PASS_WITH_HUMAN_FEEL_STILL_UNWITNESSED') process.exitCode = 1;
   } finally {
     if (!KEEP) {
       const cdpClosed = client ? await client.close() : true;
-      const browserResult = await terminateChild(browser, { processGroup: process.platform !== 'win32' });
+      const browserResult = await terminateChild(browser, { processGroup: browserProcessGroup });
       const serverResult = await terminateChild(server);
       await delay(250);
-      const profile = await removeTemporaryProfile(profileDir);
-
+      const profile = await removeTemporaryProfile(profileRoot);
       if (receipt.finishedAt) {
         receipt.cleanup = {
           cdpClosed,
@@ -517,10 +488,7 @@ async function main() {
           profileRemovalError: profile.error,
         };
         receipt.cleanupFinishedAt = new Date().toISOString();
-        receipt.harnessDisposition =
-          cdpClosed && browserResult.exited && serverResult.exited && profile.removed
-            ? 'CLEAN'
-            : 'ATTENTION_REQUIRED';
+        receipt.harnessDisposition = cdpClosed && browserResult.exited && serverResult.exited && profile.removed ? 'CLEAN' : 'ATTENTION_REQUIRED';
         await persistReceipt(receipt, runDir);
         if (receipt.harnessDisposition !== 'CLEAN' && !process.exitCode) process.exitCode = 3;
       }
