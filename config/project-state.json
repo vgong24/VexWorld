@@ -7,9 +7,9 @@
   "crossRepoFoundationRef": "github.issue.vextreme-sdk.1299",
   "currentVersionRef": "version.vexworld.v1",
   "currentVersionPath": "versions/v1",
-  "lastAcceptedMainRef": "github.commit.vexworld.975bf64b9a5133054885748e903dc455d3035847",
-  "activeStageRef": "stage.vexworld.vw-fwd-02b",
-  "activeStageIssueRef": "github.issue.vexworld.34",
+  "lastAcceptedMainRef": "github.commit.vexworld.26a3d998ed44d4d72853ce41a6299ed057ec2a52",
+  "activeStageRef": "stage.vexworld.vw-fwd-02c",
+  "activeStageIssueRef": "github.issue.vexworld.35",
   "stageOrder": [
     "stage.vexworld.vw-fwd-01a",
     "stage.vexworld.vw-fwd-01b",
@@ -58,7 +58,9 @@
       "title": "Godot world-package adapter and engine-boundary proof",
       "state": "ACCEPTED",
       "predecessorStageRef": "stage.vexworld.vw-fwd-01a",
-      "parentStageRefs": ["stage.vexworld.vw-fwd-01a"],
+      "parentStageRefs": [
+        "stage.vexworld.vw-fwd-01a"
+      ],
       "sourceChanging": false,
       "meaningOwnerRef": "project.vextreme.vexworld",
       "implementationOwnerRef": "role.vexworld.engine-adapter-builder",
@@ -81,7 +83,9 @@
       "title": "Character and vessel expression adapter with provenance-bound CC0 intake",
       "state": "ACCEPTED",
       "predecessorStageRef": "stage.vexworld.vw-fwd-01b",
-      "parentStageRefs": ["stage.vexworld.vw-fwd-01b"],
+      "parentStageRefs": [
+        "stage.vexworld.vw-fwd-01b"
+      ],
       "sourceChanging": false,
       "meaningOwnerRef": "project.vextreme.vexworld",
       "implementationOwnerRef": "role.vexworld.character-vessel-builder",
@@ -95,8 +99,6 @@
       "assetDisposition": "ORIGINAL_ONLY_FOR_STAGE_C_ACCEPTANCE",
       "windowsInvestigationReceiptRef": "github.issue.vexworld.16.comment.5641520491",
       "windowsRepairEvidenceRef": "github.issue.vexworld.16.comment.5641693965",
-      "foundationWorkflowRunRef": "github.actions.vexworld.34656985722",
-      "godotWorkflowRunRef": "github.actions.vexworld.34656985745",
       "ownedPathPatterns": [
         "adapters/characters/**",
         "config/asset-intake-policy.json",
@@ -111,9 +113,9 @@
       "title": "First Grove environment, avatar readability and cooperative adventure expansion",
       "state": "ACCEPTED",
       "predecessorStageRef": "stage.vexworld.vw-fwd-01c",
-      "parentStageRefs": ["stage.vexworld.vw-fwd-01c"],
-      "predecessorCloseReceiptRef": "github.issue.vexworld.9.comment.5641777187",
-      "startingMainRef": "github.commit.vexworld.bb3cd5d80c90f2515d3795961b19d627138f039f",
+      "parentStageRefs": [
+        "stage.vexworld.vw-fwd-01c"
+      ],
       "sourceChanging": false,
       "meaningOwnerRef": "project.vextreme.vexworld",
       "implementationOwnerRef": "role.vexworld.first-grove-builder",
@@ -126,10 +128,6 @@
       "foundationWorkflowRunRef": "github.actions.vexworld.34661615692",
       "godotWorkflowRunRef": "github.actions.vexworld.34661615823",
       "browserSelfPlayRunRef": "github.actions.vexworld.34661615668",
-      "nonBlockingDebtRefs": [
-        "github.issue.vexworld.23",
-        "github.issue.vexworld.24"
-      ],
       "humanGameFeelState": "UNPROVEN",
       "ownedPathPatterns": [
         "versions/v1/worlds/first-grove/**",
@@ -150,9 +148,9 @@
       "title": "Real local companion bridge and trusted PC/Mac two-worker rehearsal",
       "state": "ACCEPTED",
       "predecessorStageRef": "stage.vexworld.vw-fwd-01d",
-      "parentStageRefs": ["stage.vexworld.vw-fwd-01d"],
-      "predecessorCloseReceiptRef": "github.issue.vexworld.10.comment.5642264257",
-      "startingMainRef": "github.commit.vexworld.345b69f97121831375a36fa7e4083492c19c185f",
+      "parentStageRefs": [
+        "stage.vexworld.vw-fwd-01d"
+      ],
       "sourceChanging": false,
       "meaningOwnerRef": "project.vextreme.vexworld",
       "implementationOwnerRef": "role.vexworld.local-companion-bridge-builder",
@@ -162,7 +160,6 @@
       "acceptedMainRef": "github.commit.vexworld.ec3399c1a42f3683fa0f76ec0c28c68b524d40a7",
       "acceptedCloseReceiptRef": "github.issue.vexworld.11.comment.5649035967",
       "reviewReceiptRef": "github.issue.vexworld.30.comment.5649008163",
-      "foundationWorkflowRunRef": "github.actions.vexworld.34670828398",
       "windowsHardwareReceiptRef": "github.issue.vexworld.26.comment.5643153629",
       "e4RefreshReceiptRef": "github.issue.vexworld.27.comment.5643305407",
       "h4HardwareReceiptRef": "github.issue.vexworld.29.comment.5648862498",
@@ -196,9 +193,9 @@
       "title": "In-world companion communication expression without motor/memory authority",
       "state": "ACCEPTED",
       "predecessorStageRef": "stage.vexworld.vw-fwd-01e",
-      "parentStageRefs": ["stage.vexworld.vw-fwd-01e"],
-      "predecessorCloseReceiptRef": "github.issue.vexworld.11.comment.5649035967",
-      "startingMainRef": "github.commit.vexworld.ec3399c1a42f3683fa0f76ec0c28c68b524d40a7",
+      "parentStageRefs": [
+        "stage.vexworld.vw-fwd-01e"
+      ],
       "sourceChanging": false,
       "meaningOwnerRef": "project.vextreme.vexworld",
       "implementationOwnerRef": "role.vexworld.companion-expression-builder",
@@ -236,44 +233,45 @@
         "versions/v1/test/controllers.test.mjs",
         "versions/v1/test/companion-communication.test.mjs",
         "versions/v1/test/companion-communication-worker.test.mjs"
-      ],
-      "allowedEffects": [
-        "BOUNDED_COMPANION_UTTERANCE_EVENTS",
-        "TEXT_CAPTION_AND_SPEECH_BUBBLE_PROJECTION",
-        "ATTRIBUTED_MODEL_OR_DETERMINISTIC_COMMUNICATION",
-        "TRUSTED_LAN_DEVELOPMENT_RELAY"
-      ],
-      "forbiddenEffects": [
-        "MODEL_TRAINING",
-        "PRODUCTION_NETWORK",
-        "PRIVATE_DATA_INGESTION",
-        "PHYSICAL_SENSING",
-        "PHYSICAL_ACTUATION",
-        "COMMERCE",
-        "UTTERANCE_AS_MOTOR_CONTROL",
-        "UTTERANCE_AS_CANONICAL_MEMORY",
-        "UTTERANCE_AS_WORLD_LAW",
-        "UTTERANCE_AS_RELATIONSHIP_WORTH",
-        "UTTERANCE_AS_AUTOMATIC_LEARNED_ABILITY"
       ]
     },
     {
       "stageRef": "stage.vexworld.vw-fwd-02b",
       "issueRef": "github.issue.vexworld.34",
       "title": "Party/world readability, art-direction convergence and expression legibility",
-      "state": "ACTIVE_SINGLE_FORWARD_LANE",
+      "state": "ACCEPTED",
       "predecessorStageRef": "stage.vexworld.vw-fwd-02a",
-      "parentStageRefs": ["stage.vexworld.vw-fwd-02a"],
-      "predecessorCloseReceiptRef": "github.issue.vexworld.33.comment.5649357060",
-      "startingMainRef": "github.commit.vexworld.975bf64b9a5133054885748e903dc455d3035847",
-      "sourceChanging": true,
+      "parentStageRefs": [
+        "stage.vexworld.vw-fwd-02a"
+      ],
+      "sourceChanging": false,
       "meaningOwnerRef": "project.vextreme.vexworld",
       "implementationOwnerRef": "role.vexworld.playability-expression-builder",
       "reviewOwnerRef": "role.vexworld.playability-readability-reviewer",
+      "acceptedCandidateHeadRef": "github.commit.vexworld.3e5281ec537624666ae325dc15e0f8a9ab785c90",
+      "acceptedCandidateTreeRef": "github.tree.vexworld.a5ab698d53daff89cea9874645f32df40d01541e",
+      "acceptedMainRef": "github.commit.vexworld.26a3d998ed44d4d72853ce41a6299ed057ec2a52",
+      "acceptedCloseReceiptRef": "github.issue.vexworld.34.comment.5649544041",
+      "reviewReceiptRef": "github.issue.vexworld.40.comment.5649483836",
+      "foundationWorkflowRunRef": "github.actions.vexworld.34725671477",
+      "visualWorkflowRunRef": "github.actions.vexworld.34725671498",
+      "visualArtifactRef": "github.actions.artifact.vexworld.10307807459",
+      "artDirectionDisposition": "ORIGINAL_PROCEDURAL_REFINEMENT",
+      "externalAssetAcceptance": "NONE",
+      "humanGameFeelState": "UNPROVEN",
+      "resolvedDebtRefs": [
+        "github.issue.vexworld.23"
+      ],
+      "nonBlockingDebtRefs": [
+        "github.issue.vexworld.24"
+      ],
       "ownedPathPatterns": [
-        "versions/v1/src/web/**",
-        "versions/v1/worlds/first-grove/**",
-        "adapters/characters/**",
+        ".github/workflows/stage-02b-readability.yml",
+        "adapters/characters/catalog/playability-art-direction.v1.json",
+        "versions/v1/config/source-map.fragments/stage-02b-playability-readability.json",
+        "versions/v1/src/web/readability.mjs",
+        "versions/v1/src/web/renderer.mjs",
+        "versions/v1/src/web/styles.css",
         "test/first-grove-expansion.test.mjs"
       ]
     },
@@ -281,20 +279,32 @@
       "stageRef": "stage.vexworld.vw-fwd-02c",
       "issueRef": "github.issue.vexworld.35",
       "title": "Runtime resilience, launcher portability and bounded performance characterization",
-      "state": "BLOCKED_BY_PREDECESSOR",
+      "state": "ACTIVE_SINGLE_FORWARD_LANE",
       "predecessorStageRef": "stage.vexworld.vw-fwd-02b",
-      "parentStageRefs": ["stage.vexworld.vw-fwd-02b"],
-      "sourceChanging": false,
+      "parentStageRefs": [
+        "stage.vexworld.vw-fwd-02b"
+      ],
+      "sourceChanging": true,
+      "predecessorCloseReceiptRef": "github.issue.vexworld.34.comment.5649544041",
+      "startingMainRef": "github.commit.vexworld.26a3d998ed44d4d72853ce41a6299ed057ec2a52",
       "meaningOwnerRef": "project.vextreme.vexworld",
       "implementationOwnerRef": "role.vexworld.runtime-resilience-builder",
       "reviewOwnerRef": "role.vexworld.runtime-resilience-reviewer",
-      "wakeTriggerRefs": ["receipt.vexworld.vw-fwd-02b.accepted-close"],
+      "inputDebtRefs": [
+        "github.issue.vexworld.24",
+        "github.issue.vexworld.28",
+        "github.issue.vexworld.31",
+        "github.issue.vexworld.37.comment.5649234836"
+      ],
       "ownedPathPatterns": [
         "scripts/vexworld-launch.mjs",
+        "scripts/vexworld-selfplay.mjs",
+        "versions/v1/scripts/vex-relay-self-play.mjs",
         "versions/v1/src/server/session-store.mjs",
         "versions/v1/src/agents/remote-worker.mjs",
         "versions/v1/test/session-store.test.mjs",
-        ".github/workflows/foundation.yml"
+        ".github/workflows/foundation.yml",
+        ".github/workflows/stage-02b-readability.yml"
       ]
     }
   ],
@@ -305,7 +315,7 @@
     "config/change-impact-map.json",
     "vexworld.manifest.json",
     "config/current-version.json",
-    "github.issue.vexworld.34"
+    "github.issue.vexworld.35"
   ],
   "knownUnknownRefs": [
     "unknown.vexworld.software-license",
@@ -313,14 +323,13 @@
     "unknown.vexworld.first-grove-art-direction",
     "unknown.vexworld.human-game-feel",
     "unknown.vexworld.multiplayer-witness-privacy",
-    "debt.vexworld.party-density-readability",
     "debt.vexworld.selfplay-cleanup-timeout",
     "debt.vexworld.windows-root-launcher-spawn-einval",
     "debt.vexworld.stage-e.resource-stale-divergence-characterization",
     "debt.vexworld.a8-browser-exitcode-ack-not-observed"
   ],
-  "currentStrongestClaim": "VW_FWD_01_ACCEPTED__VW_FWD_02A_ACCEPTED__VW_FWD_02B_ACTIVE_PLAYABILITY_READABILITY_ART_CONVERGENCE",
-  "observedAt": "2026-09-12T23:20:24Z",
+  "currentStrongestClaim": "VW_FWD_01_ACCEPTED__VW_FWD_02A_ACCEPTED__VW_FWD_02B_ACCEPTED__VW_FWD_02C_ACTIVE_RUNTIME_RESILIENCE",
+  "observedAt": "2026-09-13T00:02:30Z",
   "effects": {
     "modelTraining": false,
     "productionNetwork": false,
