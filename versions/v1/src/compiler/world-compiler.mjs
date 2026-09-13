@@ -137,7 +137,6 @@ export async function compileFirstGrove({ root = process.cwd() } = {}) {
     }
   });
   const integrityFingerprint = sha256(canonicalJson(packageBody));
-  console.error(`[VW-FWD-05A-DIAGNOSTIC] canonicalFingerprint=${integrityFingerprint}`);
   return {
     ...packageBody,
     integrityFingerprint
