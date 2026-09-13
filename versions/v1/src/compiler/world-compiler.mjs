@@ -63,14 +63,19 @@ function validateSource({ manifest, map, laws, expressions, catalogs, scenarios 
   const itemRefs = new Set();
   const discoveryRefs = new Set((map.discoveries ?? []).map((entry) => entry.discoveryRef));
   for (const item of catalogs.items.items) {
-    for (const field of ['itemRef', 'title', 'archetypeRef', 'originWorldRef', 'sourceDiscoveryRef']) requireString(item, field, 'item');
+    for (const field of ['itemRef', 'title', 'archetypeRef', 'originWorldRef']) requireString(item, field, 'item');
     if (itemRefs.has(item.itemRef)) throw new TypeError(`duplicate item ${item.itemRef}`);
     itemRefs.add(item.itemRef);
     if (!archetypeRefs.has(item.archetypeRef)) throw new TypeError(`unknown item archetype ${item.archetypeRef}`);
-    if (item.originWorldRef !== manifest.worldRef) throw new TypeError(`item ${item.itemRef} originWorldRef must match manifest.worldRef`);
-    if (!discoveryRefs.has(item.sourceDiscoveryRef)) throw new TypeError(`unknown item discovery ${item.sourceDiscoveryRef}`);
-    if (item.itemRef === item.sourceDiscoveryRef) throw new TypeError('itemRef must remain distinct from sourceDiscoveryRef');
-    if (item.portable !== true) throw new TypeError(`item ${item.itemRef} must explicitly declare portable=true`);
+    if (typeof item.portable !== 'boolean') throw new TypeError(`item ${item.itemRef} must explicitly declare portable as boolean`);
+    if (item.portable) requireString(item, 'identityPolicy', 'item');
+    if (item.sourceDiscoveryRef !== undefined) {
+      requireString(item, 'sourceDiscoveryRef', 'item');
+      if (item.itemRef === item.sourceDiscoveryRef) throw new TypeError('itemRef must remain distinct from sourceDiscoveryRef');
+      if (item.originWorldRef === manifest.worldRef && !discoveryRefs.has(item.sourceDiscoveryRef)) {
+        throw new TypeError(`unknown item discovery ${item.sourceDiscoveryRef}`);
+      }
+    }
   }
 
   if (!catalogs.actions.actions.some((entry) => entry.actionRef === 'action.vexworld.status.open')) throw new TypeError('status action is required');
