@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "vexworld.scenario/v1",
+  "scenarioRef": "scenario.first-grove.updraft-return-margin",
+  "purpose": "A declared UPDRAFT condition must deterministically increase predicted return cost and recalculate the calm return-margin band under otherwise identical headless conditions.",
+  "startingState": {
+    "startingWeather": "CLEAR",
+    "changedWeather": "UPDRAFT",
+    "companionEnergy": 40,
+    "restorationDistance": 620,
+    "sameActorEnergy": true,
+    "sameRestorationDistance": true,
+    "expectedClearBand": "RESTORATION_AWARE",
+    "expectedUpdraftBand": "RESTORATION_RECOMMENDED"
+  },
+  "actions": [
+    "PROJECT_CLEAR_RETURN_MARGIN",
+    "UPDRAFT_BEGINS",
+    "PROJECT_UPDRAFT_RETURN_MARGIN",
+    "COMPARE_SAME_DISTANCE_AND_ENERGY"
+  ],
+  "expected": [
+    "UPDRAFT is declared by the First Grove world law",
+    "UPDRAFT predicted return cost is strictly greater than CLEAR at the same restoration distance",
+    "return margin recalculates deterministically",
+    "the fixture becomes more conservative before critical failure"
+  ],
+  "forbidden": [
+    "panic claim",
+    "physical battery claim",
+    "forced control",
+    "lineage mutation",
+    "relationship worth mutation"
+  ]
+}
