@@ -31,16 +31,25 @@ test('resource bands are calm margin classes rather than battery-only thresholds
   assert.equal(classifyReturnMargin({ margin: -1, maxEnergy:100, requiredReserve:12 }), 'PROTECTIVE_RETURN_OR_HALT');
 });
 
-test('declared UPDRAFT recalculates return margin headlessly under identical geometry', async () => {
-  const laws = JSON.parse(await readFile(new URL('../worlds/first-grove/laws.json', import.meta.url), 'utf8'));
-  assert.ok(laws.weather.states.includes('UPDRAFT'));
+test('declared UPDRAFT scenario recalculates return margin headlessly under identical geometry', async () => {
+  const [laws, scenario] = await Promise.all([
+    readFile(new URL('../worlds/first-grove/laws.json', import.meta.url), 'utf8').then(JSON.parse),
+    readFile(new URL('../worlds/first-grove/scenarios/updraft-return-margin.json', import.meta.url), 'utf8').then(JSON.parse)
+  ]);
+  const fixture = scenario.startingState;
+
+  assert.equal(scenario.scenarioRef, 'scenario.first-grove.updraft-return-margin');
+  assert.equal(fixture.sameActorEnergy, true);
+  assert.equal(fixture.sameRestorationDistance, true);
+  assert.ok(laws.weather.states.includes(fixture.changedWeather));
+  assert.equal(fixture.changedWeather, 'UPDRAFT');
   assert.equal(laws.resource.updraftMultiplier, 1.3);
-  assert.equal(weatherCostMultiplier('UPDRAFT', laws), 1.3);
+  assert.equal(weatherCostMultiplier(fixture.changedWeather, laws), 1.3);
 
   const makeMember = () => ({
-    body: { x: 620, y: 500 },
+    body: { x: fixture.restorationDistance, y: 500 },
     resources: {
-      energy: 40,
+      energy: fixture.companionEnergy,
       maxEnergy: 100,
       reserveRequired: 12,
       restorationMethods: ['restoration.vextory.sunlight']
@@ -59,15 +68,15 @@ test('declared UPDRAFT recalculates return margin headlessly under identical geo
     laws
   });
 
-  const clear = updateResourceProjection(makeMember(), makeWorld('CLEAR'));
-  const updraft = updateResourceProjection(makeMember(), makeWorld('UPDRAFT'));
+  const clear = updateResourceProjection(makeMember(), makeWorld(fixture.startingWeather));
+  const updraft = updateResourceProjection(makeMember(), makeWorld(fixture.changedWeather));
 
-  assert.equal(clear.band, 'RESTORATION_AWARE');
-  assert.equal(updraft.band, 'RESTORATION_RECOMMENDED');
+  assert.equal(clear.band, fixture.expectedClearBand);
+  assert.equal(updraft.band, fixture.expectedUpdraftBand);
   assert.ok(updraft.predictedReturnCost > clear.predictedReturnCost);
   assert.ok(updraft.returnMargin < clear.returnMargin);
 
-  const secondUpdraft = updateResourceProjection(makeMember(), makeWorld('UPDRAFT'));
+  const secondUpdraft = updateResourceProjection(makeMember(), makeWorld(fixture.changedWeather));
   assert.deepEqual(secondUpdraft, updraft);
 });
 
