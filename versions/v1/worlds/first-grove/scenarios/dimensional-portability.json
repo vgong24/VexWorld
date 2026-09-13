@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "vexworld.scenario/v1",
+  "scenarioRef": "scenario.vexworld.dim0.item-ability-portability",
+  "purpose": "Prove one item and one ability preserve source semantic identity while a synthetic destination changes only their declared expression or availability under explicit compatibility dispositions.",
+  "startingState": {
+    "sourceWorldRef": "world.vexworld.first-grove",
+    "sourceItemRef": "item.vexworld.sunshower-bell",
+    "sourceAbilityRef": "ability.vexworld.twin-horizon",
+    "syntheticDestinationRef": "destination.synthetic.dim0.contract-proof",
+    "finalDestinationWorldSelected": false
+  },
+  "actions": [
+    "LOAD_SOURCE_SEMANTICS",
+    "RESOLVE_DECLARED_DESTINATION_COMPATIBILITY",
+    "COMPARE_SOURCE_IDENTITY_WITH_DESTINATION_EXPRESSION",
+    "PROBE_UNDECLARED_MAPPING"
+  ],
+  "expected": [
+    "source itemRef and abilityRef remain unchanged",
+    "destination expression may differ from source semantic identity",
+    "compatibility disposition is explicit per source ref",
+    "transformed restrictions are explicit rather than silent capability expansion",
+    "undeclared mapping resolves UNKNOWN_BLOCKED"
+  ],
+  "forbidden": [
+    "discovery identity collapses into item identity",
+    "destination expression becomes semantic owner",
+    "missing mapping is assumed compatible",
+    "synthetic destination is represented as the final destination world",
+    "live portal traversal or teleport is implied",
+    "physical authority is implied"
+  ]
+}

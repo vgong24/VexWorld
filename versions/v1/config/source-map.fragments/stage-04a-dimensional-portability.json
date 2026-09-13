@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "vexworld.source-map-fragment/v1",
+  "fragmentRef": "source-map-fragment.vexworld.v1.stage-04a-dimensional-portability",
+  "reason": "Register the VW-FWD-04A item semantics, dimensional portability scenario and focused evidence without rewriting the historical Version 1 base source map.",
+  "entries": [
+    {
+      "path": "config/source-map.fragments/stage-04a-dimensional-portability.json",
+      "category": "navigation-and-coverage",
+      "owner": "Dimensional Portability",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "world/items.json",
+      "category": "world-semantics",
+      "owner": "World Semantics + Compiler",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "worlds/first-grove/scenarios/dimensional-portability.json",
+      "category": "scenario-source",
+      "owner": "Dimensional Portability",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "test/portal-portability.test.mjs",
+      "category": "test-evidence",
+      "owner": "Assurance",
+      "sourceClass": "EVIDENCE_SOURCE"
+    }
+  ]
+}

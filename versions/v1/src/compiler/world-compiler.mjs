@@ -12,6 +12,7 @@ const SOURCE_FILES = Object.freeze([
   'world/behaviors.json',
   'world/actions.json',
   'world/practices.json',
+  'world/items.json',
   'world/abilities.json',
   'world/team-techniques.json'
 ]);
@@ -40,6 +41,9 @@ function validateSource({ manifest, map, laws, expressions, catalogs, scenarios 
   for (const field of ['worldRef', 'title', 'realityClass', 'mapRef', 'lawRef', 'expressionRef']) requireString(manifest, field, 'manifest');
   if (manifest.partyCapacity !== 4) throw new TypeError('reference world partyCapacity must be 4');
   if (manifest.physicalEffectPossible !== false) throw new TypeError('prototype physicalEffectPossible must be false');
+  if (!Array.isArray(manifest.catalogRefs) || !manifest.catalogRefs.includes('world/items.json')) {
+    throw new TypeError('world manifest must declare world/items.json');
+  }
   if (map.schemaVersion !== 'vexworld.map/v1') throw new TypeError('invalid map schemaVersion');
   if (!Array.isArray(map.platforms) || map.platforms.length === 0) throw new TypeError('map requires platforms');
   if (!Array.isArray(map.restorationPoints) || map.restorationPoints.length === 0) throw new TypeError('map requires restoration points');
@@ -53,6 +57,27 @@ function validateSource({ manifest, map, laws, expressions, catalogs, scenarios 
     for (const ref of archetype.behaviorRefs) if (!behaviorRefs.has(ref)) throw new TypeError(`unknown behavior ${ref}`);
   }
   for (const decoration of map.decorations) if (!archetypeRefs.has(decoration.archetypeRef)) throw new TypeError(`unknown decoration archetype ${decoration.archetypeRef}`);
+
+  if (catalogs.items.schemaVersion !== 'vexworld.item-catalog/v1') throw new TypeError('invalid item catalog schemaVersion');
+  if (!Array.isArray(catalogs.items.items) || catalogs.items.items.length === 0) throw new TypeError('item catalog requires items');
+  const itemRefs = new Set();
+  const discoveryRefs = new Set((map.discoveries ?? []).map((entry) => entry.discoveryRef));
+  for (const item of catalogs.items.items) {
+    for (const field of ['itemRef', 'title', 'archetypeRef', 'originWorldRef']) requireString(item, field, 'item');
+    if (itemRefs.has(item.itemRef)) throw new TypeError(`duplicate item ${item.itemRef}`);
+    itemRefs.add(item.itemRef);
+    if (!archetypeRefs.has(item.archetypeRef)) throw new TypeError(`unknown item archetype ${item.archetypeRef}`);
+    if (typeof item.portable !== 'boolean') throw new TypeError(`item ${item.itemRef} must explicitly declare portable as boolean`);
+    if (item.portable) requireString(item, 'identityPolicy', 'item');
+    if (item.sourceDiscoveryRef !== undefined) {
+      requireString(item, 'sourceDiscoveryRef', 'item');
+      if (item.itemRef === item.sourceDiscoveryRef) throw new TypeError('itemRef must remain distinct from sourceDiscoveryRef');
+      if (item.originWorldRef === manifest.worldRef && !discoveryRefs.has(item.sourceDiscoveryRef)) {
+        throw new TypeError(`unknown item discovery ${item.sourceDiscoveryRef}`);
+      }
+    }
+  }
+
   if (!catalogs.actions.actions.some((entry) => entry.actionRef === 'action.vexworld.status.open')) throw new TypeError('status action is required');
   if (!catalogs.teamTechniques.techniques.some((entry) => entry.teamTechniqueRef === 'technique.vexworld.high-low')) throw new TypeError('High/Low technique is required');
   for (const scenario of scenarios) {
@@ -82,6 +107,7 @@ export async function compileFirstGrove({ root = process.cwd() } = {}) {
     behaviors: records['world/behaviors.json'].value,
     actions: records['world/actions.json'].value,
     practices: records['world/practices.json'].value,
+    items: records['world/items.json'].value,
     abilities: records['world/abilities.json'].value,
     teamTechniques: records['world/team-techniques.json'].value
   };

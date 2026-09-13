@@ -1,7 +1,7 @@
 {
   "schemaVersion": "vexworld.generated-source-map/v1",
   "packageRef": "package.vexworld.first-grove.prototype.v1",
-  "integrityFingerprint": "ae9ed735e9e1174347160616c862bb0662050dcd16344f475cbba18983f8b09e",
+  "integrityFingerprint": "c4bcd33bee0555f543960b3f6b6327f639a2208aaec73b933dd83796577afd2c",
   "sources": [
     {
       "relativePath": "world/abilities.json",
@@ -18,6 +18,10 @@
     {
       "relativePath": "world/behaviors.json",
       "sha256": "9c179fdbd778bc527bc18ba63df8c2faacf3830ef2e020232a32f0621c4ba0e4"
+    },
+    {
+      "relativePath": "world/items.json",
+      "sha256": "497e0d0278451baad5191cbbbff4b151665d2cb81fcb984a3a62bc9161379c5f"
     },
     {
       "relativePath": "world/practices.json",
@@ -37,7 +41,7 @@
     },
     {
       "relativePath": "worlds/first-grove/manifest.json",
-      "sha256": "10fd0a0155111c7c0e868aff5f8e7c0cce9322c2cc21937ac4e6d951eb29216f"
+      "sha256": "326422cfd624225ee833e5b8b4291c8e8a3d0e2ee0496399ee1f0b8fbd159449"
     },
     {
       "relativePath": "worlds/first-grove/map.json",
@@ -46,6 +50,10 @@
     {
       "relativePath": "worlds/first-grove/scenarios/arrival-origin-consequence.json",
       "sha256": "10ebdc62d222d4ca0288e26c24a371b0b4cf7d88a94684fc288b564d11a896dc"
+    },
+    {
+      "relativePath": "worlds/first-grove/scenarios/dimensional-portability.json",
+      "sha256": "d5896d629bee879fb5d475935a349d86b082ed4b81596fbf5487cf4a76d22d31"
     },
     {
       "relativePath": "worlds/first-grove/scenarios/echo-overlook-witness.json",
