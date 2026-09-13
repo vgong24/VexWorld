@@ -5,7 +5,7 @@ import { FIXED_STEP_MS } from '../core/constants.mjs';
 import { deterministicCommunicationProposal, formCompanionUtterance } from '../core/companion-communication.mjs';
 import { createInput } from './input.mjs';
 import { createRenderer } from './renderer.mjs';
-import { ServerSessionClient } from './network-client.mjs';
+import { buildReturnReconciliation, ServerSessionClient } from './network-client.mjs';
 
 const canvas = document.querySelector('#game');
 const renderer = createRenderer(canvas);
@@ -32,6 +32,8 @@ let lastFrame = performance.now();
 let accumulator = 0;
 let activeClient = null;
 let networkState = 'LOCAL_ONLY';
+let returnPreview = null;
+let lastReturnProjection = null;
 let remoteIntents = {};
 let activeUtterances = {};
 let lastSeenUtteranceSequences = {};
@@ -53,6 +55,16 @@ const companionDefaults = [
 
 function saveKey(slot) {
   return `vexworld.first-grove.save.${slot}`;
+}
+
+function readLocalCheckpoint(slot) {
+  const raw = localStorage.getItem(saveKey(slot));
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
 function normalizeEnvironment(value) {
@@ -215,6 +227,62 @@ function updateSaveSummary() {
   }
 }
 
+function regionLabel(regionRef) {
+  return regionRef?.split('.').pop()?.replaceAll('-', ' ') || 'First Grove';
+}
+
+function renderReturnProjection(projection) {
+  if (!projection?.canonicalCheckpointPresent) {
+    ui.saved_summary.textContent = 'This LAN session has no accepted server checkpoint yet.';
+    return;
+  }
+  const pieces = [
+    `Server checkpoint v${projection.stateVersion}`,
+    `tick ${projection.canonicalTick}`,
+    `${Math.round((projection.canonicalNowMs || 0) / 1000)}s simulation`,
+    regionLabel(projection.currentRegionRef)
+  ];
+  if (projection.localBaselineUsed) {
+    pieces.push(`since this Pair baseline: +${projection.ticksAdvanced} ticks / +${Math.round((projection.simulationMsAdvanced || 0) / 1000)}s`);
+    if (projection.fromRegionRef && projection.fromRegionRef !== projection.currentRegionRef) {
+      pieces.push(`${regionLabel(projection.fromRegionRef)} → ${regionLabel(projection.currentRegionRef)}`);
+    }
+  }
+  if (projection.recentCanonicalReceipts.length) {
+    pieces.push(`canonical events: ${projection.recentCanonicalReceipts.map((receipt) => receipt.type).join(', ')}`);
+  }
+  if (projection.takeoverState === 'WAIT_FOR_RELEASE_OR_EXPIRY') {
+    pieces.push('another realm host still holds authority; this browser will not steal its lease');
+  } else {
+    pieces.push('return authority is available to claim');
+  }
+  pieces.push('display-only return context — not memory, world law, relationship worth, or private conversation history');
+  ui.saved_summary.textContent = pieces.join(' • ');
+}
+
+async function previewRemoteReturn(setup = collectSetup()) {
+  if (!serverToken || !ui.use_server.checked) {
+    returnPreview = null;
+    return null;
+  }
+  const previewClient = new ServerSessionClient({
+    baseUrl: serverBase,
+    token: serverToken,
+    sessionRef: setup.sessionRef,
+    hostId
+  });
+  await previewClient.health();
+  const record = await previewClient.load();
+  const projection = buildReturnReconciliation(
+    record,
+    readLocalCheckpoint(setup.saveSlot),
+    { hostId }
+  );
+  returnPreview = { stateVersion: record.stateVersion, projection };
+  renderReturnProjection(projection);
+  return projection;
+}
+
 async function initializeNetwork(setup, { continueExisting }) {
   if (!serverToken || !ui.use_server.checked) {
     activeClient = null;
@@ -225,11 +293,47 @@ async function initializeNetwork(setup, { continueExisting }) {
   networkState = 'CONNECTING';
   await activeClient.health();
   const prior = await activeClient.load();
+  const projection = buildReturnReconciliation(
+    prior,
+    readLocalCheckpoint(setup.saveSlot),
+    { hostId }
+  );
+  returnPreview = { stateVersion: prior.stateVersion, projection };
+  renderReturnProjection(projection);
+
+  if (!continueExisting && prior.checkpoint) {
+    networkState = 'REMOTE_CHECKPOINT_PRESENT';
+    activeClient = null;
+    throw new Error('This LAN session already has an accepted journey. Choose Continue saved journey to reconcile and return to it.');
+  }
+  if (projection.takeoverState === 'WAIT_FOR_RELEASE_OR_EXPIRY') {
+    networkState = 'WAIT_FOR_RELEASE_OR_EXPIRY';
+    activeClient = null;
+    throw new Error('Another realm host still holds this session lease. Return is available only after explicit release or actual expiry.');
+  }
+
   await activeClient.claimLease();
   networkState = 'HOST_LEASE_HELD';
-  if (continueExisting && prior.checkpoint) {
-    validateGameState(prior.checkpoint);
-    return prior.checkpoint;
+  const current = await activeClient.load();
+  if (continueExisting && current.checkpoint) {
+    validateGameState(current.checkpoint);
+    const currentProjection = buildReturnReconciliation(
+      current,
+      readLocalCheckpoint(setup.saveSlot),
+      { hostId }
+    );
+    if (returnPreview && returnPreview.stateVersion !== current.stateVersion) {
+      returnPreview = { stateVersion: current.stateVersion, projection: currentProjection };
+      renderReturnProjection(currentProjection);
+      await activeClient.releaseLease();
+      activeClient = null;
+      networkState = 'RETURN_REFRESH_REQUIRED';
+      throw new Error('The accepted journey changed while return was being prepared. Review the refreshed return summary, then choose Continue again.');
+    }
+    lastReturnProjection = currentProjection;
+    returnPreview = { stateVersion: current.stateVersion, projection: currentProjection };
+    renderReturnProjection(currentProjection);
+    return current.checkpoint;
   }
   return null;
 }
@@ -263,11 +367,11 @@ async function begin({ continueExisting = false } = {}) {
     await saveCurrentState(true);
   } catch (error) {
     ui.setup_error.textContent = `Could not begin: ${error.message}`;
-    if (activeClient) {
+    if (activeClient && networkState === 'HOST_LEASE_HELD') {
       try { await activeClient.releaseLease(); } catch {}
-      activeClient = null;
     }
-    networkState = 'ERROR';
+    activeClient = null;
+    if (networkState === 'CONNECTING' || networkState === 'HOST_LEASE_HELD') networkState = 'ERROR';
   }
 }
 
@@ -336,6 +440,7 @@ async function saveReleaseAndReturnToGarden() {
   ui.pause_panel.classList.add('hidden');
   ui.setup_panel.classList.remove('hidden');
   updateSaveSummary();
+  if (serverToken && ui.use_server.checked) previewRemoteReturn().catch(() => {});
   ui.setup_error.textContent = networkState === 'LEASE_RELEASE_UNCONFIRMED'
     ? 'Journey saved locally. The LAN host lease could not be confirmed released; another device may need to wait up to 15 seconds.'
     : 'Journey saved. Another device may now continue the same LAN session.';
@@ -412,6 +517,9 @@ function renderStatus() {
   const dialogueSummary = recentDialogue.length
     ? recentDialogue.slice(-4).map((utterance) => `${escapeHtml(memberForParticipant(utterance.participantRef)?.displayName || 'Companion')}: ${escapeHtml(utterance.text)}`).join('<br>')
     : 'No recent companion expression.';
+  const returnSummary = lastReturnProjection
+    ? `<article class="status-card"><h3>Return continuity</h3><p>Accepted checkpoint v${lastReturnProjection.stateVersion} • tick ${lastReturnProjection.canonicalTick} • ${escapeHtml(regionLabel(lastReturnProjection.currentRegionRef))}</p>${lastReturnProjection.localBaselineUsed ? `<p>Since this Pair baseline: +${lastReturnProjection.ticksAdvanced} ticks / +${Math.round((lastReturnProjection.simulationMsAdvanced || 0) / 1000)}s simulation.</p>` : '<p>No same-session local baseline was used.</p>'}<p class="tiny-note">Factual display projection only — not memory, world law, relationship worth, or imported private conversation.</p></article>`
+    : '';
   ui.status_content.innerHTML = `
     <article class="status-card"><h3>Who am I here?</h3><p><b>${escapeHtml(human.displayName)}</b> — ${escapeHtml(human.avatarExpression.form)}</p><p>Participant: <code>${escapeHtml(human.participantRef)}</code></p><p>Vessel: <code>${escapeHtml(human.vesselRef)}</code></p></article>
     <article class="status-card"><h3>Party</h3><p>${state.party.members.map((m)=>escapeHtml(m.displayName)).join(' • ')}</p><p>${state.party.members.length} / ${state.party.capacity}</p></article>
@@ -422,6 +530,7 @@ function renderStatus() {
     <article class="status-card"><h3>First Grove journey</h3><p><b>${escapeHtml(region?.title || 'First Grove')}</b></p><p>Home: <code>${escapeHtml(journey.homeAnchorRef || 'UNKNOWN')}</code></p><p>Regions visited: ${(journey.visitedRegionRefs || []).length} • discoveries: ${(journey.discoveredRefs || []).length}</p><p>Origin lesson: ${escapeHtml(journey.originContext?.earlyTraversalCue?.replaceAll('_',' ') || 'UNKNOWN')}</p><p>Potential ceiling effect: <b>${escapeHtml(journey.originContext?.potentialCeilingEffect || 'UNKNOWN')}</b></p></article>
     <article class="status-card"><h3>World / quest</h3><p>${escapeHtml(state.quest.progressText)}</p><p>Weather: ${escapeHtml(state.weather.state)}</p><p>Twin Horizon: ${state.quest.twinHorizonUnlocked ? 'LEARNED' : state.quest.twinHorizonTrial}</p></article>
     <article class="status-card"><h3>Recent companion expression</h3><p>${dialogueSummary}</p><p class="tiny-note">Ephemeral expression only — not canonical memory, world law, relationship worth, or motor authority.</p></article>
+    ${returnSummary}
     <article class="status-card"><h3>Session</h3><p>${escapeHtml(networkState)}</p><p><code>${escapeHtml(state.sessionRef)}</code></p>${remoteCommands.length ? `<p>Remote worker command${remoteCommands.length > 1 ? 's' : ''}:</p>${remoteCommands.join('')}` : '<p>All companions are local.</p>'}${hasRemoteOllama ? '<p class="tiny-note">Ollama worker commands do not guess a model name. If exactly one model is installed it is observed and selected; if several are installed, add <code>--model &lt;exact-name-from-ollama-list&gt;</code>.</p>' : ''}<p class="tiny-note">The token is a trusted-LAN development credential. Do not post it publicly.</p></article>`;
   ui.status_content.querySelectorAll('[data-copy-worker]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -480,7 +589,18 @@ function frame(timestamp) {
 }
 
 ui.companion_count.addEventListener('change', makeCompanionRows);
-ui.save_slot.addEventListener('change', updateSaveSummary);
+ui.save_slot.addEventListener('change', () => {
+  updateSaveSummary();
+  if (serverToken && ui.use_server.checked) previewRemoteReturn().catch(() => {});
+});
+ui.use_server.addEventListener('change', () => {
+  updateSaveSummary();
+  if (serverToken && ui.use_server.checked) previewRemoteReturn().catch(() => {});
+});
+ui.session_id.addEventListener('change', () => {
+  updateSaveSummary();
+  if (serverToken && ui.use_server.checked) previewRemoteReturn().catch(() => {});
+});
 ui.begin_button.addEventListener('click', () => begin({ continueExisting: false }));
 ui.continue_button.addEventListener('click', () => begin({ continueExisting: true }));
 ui.status_button.addEventListener('click', () => { if (state) { state.flags.statusOpen = true; renderUi(true); } });
@@ -507,6 +627,7 @@ try {
   makeCompanionRows();
   updateSaveSummary();
   resetCommunicationExpression();
+  if (serverToken && ui.use_server.checked) await previewRemoteReturn().catch(() => null);
   requestAnimationFrame(frame);
 } catch (error) {
   ui.setup_error.textContent = error.message;
