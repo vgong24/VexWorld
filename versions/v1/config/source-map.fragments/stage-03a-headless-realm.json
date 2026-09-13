@@ -20,6 +20,12 @@
       "category": "test-evidence",
       "owner": "Assurance",
       "sourceClass": "EVIDENCE_SOURCE"
+    },
+    {
+      "path": "test/headless-realm-lease-loss.test.mjs",
+      "category": "test-evidence",
+      "owner": "Assurance",
+      "sourceClass": "EVIDENCE_SOURCE"
     }
   ]
 }
