@@ -2,15 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-import { projectPhysicalShadow } from '../src/core/physical-shadow.mjs';
+import {
+  projectPhysicalShadow,
+  scenarioSemanticSha256
+} from '../src/core/physical-shadow.mjs';
 
 const SOURCE_WORLD_REF = 'world.vexworld.first-grove';
 const SOURCE_SCENARIO_REF = 'scenario.first-grove.updraft-return-margin';
+const SOURCE_SCENARIO_SEMANTIC_SHA256 = 'e6765d50937bdbf3b60b3c40d8abcf4c5d305f7b1be57d04cee73265f47b6c66';
 
 const ACCEPTANCE = Object.freeze({
   disposition: 'ACCEPTED',
   sourceWorldRef: SOURCE_WORLD_REF,
   sourceScenarioRef: SOURCE_SCENARIO_REF,
+  sourceScenarioSemanticSha256: SOURCE_SCENARIO_SEMANTIC_SHA256,
   closeReceiptRef: 'github.issue.vexworld.61.comment.5656924894',
   acceptedMainRef: 'github.commit.vexworld.e0e868aa3fa68ccf87b11616b80bfa036ce89c61',
   foundationRunRef: 'github.actions.vexworld.34789122616'
@@ -33,6 +38,8 @@ function project(scenario, sourceAcceptance = ACCEPTANCE) {
 
 test('accepted UPDRAFT scenario projects into a deterministic read-only physical shadow', async () => {
   const scenario = await loadScenario();
+  assert.equal(scenarioSemanticSha256(scenario), SOURCE_SCENARIO_SEMANTIC_SHA256);
+
   const first = project(scenario);
   const second = project(scenario);
 
@@ -41,6 +48,7 @@ test('accepted UPDRAFT scenario projects into a deterministic read-only physical
   assert.equal(first.shadowRef, `physical-shadow.${SOURCE_SCENARIO_REF}`);
   assert.equal(first.sourceWorldRef, SOURCE_WORLD_REF);
   assert.equal(first.sourceScenarioRef, SOURCE_SCENARIO_REF);
+  assert.equal(first.sourceScenarioSemanticSha256, SOURCE_SCENARIO_SEMANTIC_SHA256);
   assert.equal(first.sourceRealityClass, 'SIMULATION');
   assert.equal(first.projectionMode, 'READ_ONLY_PHYSICAL_SHADOW');
 
@@ -72,7 +80,7 @@ test('accepted UPDRAFT scenario projects into a deterministic read-only physical
   assert.equal(first.physicalObservation, null);
   assert.deepEqual(first.truthBoundary, {
     simulationValidated: true,
-    simulationValidationBasis: 'BOUND_ACCEPTED_SOURCE_EVIDENCE',
+    simulationValidationBasis: 'BOUND_ACCEPTED_SOURCE_EVIDENCE_AND_SCENARIO_DIGEST',
     physicalSafetyCertified: false,
     physicalEquivalenceProven: false
   });
@@ -102,6 +110,37 @@ test('physical shadow is a deep copy and cannot mutate its accepted source scena
   assert.deepEqual(scenario, original);
   assert.equal(scenario.startingState.changedWeather, 'UPDRAFT');
   assert.ok(!scenario.actions.includes('ACTUATE_DEVICE'));
+});
+
+test('accepted evidence cannot be applied to mutated same-ref scenario semantics', async () => {
+  const scenario = await loadScenario();
+  const mutations = [
+    (value) => { value.purpose = `${value.purpose} mutated`; },
+    (value) => { value.startingState.companionEnergy += 1; },
+    (value) => { value.actions = [...value.actions, 'UNREVIEWED_ACTION']; },
+    (value) => { value.expected[0] = 'unreviewed expected meaning'; },
+    (value) => { value.forbidden = value.forbidden.slice(1); }
+  ];
+
+  for (const mutate of mutations) {
+    const changed = structuredClone(scenario);
+    mutate(changed);
+    assert.equal(changed.scenarioRef, SOURCE_SCENARIO_REF);
+    assert.notEqual(scenarioSemanticSha256(changed), SOURCE_SCENARIO_SEMANTIC_SHA256);
+    assert.throws(
+      () => project(changed),
+      /sourceAcceptance\.sourceScenarioSemanticSha256 must match scenario semantics/
+    );
+  }
+
+  assert.throws(
+    () => project(scenario, { ...ACCEPTANCE, sourceScenarioSemanticSha256: '0'.repeat(64) }),
+    /sourceAcceptance\.sourceScenarioSemanticSha256 must match scenario semantics/
+  );
+  assert.throws(
+    () => project(scenario, { ...ACCEPTANCE, sourceScenarioSemanticSha256: 'not-a-digest' }),
+    /sourceAcceptance\.sourceScenarioSemanticSha256 must be a SHA-256 hex digest/
+  );
 });
 
 test('digital UPDRAFT remains simulation meaning rather than physical observation or implementation', async () => {
