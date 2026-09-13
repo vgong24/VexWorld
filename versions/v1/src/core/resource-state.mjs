@@ -7,7 +7,9 @@ export function weatherCostMultiplier(weather, laws) {
   if (weather === 'MIST') return 1.1;
   if (weather === 'UPDRAFT') {
     const multiplier = laws.resource.updraftMultiplier;
-    if (!(multiplier > 0)) throw new TypeError('UPDRAFT requires positive laws.resource.updraftMultiplier');
+    if (typeof multiplier !== 'number' || !Number.isFinite(multiplier) || multiplier <= 0) {
+      throw new TypeError('UPDRAFT requires finite positive laws.resource.updraftMultiplier');
+    }
     return multiplier;
   }
   return 1;
