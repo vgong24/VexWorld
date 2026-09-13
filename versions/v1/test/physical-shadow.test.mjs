@@ -121,7 +121,7 @@ test('digital UPDRAFT remains simulation meaning rather than physical observatio
   assert.doesNotMatch(serialized, /actuatorCommand/i);
 });
 
-test('protected physical and control claims are rejected recursively before projection', async () => {
+test('protected physical truth and authority claims are rejected recursively before projection', async () => {
   const source = await loadScenario();
   const injections = [
     ['actuatorCommand', { actuatorCommand: 'MOVE_PLATFORM' }],
@@ -129,6 +129,12 @@ test('protected physical and control claims are rejected recursively before proj
     ['measuredWindSpeed', { nested: { measuredWindSpeed: 12 } }],
     ['physical_safety_certified', { nested: [{ physical_safety_certified: true }] }],
     ['physicalEquivalenceProven', { nested: { physicalEquivalenceProven: true } }],
+    ['physicalActuation', { nested: { physicalActuation: true } }],
+    ['physicalSensing', { nested: { physicalSensing: true } }],
+    ['robotics', { nested: { robotics: true } }],
+    ['construction', { nested: { construction: true } }],
+    ['venueOperation', { nested: { venueOperation: true } }],
+    ['canonicalWorldMutation', { nested: { canonicalWorldMutation: true } }],
     ['deviceRef', { nested: { deviceRef: 'device.real.fan' } }],
     ['sensorReading', { nested: { sensorReading: { wind: 12 } } }]
   ];
