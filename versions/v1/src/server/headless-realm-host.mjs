@@ -212,6 +212,11 @@ export class HeadlessRealmHost {
 
   async readRelayState() {
     const record = await this.client.load({ trackVersion: false });
+    const lease = record.hostLease;
+    if (!lease || lease.hostId !== this.hostId || Number(lease.expiresAt) <= Date.now()) {
+      this.leaseHeld = false;
+      throw hostError('HOST_LEASE_LOST', 'headless realm host lease is absent, expired, or owned by another host');
+    }
     if (record.stateVersion !== this.client.stateVersion) {
       throw hostError(
         'VERSION_DRIFT_OBSERVED',
