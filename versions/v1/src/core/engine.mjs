@@ -17,15 +17,24 @@ import { makeParticipantObservation } from './observation.mjs';
 
 export { createInitialGame, makeParticipantObservation };
 
-export function stepGame(state, input, worldPackage, { dtMs = FIXED_STEP_MS, externalIntents = {} } = {}) {
+export function stepGame(
+  state,
+  input,
+  worldPackage,
+  { dtMs = FIXED_STEP_MS, externalIntents = {}, humanInputAbsent = false } = {}
+) {
   if (!state || state.schemaVersion !== 'vexworld.game-state/v1') throw new TypeError('invalid game state');
   const dt = dtMs / 1000;
-  if (state.flags.paused && !input.pausePressed && !input.statusPressed) return state;
+  const effectiveInput = input || {};
+  if (state.flags.paused && !effectiveInput.pausePressed && !effectiveInput.statusPressed) return state;
 
   state.nowMs += dtMs;
   state.tick += 1;
   state.updatedAt = Date.now();
-  applyHumanInput(state, input, worldPackage, dt);
+  // A headless realm host may advance the fictional world without fabricating
+  // human controls. Skipping this call does not grant the host human identity;
+  // it simply leaves the human participant untouched for this simulation tick.
+  if (!humanInputAbsent) applyHumanInput(state, effectiveInput, worldPackage, dt);
   if (!state.flags.paused && !state.flags.statusOpen) {
     updateWeather(state, worldPackage);
     updateCompanions(state, externalIntents, worldPackage, dt);
