@@ -32,7 +32,7 @@ jobs:
         run: npm --prefix versions/v1 run compile
 
       - name: Run exact headless realm boundary regressions
-        run: node --test versions/v1/test/headless-realm-host.test.mjs
+        run: node --test versions/v1/test/headless-realm-host.test.mjs versions/v1/test/headless-realm-lease-loss.test.mjs
 
       - name: Verify headless host is renderer independent
         shell: bash
@@ -44,6 +44,10 @@ jobs:
           fi
           if ! grep -q "humanInputAbsent: true" versions/v1/src/server/headless-realm-host.mjs; then
             echo "Headless realm host must explicitly suppress fabricated human input" >&2
+            exit 1
+          fi
+          if ! grep -q "HOST_LEASE_LOST" versions/v1/src/server/headless-realm-host.mjs; then
+            echo "Headless realm host must fail closed when lease authority is lost" >&2
             exit 1
           fi
 
