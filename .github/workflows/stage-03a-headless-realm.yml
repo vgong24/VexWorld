@@ -1,0 +1,53 @@
+name: Stage 03A Headless Realm
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  headless-realm:
+    if: github.event.pull_request.head.ref == 'VXG-091226-vw-fwd-03a-headless-realm'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact Stage 03A candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Compile canonical First Grove package
+        run: npm --prefix versions/v1 run compile
+
+      - name: Run exact headless realm boundary regressions
+        run: node --test versions/v1/test/headless-realm-host.test.mjs
+
+      - name: Verify headless host is renderer independent
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -E "renderer|canvas|document|window" versions/v1/src/server/headless-realm-host.mjs | grep -v -E "renderer-independent|browser|window"; then
+            echo "Headless realm host must not depend on renderer/browser globals" >&2
+            exit 1
+          fi
+          if ! grep -q "humanInputAbsent: true" versions/v1/src/server/headless-realm-host.mjs; then
+            echo "Headless realm host must explicitly suppress fabricated human input" >&2
+            exit 1
+          fi
+
+# This workflow proves bounded renderer-independent fictional-world continuity only.
+# OFFSCREEN_PLAY != PRODUCTION_SERVER.
+# AUTOMATED_HEADLESS_EVIDENCE != HUMAN_GAME_FEEL.
+# [VXG RealForever]
