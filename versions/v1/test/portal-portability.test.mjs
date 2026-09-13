@@ -112,12 +112,28 @@ test('undeclared portability mappings fail closed and invalid dispositions are r
     }),
     /invalid compatibility disposition/
   );
+  assert.throws(
+    () => resolvePortableSemantic({
+      sourceRef: 'capability.not-an-item-or-ability',
+      semanticType: 'CAPABILITY',
+      destinationAdapter
+    }),
+    /semanticType must be ITEM or ABILITY/
+  );
 });
 
-test('legacy capability resolver remains compatible with capabilityMappings', () => {
+test('legacy capability resolver remains compatible with capabilityMappings even when portabilityMappings collide', () => {
   const mapped = resolvePortableCapability({
     capability: { capabilityRef: 'capability.example' },
     destinationAdapter: {
+      portabilityMappings: {
+        'capability.example': {
+          disposition: 'NATIVE',
+          destinationExpressionRef: 'expression.synthetic.must-not-win',
+          changedProperties: [],
+          reason: 'NEW_NAMESPACE_MUST_NOT_OVERRIDE_LEGACY'
+        }
+      },
       capabilityMappings: {
         'capability.example': {
           disposition: 'PRESENT_BUT_INACTIVE',
