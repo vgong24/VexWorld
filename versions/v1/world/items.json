@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "vexworld.item-catalog/v1",
+  "items": [
+    {
+      "itemRef": "item.vexworld.sunshower-bell",
+      "title": "Sunshower Bell",
+      "archetypeRef": "archetype.world.item",
+      "originWorldRef": "world.vexworld.first-grove",
+      "sourceDiscoveryRef": "discovery.first-grove.sunshower-bell",
+      "portable": true,
+      "identityPolicy": "SEMANTIC_IDENTITY_PERSISTS_ACROSS_EXPRESSIONS"
+    }
+  ]
+}
