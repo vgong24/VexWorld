@@ -80,13 +80,19 @@ test('UPDRAFT addition preserves accepted weather cost multipliers', async () =>
   assert.equal(weatherCostMultiplier('CLEAR', laws), 1);
 });
 
-test('UPDRAFT fails closed when its declared resource multiplier is missing or invalid', () => {
-  assert.throws(
-    () => weatherCostMultiplier('UPDRAFT', { resource: {} }),
-    /UPDRAFT requires positive laws\.resource\.updraftMultiplier/
-  );
-  assert.throws(
-    () => weatherCostMultiplier('UPDRAFT', { resource: { updraftMultiplier: 0 } }),
-    /UPDRAFT requires positive laws\.resource\.updraftMultiplier/
-  );
+test('UPDRAFT fails closed when its declared resource multiplier is missing or malformed', () => {
+  const invalid = [
+    undefined,
+    0,
+    -1,
+    '1.3',
+    Number.POSITIVE_INFINITY,
+    Number.NaN
+  ];
+  for (const updraftMultiplier of invalid) {
+    assert.throws(
+      () => weatherCostMultiplier('UPDRAFT', { resource: { updraftMultiplier } }),
+      /UPDRAFT requires finite positive laws\.resource\.updraftMultiplier/
+    );
+  }
 });
