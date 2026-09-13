@@ -51,23 +51,29 @@ class StoreSessionClient {
   }
 }
 
-test('headless realm stops before another simulation tick when its persisted lease has expired', async (t) => {
+async function createLeaseLossFixture(t, sessionRef) {
   const directory = await mkdtemp(path.join(tmpdir(), 'vexworld-headless-lease-loss-'));
   t.after(async () => rm(directory, { recursive: true, force: true }));
 
   const store = new SessionStore(directory);
   const worldPackage = await compileFirstGrove({ root: versionRoot });
   const state = createInitialGame(worldPackage, {
-    sessionRef: 'realm.lease-loss',
+    sessionRef,
     companions: [{ displayName: 'Vex', controllerClass: 'REMOTE_DETERMINISTIC' }]
   });
   const now = Date.now();
-  assert.equal((await store.claimLease('realm.lease-loss', 'host.browser.seed', { now, ttlMs: 5000 })).accepted, true);
-  assert.equal((await store.writeCheckpoint('realm.lease-loss', 'host.browser.seed', 0, serializeGameState(state), { now: now + 1 })).accepted, true);
-  assert.equal((await store.releaseLease('realm.lease-loss', 'host.browser.seed', { now: now + 2 })).accepted, true);
+  assert.equal((await store.claimLease(sessionRef, 'host.browser.seed', { now, ttlMs: 5000 })).accepted, true);
+  assert.equal((await store.writeCheckpoint(sessionRef, 'host.browser.seed', 0, serializeGameState(state), { now: now + 1 })).accepted, true);
+  assert.equal((await store.releaseLease(sessionRef, 'host.browser.seed', { now: now + 2 })).accepted, true);
+  return { store, worldPackage, state };
+}
+
+test('headless realm stops before another simulation tick when its persisted lease has expired', async (t) => {
+  const sessionRef = 'realm.lease-loss';
+  const { store, worldPackage, state } = await createLeaseLossFixture(t, sessionRef);
 
   const hostId = 'host.headless.lease-loss';
-  const client = new StoreSessionClient(store, 'realm.lease-loss', hostId);
+  const client = new StoreSessionClient(store, sessionRef, hostId);
   const host = new HeadlessRealmHost({
     client,
     worldPackage,
@@ -81,8 +87,9 @@ test('headless realm stops before another simulation tick when its persisted lea
   });
   await host.start();
   const tickBeforeLoss = host.state.tick;
+  assert.equal(tickBeforeLoss, state.tick);
 
-  const record = await store.read('realm.lease-loss');
+  const record = await store.read(sessionRef);
   record.hostLease.expiresAt = 0;
   await store.write(record);
 
@@ -90,8 +97,57 @@ test('headless realm stops before another simulation tick when its persisted lea
   assert.equal(host.state.tick, tickBeforeLoss, 'no canonical world step may occur after lease loss');
   assert.equal(host.leaseHeld, false);
 
-  const takeover = await store.claimLease('realm.lease-loss', 'host.browser.return', { now: Date.now(), ttlMs: 5000 });
+  const takeover = await store.claimLease(sessionRef, 'host.browser.return', { now: Date.now(), ttlMs: 5000 });
   assert.equal(takeover.accepted, true, 'an expired headless lease must not block explicit later takeover');
+});
+
+test('headless realm does not publish companion state after lease replacement following an authorized tick', async (t) => {
+  const sessionRef = 'realm.post-step-lease-loss';
+  const { store, worldPackage, state } = await createLeaseLossFixture(t, sessionRef);
+  const companion = state.party.members.find((member) => member.participantType === 'AI_COMPANION');
+  assert.ok(companion);
+
+  const hostId = 'host.headless.post-step-lease-loss';
+  const successorHostId = 'host.browser.return-after-step';
+  const client = new StoreSessionClient(store, sessionRef, hostId);
+  const host = new HeadlessRealmHost({
+    client,
+    worldPackage,
+    hostId,
+    maxTicks: 3,
+    tickDelayMs: 0,
+    saveEveryTicks: 99,
+    leaseRenewEveryTicks: 99,
+    leaseTtlMs: 60000,
+    sleep: async () => {}
+  });
+  await host.start();
+  const persistedTickBeforeLoss = (await store.read(sessionRef)).checkpoint.tick;
+  const originalPublish = host.publishCompanionObservations.bind(host);
+  host.publishCompanionObservations = async () => {
+    assert.equal((await store.releaseLease(sessionRef, hostId)).accepted, true);
+    assert.equal((await store.claimLease(sessionRef, successorHostId, { ttlMs: 60000 })).accepted, true);
+    return originalPublish();
+  };
+
+  await assert.rejects(host.stepOnce(), (error) => error?.code === 'HOST_LEASE_LOST');
+  assert.equal(
+    host.state.tick,
+    persistedTickBeforeLoss + 1,
+    'the in-memory canonical tick occurred while the old host still had authority'
+  );
+  assert.equal(host.leaseHeld, false);
+  assert.equal(host.companionObservationsPublished, 0);
+  assert.equal(host.companionObservationPublishFailures, 0, 'authority loss is not an observation transport failure');
+
+  const afterLoss = await store.read(sessionRef);
+  assert.equal(afterLoss.hostLease?.hostId, successorHostId);
+  assert.equal(afterLoss.checkpoint.tick, persistedTickBeforeLoss, 'the losing host must not persist its in-memory tick');
+  assert.equal(afterLoss.observations[companion.participantRef], undefined, 'the losing host must not publish observer state');
+
+  await host.stop({ persist: false });
+  const afterStop = await store.read(sessionRef);
+  assert.equal(afterStop.hostLease?.hostId, successorHostId, 'losing-host cleanup must not release successor authority');
 });
 
 // [VXG RealForever]

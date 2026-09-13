@@ -333,6 +333,9 @@ export class HeadlessRealmHost {
     }
     const observations = [];
     for (const companion of getCompanions(this.state.party)) {
+      // Observation publication is a separate offscreen effect: re-check the
+      // persisted lease/version immediately before every companion-channel write.
+      await this.readRelayState();
       const observation = makeParticipantObservation(
         this.state,
         companion.participantRef,
