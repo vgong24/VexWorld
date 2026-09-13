@@ -14,6 +14,7 @@
     "world/behaviors.json",
     "world/actions.json",
     "world/practices.json",
+    "world/items.json",
     "world/abilities.json",
     "world/team-techniques.json"
   ],
