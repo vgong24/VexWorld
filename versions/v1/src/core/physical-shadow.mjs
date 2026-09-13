@@ -15,6 +15,7 @@ const PROTECTED_PHYSICAL_KEYS = new Set([
   'deviceref',
   'devicerefs',
   'measuredwindspeed',
+  'physicalequivalenceproven',
   'physicalimplementationmanifest',
   'physicalobservation',
   'physicalsafetycertified',
