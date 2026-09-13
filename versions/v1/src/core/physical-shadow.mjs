@@ -69,18 +69,24 @@ function validateScenario(scenario) {
   rejectProtectedPhysicalClaims(scenario);
 }
 
-function validateAcceptance(sourceAcceptance) {
+function validateAcceptance(sourceAcceptance, sourceWorldRef, scenarioRef) {
   if (!objectRecord(sourceAcceptance)) throw new TypeError('sourceAcceptance must be an object');
   if (sourceAcceptance.disposition !== 'ACCEPTED') throw new TypeError('sourceAcceptance.disposition must be ACCEPTED');
-  requireString(sourceAcceptance, 'closeReceiptRef', 'sourceAcceptance');
-  requireString(sourceAcceptance, 'acceptedMainRef', 'sourceAcceptance');
-  requireString(sourceAcceptance, 'foundationRunRef', 'sourceAcceptance');
+  for (const key of ['sourceWorldRef', 'sourceScenarioRef', 'closeReceiptRef', 'acceptedMainRef', 'foundationRunRef']) {
+    requireString(sourceAcceptance, key, 'sourceAcceptance');
+  }
+  if (sourceAcceptance.sourceWorldRef !== sourceWorldRef) {
+    throw new TypeError('sourceAcceptance.sourceWorldRef must match sourceWorldRef');
+  }
+  if (sourceAcceptance.sourceScenarioRef !== scenarioRef) {
+    throw new TypeError('sourceAcceptance.sourceScenarioRef must match scenario.scenarioRef');
+  }
 }
 
 export function projectPhysicalShadow({ sourceWorldRef, scenario, sourceAcceptance }) {
   if (!nonempty(sourceWorldRef)) throw new TypeError('sourceWorldRef must be a non-empty string');
   validateScenario(scenario);
-  validateAcceptance(sourceAcceptance);
+  validateAcceptance(sourceAcceptance, sourceWorldRef, scenario.scenarioRef);
 
   return {
     schemaVersion: 'vexworld.physical-shadow-projection/v1',
