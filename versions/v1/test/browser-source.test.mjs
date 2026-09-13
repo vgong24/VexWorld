@@ -27,7 +27,8 @@ test('browser entry exposes setup, game canvas, status, party, communication, an
   assert.match(app,/WAIT_FOR_RELEASE_OR_EXPIRY/);
   assert.match(app,/RETURN_REFRESH_REQUIRED/);
   assert.match(app,/const current = await activeClient\.load\(\)/);
-  assert.match(app,/returnPreview\.stateVersion !== current\.stateVersion/);
+  assert.match(app,/visiblePreviewVersion !== prior\.stateVersion/);
+  assert.match(app,/prior\.stateVersion !== current\.stateVersion/);
   assert.match(app,/display-only return context — not memory, world law, relationship worth, or private conversation history/);
 
   const styles=await readFile('src/web/styles.css','utf8');

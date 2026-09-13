@@ -292,6 +292,7 @@ async function initializeNetwork(setup, { continueExisting }) {
   activeClient = new ServerSessionClient({ baseUrl: serverBase, token: serverToken, sessionRef: setup.sessionRef, hostId });
   networkState = 'CONNECTING';
   await activeClient.health();
+  const visiblePreviewVersion = returnPreview?.stateVersion ?? null;
   const prior = await activeClient.load();
   const projection = buildReturnReconciliation(
     prior,
@@ -305,6 +306,11 @@ async function initializeNetwork(setup, { continueExisting }) {
     networkState = 'REMOTE_CHECKPOINT_PRESENT';
     activeClient = null;
     throw new Error('This LAN session already has an accepted journey. Choose Continue saved journey to reconcile and return to it.');
+  }
+  if (continueExisting && prior.checkpoint && visiblePreviewVersion !== prior.stateVersion) {
+    networkState = 'RETURN_REFRESH_REQUIRED';
+    activeClient = null;
+    throw new Error('The accepted journey changed since the visible return summary. Review the refreshed summary, then choose Continue again.');
   }
   if (projection.takeoverState === 'WAIT_FOR_RELEASE_OR_EXPIRY') {
     networkState = 'WAIT_FOR_RELEASE_OR_EXPIRY';
@@ -322,7 +328,7 @@ async function initializeNetwork(setup, { continueExisting }) {
       readLocalCheckpoint(setup.saveSlot),
       { hostId }
     );
-    if (returnPreview && returnPreview.stateVersion !== current.stateVersion) {
+    if (prior.stateVersion !== current.stateVersion) {
       returnPreview = { stateVersion: current.stateVersion, projection: currentProjection };
       renderReturnProjection(currentProjection);
       await activeClient.releaseLease();
