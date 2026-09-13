@@ -2,16 +2,16 @@
 /**
  * Vex Relay Self-Play
  *
- * Drives the public browser build through Chrome DevTools Protocol using only
- * Node.js built-ins. This is an observer/test adapter: it does not become game
+ * Browser evidence adapter for Vextory: First Grove. It does not become game
  * authority, call a model, publish evidence, or intentionally mutate saves.
  *
- * Runtime-resilience requirements:
- * - initial CDP readiness is retried inside one bounded total window;
- * - the Vextory server is spawned directly through Node (no npm wrapper child);
- * - CDP, browser and server handles are closed/reaped deterministically;
- * - product evidence and harness-cleanup disposition stay separate;
- * - a screenshot never turns an incomplete receipt into PASS.
+ * Runtime-resilience rules:
+ * - retry initial CDP readiness inside one bounded total window;
+ * - spawn Vextory directly through Node (no npm wrapper child);
+ * - close CDP and reap the browser process group + server deterministically;
+ * - remove the temporary browser profile with bounded retry;
+ * - keep product evidence disposition separate from harness cleanup;
+ * - never convert incomplete evidence into PASS because screenshots exist.
  *
  * [VXG RealForever]
  */
@@ -53,9 +53,7 @@ async function freePort() {
     server.listen(0, '127.0.0.1', () => {
       const address = server.address();
       const port = typeof address === 'object' && address ? address.port : null;
-      server.close(() =>
-        port ? resolvePort(port) : reject(new Error('Could not allocate a port')),
-      );
+      server.close(() => port ? resolvePort(port) : reject(new Error('Could not allocate a port')));
     });
   });
 }
@@ -119,20 +117,58 @@ export async function waitForChildExit(child, timeoutMs = 1500) {
   });
 }
 
-export async function terminateChild(child, { termMs = 1500, killMs = 1500 } = {}) {
+function signalChild(child, signal, { processGroup = false } = {}) {
+  if (!child || child.exitCode !== null || child.signalCode !== null) return true;
+  try {
+    if (processGroup && process.platform !== 'win32' && child.pid) process.kill(-child.pid, signal);
+    else child.kill(signal);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function terminateChild(child, {
+  termMs = 1500,
+  killMs = 1500,
+  processGroup = false
+} = {}) {
   if (!child) return { present: false, exited: true, forced: false, exitCode: null, signalCode: null };
   if (child.exitCode !== null || child.signalCode !== null) {
     return { present: true, exited: true, forced: false, exitCode: child.exitCode, signalCode: child.signalCode };
   }
 
-  try { child.kill('SIGTERM'); } catch {}
+  signalChild(child, 'SIGTERM', { processGroup });
   if (await waitForChildExit(child, termMs)) {
     return { present: true, exited: true, forced: false, exitCode: child.exitCode, signalCode: child.signalCode };
   }
 
-  try { child.kill('SIGKILL'); } catch {}
+  signalChild(child, 'SIGKILL', { processGroup });
   const exited = await waitForChildExit(child, killMs);
   return { present: true, exited, forced: true, exitCode: child.exitCode, signalCode: child.signalCode };
+}
+
+async function removeTemporaryProfile(directory, { attempts = 6, retryDelayMs = 150 } = {}) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await rm(directory, {
+        recursive: true,
+        force: true,
+        maxRetries: 3,
+        retryDelay: retryDelayMs,
+      });
+      if (!existsSync(directory)) return { removed: true, attempts: attempt, error: null };
+    } catch (error) {
+      lastError = error;
+    }
+    await delay(retryDelayMs * attempt);
+  }
+  return {
+    removed: !existsSync(directory),
+    attempts,
+    error: lastError ? `${lastError.code || 'ERROR'}: ${lastError.message}` : 'directory remained present',
+  };
 }
 
 class CdpClient {
@@ -345,6 +381,7 @@ async function main() {
     const discovered = await waitForServerUrl(server);
     receipt.serverUrl = discovered.url;
 
+    const browserUsesProcessGroup = process.platform !== 'win32';
     browser = spawn(browserPath, [
       `--remote-debugging-port=${debugPort}`,
       `--user-data-dir=${profileDir}`,
@@ -362,8 +399,9 @@ async function main() {
       '--no-sandbox',
       ...(HEADED ? [] : ['--headless=new', '--hide-scrollbars']),
       discovered.url,
-    ], { stdio: 'ignore' });
+    ], { stdio: 'ignore', detached: browserUsesProcessGroup });
 
+    receipt.harness = { browserUsesProcessGroup };
     const target = await waitForPageTarget(debugPort, 15000);
     client = await CdpClient.connect(target.webSocketDebuggerUrl);
     await Promise.all([
@@ -437,12 +475,8 @@ async function main() {
     receipt.screenshots.push(await screenshot(client, join(runDir, '06-status.png')));
 
     for (const event of client.events) {
-      if (event.method === 'Runtime.exceptionThrown') {
-        receipt.pageErrors.push(event.params?.exceptionDetails?.text || 'Runtime exception');
-      }
-      if (event.method === 'Log.entryAdded' && event.params?.entry?.level === 'error') {
-        receipt.consoleErrors.push(event.params.entry.text);
-      }
+      if (event.method === 'Runtime.exceptionThrown') receipt.pageErrors.push(event.params?.exceptionDetails?.text || 'Runtime exception');
+      if (event.method === 'Log.entryAdded' && event.params?.entry?.level === 'error') receipt.consoleErrors.push(event.params.entry.text);
     }
 
     const distinctHashes = new Set(receipt.screenshots.map((entry) => entry.sha256));
@@ -468,24 +502,23 @@ async function main() {
   } finally {
     if (!KEEP) {
       const cdpClosed = client ? await client.close() : true;
-      const browserResult = await terminateChild(browser);
+      const browserResult = await terminateChild(browser, { processGroup: process.platform !== 'win32' });
       const serverResult = await terminateChild(server);
-      let profileRemoved = false;
-      try {
-        await rm(profileDir, { recursive: true, force: true });
-        profileRemoved = true;
-      } catch {}
+      await delay(250);
+      const profile = await removeTemporaryProfile(profileDir);
 
       if (receipt.finishedAt) {
         receipt.cleanup = {
           cdpClosed,
           browser: browserResult,
           server: serverResult,
-          profileRemoved,
+          profileRemoved: profile.removed,
+          profileRemovalAttempts: profile.attempts,
+          profileRemovalError: profile.error,
         };
         receipt.cleanupFinishedAt = new Date().toISOString();
         receipt.harnessDisposition =
-          cdpClosed && browserResult.exited && serverResult.exited && profileRemoved
+          cdpClosed && browserResult.exited && serverResult.exited && profile.removed
             ? 'CLEAN'
             : 'ATTENTION_REQUIRED';
         await persistReceipt(receipt, runDir);
