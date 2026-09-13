@@ -5,11 +5,13 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { runWorkerCycle } from '../src/agents/remote-worker.mjs';
 import { compileFirstGrove, sha256 } from '../src/compiler/world-compiler.mjs';
 import { FIXED_STEP_MS } from '../src/core/constants.mjs';
 import { createInitialGame, serializeGameState } from '../src/core/engine.mjs';
 import { canonicalJson } from '../src/core/utils.mjs';
-import { HeadlessRealmHost } from '../src/server/headless-realm-host.mjs';
+import { HeadlessRealmHost, HeadlessSessionClient } from '../src/server/headless-realm-host.mjs';
+import { createVexWorldServer } from '../src/server/server.mjs';
 import { SessionStore } from '../src/server/session-store.mjs';
 
 const versionRoot = fileURLToPath(new URL('../', import.meta.url));
@@ -55,6 +57,10 @@ class StoreSessionClient {
     if (!result.accepted) throw Object.assign(new Error(result.reason), { code: result.reason, payload: result });
     this.stateVersion = result.stateVersion;
     return result;
+  }
+
+  async publishObservation(participantRef, observation) {
+    return this.store.putObservation(this.sessionRef, participantRef, observation);
   }
 }
 
@@ -138,10 +144,154 @@ test('headless realm host owns one lease, advances a bounded world clock, and ne
   const receipt = host.receipt();
   assert.equal(receipt.hostClass, 'HEADLESS_REALM_HOST');
   assert.equal(receipt.participantIdentityClaimed, false);
+  assert.equal(receipt.companionObservationsPublished, 3);
+  assert.equal(receipt.companionObservationPublishFailures, 0);
+  assert.equal(receipt.lastCompanionObservationFailure, null);
+  assert.equal(receipt.offscreenCompanionObservationSource, 'HEADLESS_CANONICAL_STATE');
   assert.equal(receipt.wallClockCatchUp, false);
   assert.equal(receipt.humanInputFabricated, false);
   assert.equal(receipt.physicalEffectPossible, false);
   assert.equal(receipt.disposition, 'PASS_BOUNDED_HEADLESS_REALM_CONTINUITY');
+});
+
+test('headless realm publishes fresh observations through the accepted worker intent and utterance path', async (t) => {
+  const { directory, worldPackage, state: initial } = await fixture(t, {
+    controllerClass: 'REMOTE_DETERMINISTIC'
+  });
+  const token = 'stage-03b-test-token';
+  const { server, store } = createVexWorldServer({
+    host: '127.0.0.1',
+    port: 0,
+    token,
+    dataDirectory: directory
+  });
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  t.after(async () => {
+    if (server.listening) {
+      await new Promise((resolve) => server.close(resolve));
+    }
+  });
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+  const companion = initial.party.members.find((member) => member.participantType === 'AI_COMPANION');
+  const hostId = 'host.headless.offscreen-worker';
+  const client = new HeadlessSessionClient({
+    baseUrl,
+    token,
+    sessionRef: 'realm.test',
+    hostId
+  });
+  const host = new HeadlessRealmHost({
+    client,
+    worldPackage,
+    hostId,
+    maxTicks: 4,
+    tickDelayMs: 0,
+    saveEveryTicks: 99,
+    leaseRenewEveryTicks: 99,
+    leaseTtlMs: 60000,
+    sleep: async () => {}
+  });
+
+  await host.start();
+  await host.stepOnce();
+
+  const firstRelay = await store.read('realm.test');
+  const observation = firstRelay.observations[companion.participantRef];
+  assert.equal(observation.schemaVersion, 'vexworld.companion-observation/v1');
+  assert.equal(observation.observerParticipantRef, companion.participantRef);
+  assert.equal(observation.sequence, host.state.tick);
+  assert.equal(observation.worldRef, host.state.worldRef);
+  assert.equal(observation.physicalEffectPossible, false);
+
+  const workerState = await runWorkerCycle({
+    server: baseUrl,
+    token,
+    session: 'realm.test',
+    companion: companion.participantRef,
+    mode: 'deterministic',
+    model: null,
+    ollama: 'http://127.0.0.1:11434',
+    intervalMs: 900,
+    modelTimeoutMs: 5000,
+    once: true,
+    maxCycles: 1,
+    workerId: 'worker.stage-03b.test'
+  });
+  assert.equal(workerState.processed, true);
+  assert.ok(workerState.intent);
+  assert.equal(workerState.intent.sourceObservationRef, observation.observationRef);
+  assert.ok(workerState.utterance);
+  assert.equal(workerState.utterance.sourceObservationRef, observation.observationRef);
+  assert.equal(workerState.utterance.sourceIntentRef, workerState.intent.intentRef);
+
+  const relayed = await store.read('realm.test');
+  assert.equal(relayed.intents[companion.participantRef].intentRef, workerState.intent.intentRef);
+  assert.equal(relayed.utterances[companion.participantRef].utteranceRef, workerState.utterance.utteranceRef);
+
+  await host.stepOnce();
+  assert.equal(
+    host.state.prototype.controllerObservations[companion.participantRef].intentType,
+    workerState.intent.intentType
+  );
+  assert.equal(host.state.prototype.controllerObservations[companion.participantRef].reason, workerState.intent.reason);
+
+  const secondRelay = await store.read('realm.test');
+  assert.equal(secondRelay.observations[companion.participantRef].sequence, host.state.tick);
+  assert.ok(
+    secondRelay.observations[companion.participantRef].sequence > observation.sequence,
+    'headless observations must advance with canonical simulation ticks'
+  );
+
+  await host.stop();
+  const persisted = await store.read('realm.test');
+  assert.equal(persisted.hostLease, null);
+  assert.equal(persisted.checkpoint.tick, initial.tick + 2);
+  assert.equal(
+    persisted.checkpoint.messages.some((message) => message.text === workerState.utterance.text),
+    false,
+    'ephemeral companion utterance must not become canonical checkpoint memory'
+  );
+  assert.equal(
+    persisted.utterances[companion.participantRef].utteranceRef,
+    workerState.utterance.utteranceRef
+  );
+});
+
+test('offscreen observation relay failure degrades to existing safe controller fallback without stopping the realm', async (t) => {
+  const { store, worldPackage, state: initial } = await fixture(t, {
+    controllerClass: 'REMOTE_DETERMINISTIC'
+  });
+  const companion = initial.party.members.find((member) => member.participantType === 'AI_COMPANION');
+  const { host, client } = createHost(store, worldPackage, {
+    hostId: 'host.headless.observation-relay-failure'
+  });
+  client.publishObservation = async () => ({
+    accepted: false,
+    reason: 'TEST_OBSERVATION_RELAY_UNAVAILABLE'
+  });
+
+  await host.start();
+  await host.stepOnce();
+
+  assert.equal(host.state.tick, initial.tick + 1);
+  assert.equal(
+    host.state.prototype.controllerObservations[companion.participantRef].reason,
+    'REMOTE_STALE_SAFE_FALLBACK'
+  );
+  const record = await store.read('realm.test');
+  assert.equal(record.observations[companion.participantRef], undefined);
+
+  await host.stop();
+  const receipt = host.receipt();
+  assert.equal(receipt.companionObservationsPublished, 0);
+  assert.equal(receipt.companionObservationPublishFailures, 1);
+  assert.equal(receipt.lastCompanionObservationFailure, 'OBSERVATION_RELAY_REJECTED');
+  assert.equal((await store.read('realm.test')).hostLease, null);
 });
 
 test('headless realm host binds canonical World Package integrity and checkpoint identity before taking a lease', async (t) => {

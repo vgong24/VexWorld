@@ -18,6 +18,8 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { FIXED_STEP_MS } from '../core/constants.mjs';
 import { serializeGameState, stepGame, validateGameState } from '../core/engine.mjs';
+import { makeParticipantObservation } from '../core/observation.mjs';
+import { getCompanions } from '../core/party.mjs';
 import { canonicalJson } from '../core/utils.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -212,6 +214,16 @@ export class HeadlessSessionClient {
     this.stateVersion = result.stateVersion;
     return result;
   }
+
+  async publishObservation(participantRef, observation) {
+    return this.request(
+      `/api/v1/sessions/${encodeURIComponent(this.sessionRef)}/companions/${encodeURIComponent(participantRef)}/observation`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(observation)
+      }
+    );
+  }
 }
 
 export class HeadlessRealmHost {
@@ -249,6 +261,9 @@ export class HeadlessRealmHost {
     this.leaseHeld = false;
     this.dirty = false;
     this.ticksCompleted = 0;
+    this.companionObservationsPublished = 0;
+    this.companionObservationPublishFailures = 0;
+    this.lastCompanionObservationFailure = null;
     this.initialTick = null;
     this.initialNowMs = null;
     this.initialStateVersion = null;
@@ -312,6 +327,36 @@ export class HeadlessRealmHost {
     return result;
   }
 
+  async publishCompanionObservations() {
+    if (!this.started || !this.leaseHeld) {
+      throw hostError('HOST_LEASE_REQUIRED', 'cannot publish companion observations without active headless host lease');
+    }
+    const observations = [];
+    for (const companion of getCompanions(this.state.party)) {
+      const observation = makeParticipantObservation(
+        this.state,
+        companion.participantRef,
+        this.worldPackage
+      );
+      try {
+        const result = await this.client.publishObservation(companion.participantRef, observation);
+        if (!result?.accepted) {
+          throw hostError(
+            'OBSERVATION_RELAY_REJECTED',
+            `headless companion observation relay rejected ${companion.participantRef}`,
+            { participantRef: companion.participantRef, result }
+          );
+        }
+        this.companionObservationsPublished += 1;
+        observations.push(observation);
+      } catch (error) {
+        this.companionObservationPublishFailures += 1;
+        this.lastCompanionObservationFailure = error?.code || error?.message || 'OBSERVATION_RELAY_UNAVAILABLE';
+      }
+    }
+    return observations;
+  }
+
   async stepOnce() {
     if (!this.started || !this.leaseHeld) throw hostError('HOST_NOT_STARTED', 'headless realm host must start before stepping');
     if (this.ticksCompleted >= this.maxTicks) throw hostError('TICK_BOUND_REACHED', 'headless realm host reached its explicit tick bound');
@@ -324,6 +369,7 @@ export class HeadlessRealmHost {
     });
     this.ticksCompleted += 1;
     this.dirty = true;
+    await this.publishCompanionObservations();
     if (this.ticksCompleted % this.leaseRenewEveryTicks === 0) await this.renewLease();
     if (this.ticksCompleted % this.saveEveryTicks === 0) await this.persist();
     return this.state;
@@ -359,6 +405,10 @@ export class HeadlessRealmHost {
       hostId: this.hostId,
       participantIdentityClaimed: false,
       ticksCompleted: this.ticksCompleted,
+      companionObservationsPublished: this.companionObservationsPublished,
+      companionObservationPublishFailures: this.companionObservationPublishFailures,
+      lastCompanionObservationFailure: this.lastCompanionObservationFailure,
+      offscreenCompanionObservationSource: 'HEADLESS_CANONICAL_STATE',
       initialTick: this.initialTick,
       finalTick: this.state.tick,
       simulationMsAdvanced: Number((this.state.nowMs - this.initialNowMs).toFixed(6)),
