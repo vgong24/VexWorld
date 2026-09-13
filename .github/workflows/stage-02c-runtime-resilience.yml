@@ -1,0 +1,123 @@
+name: Stage 02C Runtime Resilience
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/vexworld-launch.mjs'
+      - 'scripts/vexworld-selfplay.mjs'
+      - 'test/runtime-resilience.test.mjs'
+      - 'versions/v1/scripts/vex-relay-self-play.mjs'
+      - 'versions/v1/src/core/controllers.mjs'
+      - 'versions/v1/src/server/session-store.mjs'
+      - 'versions/v1/test/controllers.test.mjs'
+      - 'versions/v1/test/session-store.test.mjs'
+      - '.github/workflows/stage-02c-runtime-resilience.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  launcher-portability:
+    name: Launcher portability (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Root launcher invokes current-version checks
+        run: node scripts/vexworld-launch.mjs check-version
+
+  selfplay-lifecycle:
+    name: Self-play readiness and cleanup (ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Resolve installed Chromium-family browser
+        shell: bash
+        run: |
+          BROWSER_PATH="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$BROWSER_PATH" ]; then
+            echo "No Chromium-family browser present on runner" >&2
+            exit 1
+          fi
+          echo "CHROME_BIN=$BROWSER_PATH" >> "$GITHUB_ENV"
+
+      - name: Compile current First Grove package
+        run: npm --prefix versions/v1 run compile
+
+      - name: Run self-play with external guard that must remain unused
+        id: selfplay
+        shell: bash
+        run: |
+          set +e
+          timeout --signal=TERM --kill-after=5s 45s npm run selfplay -- --out="${RUNNER_TEMP}/vexworld-stage-02c-selfplay"
+          STATUS=$?
+          set -e
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          if [ "$STATUS" -ne 0 ]; then
+            echo "Self-play must exit cleanly before the external guard; status=$STATUS" >&2
+            exit "$STATUS"
+          fi
+
+      - name: Require complete evidence and deterministic cleanup
+        if: always()
+        shell: bash
+        run: |
+          RECEIPT="${RUNNER_TEMP}/vexworld-stage-02c-selfplay/latest.json"
+          test -f "$RECEIPT"
+          node - "$RECEIPT" <<'NODE'
+          const fs = require('node:fs');
+          const receipt = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          console.log(JSON.stringify({
+            disposition: receipt.disposition,
+            harnessDisposition: receipt.harnessDisposition,
+            cleanup: receipt.cleanup,
+            screenshots: receipt.screenshots?.length ?? 0,
+            pageErrors: receipt.pageErrors ?? [],
+            consoleErrors: receipt.consoleErrors ?? []
+          }, null, 2));
+          if (receipt.disposition !== 'PASS_WITH_HUMAN_FEEL_STILL_UNWITNESSED') process.exit(2);
+          if (receipt.harnessDisposition !== 'CLEAN') process.exit(3);
+          if (!receipt.cleanup?.cdpClosed) process.exit(4);
+          if (!receipt.cleanup?.browser?.exited) process.exit(5);
+          if (!receipt.cleanup?.server?.exited) process.exit(6);
+          if (!receipt.cleanup?.profileRemoved) process.exit(7);
+          NODE
+
+      - name: Upload Stage 02C self-play evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage-02c-selfplay-lifecycle
+          path: ${{ runner.temp }}/vexworld-stage-02c-selfplay/**
+          if-no-files-found: error
+
+# A timeout/failure is never converted into product PASS by screenshot existence.
+# Runtime resilience remains a development/runtime proof, not production networking.
+# [VXG RealForever]

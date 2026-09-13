@@ -2,13 +2,16 @@
 /**
  * Vex Relay Self-Play
  *
- * Drives the public browser build through Chrome DevTools Protocol using only
- * Node.js built-ins. It starts the local Vextory server, enters the Garden of
- * Arrival, attempts to form the largest local party, performs a short movement
- * and combat rehearsal, opens Status, and records screenshots plus a receipt.
+ * Browser evidence adapter for Vextory: First Grove. It does not become game
+ * authority, call a model, publish evidence, or intentionally mutate saves.
  *
- * This is an observer/test adapter. It does not become game authority, mutate
- * saves intentionally, call a model, or publish generated evidence.
+ * Runtime-resilience rules:
+ * - retry CDP readiness across a bounded number of browser launch attempts;
+ * - spawn Vextory directly through Node (no npm wrapper child);
+ * - close CDP and reap the browser process group + server deterministically;
+ * - remove the temporary browser profile with bounded retry;
+ * - keep product evidence disposition separate from harness cleanup;
+ * - never convert incomplete evidence into PASS because screenshots exist.
  *
  * [VXG RealForever]
  */
@@ -28,11 +31,11 @@ const HEADED = argv.has('--headed');
 const KEEP = argv.has('--keep');
 const OUT_ARG = process.argv.find((value) => value.startsWith('--out='));
 const OUTPUT_ROOT = resolve(
-  OUT_ARG
-    ? OUT_ARG.slice('--out='.length)
-    : join(homedir(), '.vexworld', 'evidence', 'self-play'),
+  OUT_ARG ? OUT_ARG.slice('--out='.length) : join(homedir(), '.vexworld', 'evidence', 'self-play'),
 );
 const RUN_REF = `selfplay.vexworld.v1.${randomUUID()}`;
+const MAX_BROWSER_LAUNCH_ATTEMPTS = 2;
+const CDP_ATTEMPT_TIMEOUT_MS = 15000;
 
 function sha256(buffer) {
   return createHash('sha256').update(buffer).digest('hex');
@@ -50,9 +53,7 @@ async function freePort() {
     server.listen(0, '127.0.0.1', () => {
       const address = server.address();
       const port = typeof address === 'object' && address ? address.port : null;
-      server.close(() =>
-        port ? resolvePort(port) : reject(new Error('Could not allocate a port')),
-      );
+      server.close(() => port ? resolvePort(port) : reject(new Error('Could not allocate a port')));
     });
   });
 }
@@ -61,30 +62,10 @@ function browserCandidates() {
   return [
     process.env.CHROME_BIN,
     process.env.EDGE_BIN,
-    process.platform === 'win32'
-      ? join(
-          process.env.PROGRAMFILES || 'C:\\Program Files',
-          'Google',
-          'Chrome',
-          'Application',
-          'chrome.exe',
-        )
-      : null,
-    process.platform === 'win32'
-      ? join(
-          process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)',
-          'Microsoft',
-          'Edge',
-          'Application',
-          'msedge.exe',
-        )
-      : null,
-    process.platform === 'darwin'
-      ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-      : null,
-    process.platform === 'darwin'
-      ? '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'
-      : null,
+    process.platform === 'win32' ? join(process.env.PROGRAMFILES || 'C:\\Program Files', 'Google', 'Chrome', 'Application', 'chrome.exe') : null,
+    process.platform === 'win32' ? join(process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)', 'Microsoft', 'Edge', 'Application', 'msedge.exe') : null,
+    process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : null,
+    process.platform === 'darwin' ? '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge' : null,
     '/usr/bin/chromium',
     '/usr/bin/chromium-browser',
     '/usr/bin/google-chrome',
@@ -95,11 +76,7 @@ function browserCandidates() {
 
 function findBrowser() {
   const found = browserCandidates().find((candidate) => existsSync(candidate));
-  if (!found) {
-    throw new Error(
-      'No supported Chrome/Chromium/Edge executable was found. Set CHROME_BIN or EDGE_BIN.',
-    );
-  }
+  if (!found) throw new Error('No supported Chrome/Chromium/Edge executable was found. Set CHROME_BIN or EDGE_BIN.');
   return found;
 }
 
@@ -116,9 +93,67 @@ async function waitForJson(url, timeoutMs = 15000) {
     }
     await delay(150);
   }
-  throw new Error(
-    `Timed out waiting for ${url}: ${lastError?.message || 'unknown error'}`,
-  );
+  throw new Error(`Timed out waiting for ${url}: ${lastError?.message || 'unknown error'}`);
+}
+
+export async function waitForChildExit(child, timeoutMs = 1500) {
+  if (!child || child.exitCode !== null || child.signalCode !== null) return true;
+  return await new Promise((resolveExit) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      child.off('exit', onExit);
+      resolveExit(value);
+    };
+    const onExit = () => finish(true);
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    child.once('exit', onExit);
+  });
+}
+
+function signalChild(child, signal, { processGroup = false } = {}) {
+  if (!child || child.exitCode !== null || child.signalCode !== null) return true;
+  try {
+    if (processGroup && process.platform !== 'win32' && child.pid) process.kill(-child.pid, signal);
+    else child.kill(signal);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function terminateChild(child, { termMs = 1500, killMs = 1500, processGroup = false } = {}) {
+  if (!child) return { present: false, exited: true, forced: false, exitCode: null, signalCode: null };
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return { present: true, exited: true, forced: false, exitCode: child.exitCode, signalCode: child.signalCode };
+  }
+  signalChild(child, 'SIGTERM', { processGroup });
+  if (await waitForChildExit(child, termMs)) {
+    return { present: true, exited: true, forced: false, exitCode: child.exitCode, signalCode: child.signalCode };
+  }
+  signalChild(child, 'SIGKILL', { processGroup });
+  const exited = await waitForChildExit(child, killMs);
+  return { present: true, exited, forced: true, exitCode: child.exitCode, signalCode: child.signalCode };
+}
+
+async function removeTemporaryProfile(directory, { attempts = 6, retryDelayMs = 150 } = {}) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: retryDelayMs });
+      if (!existsSync(directory)) return { removed: true, attempts: attempt, error: null };
+    } catch (error) {
+      lastError = error;
+    }
+    await delay(retryDelayMs * attempt);
+  }
+  return {
+    removed: !existsSync(directory),
+    attempts,
+    error: lastError ? `${lastError.code || 'ERROR'}: ${lastError.message}` : 'directory remained present',
+  };
 }
 
 class CdpClient {
@@ -158,22 +193,26 @@ class CdpClient {
   }
 
   async evaluate(expression) {
-    const result = await this.send('Runtime.evaluate', {
-      expression,
-      awaitPromise: true,
-      returnByValue: true,
-      userGesture: true,
-    });
-    if (result.exceptionDetails) {
-      throw new Error(result.exceptionDetails.text || 'Browser evaluation failed');
-    }
+    const result = await this.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true, userGesture: true });
+    if (result.exceptionDetails) throw new Error(result.exceptionDetails.text || 'Browser evaluation failed');
     return result.result?.value;
   }
 
-  close() {
-    try {
-      this.socket.close();
-    } catch {}
+  async close(timeoutMs = 700) {
+    const socket = this.socket;
+    if (!socket) return true;
+    return await new Promise((resolveClose) => {
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolveClose(value);
+      };
+      const timer = setTimeout(() => finish(false), timeoutMs);
+      socket.addEventListener('close', () => finish(true), { once: true });
+      try { socket.close(); } catch { finish(false); }
+    });
   }
 }
 
@@ -183,189 +222,164 @@ async function waitForServerUrl(child, timeoutMs = 20000) {
   return await new Promise((resolveUrl, reject) => {
     const timer = setTimeout(() => {
       cleanup();
-      reject(
-        new Error(
-          `Timed out waiting for VexWorld server URL. Output: ${output.slice(-2000)}`,
-        ),
-      );
+      reject(new Error(`Timed out waiting for VexWorld server URL. Output: ${output.slice(-2000)}`));
     }, timeoutMs);
-
     const consume = (chunk) => {
       output += chunk.toString();
       const matches = output.match(urlPattern);
       if (matches?.length) {
         cleanup();
-        resolveUrl({
-          url: matches[matches.length - 1].replace(/[),.;]+$/, ''),
-          output,
-        });
+        resolveUrl({ url: matches[matches.length - 1].replace(/[),.;]+$/, ''), output });
       }
     };
-
     const onExit = (code) => {
       cleanup();
-      reject(
-        new Error(
-          `VexWorld server exited before URL discovery (${code}). Output: ${output.slice(-2000)}`,
-        ),
-      );
+      reject(new Error(`VexWorld server exited before URL discovery (${code}). Output: ${output.slice(-2000)}`));
     };
-
     const cleanup = () => {
       clearTimeout(timer);
       child.stdout?.off('data', consume);
       child.stderr?.off('data', consume);
       child.off('exit', onExit);
     };
-
     child.stdout?.on('data', consume);
     child.stderr?.on('data', consume);
     child.on('exit', onExit);
   });
 }
 
+export async function waitForPageTarget(debugPort, timeoutMs = CDP_ATTEMPT_TIMEOUT_MS) {
+  const started = Date.now();
+  let lastError = null;
+  while (Date.now() - started < timeoutMs) {
+    const remaining = timeoutMs - (Date.now() - started);
+    try {
+      const targets = await waitForJson(`http://127.0.0.1:${debugPort}/json/list`, Math.max(250, Math.min(1200, remaining)));
+      const target = targets.find((entry) => entry.type === 'page' && entry.url.startsWith('http')) || targets.find((entry) => entry.type === 'page');
+      if (target?.webSocketDebuggerUrl) return target;
+      lastError = new Error('Chrome debug endpoint is reachable but no page target exists yet');
+    } catch (error) {
+      lastError = error;
+    }
+    await delay(Math.min(250, Math.max(1, remaining)));
+  }
+  throw new Error(`Could not find browser page target within ${timeoutMs}ms: ${lastError?.message || 'debug endpoint unavailable'}`);
+}
+
 async function waitForCondition(client, expression, timeoutMs = 15000) {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
-    try {
-      if (await client.evaluate(expression)) return true;
-    } catch {}
+    try { if (await client.evaluate(expression)) return true; } catch {}
     await delay(150);
   }
   return false;
 }
 
 async function screenshot(client, path) {
-  const result = await client.send('Page.captureScreenshot', {
-    format: 'png',
-    captureBeyondViewport: false,
-    fromSurface: true,
-  });
+  const result = await client.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false, fromSurface: true });
   const buffer = Buffer.from(result.data, 'base64');
   await writeFile(path, buffer);
   return { path, bytes: buffer.length, sha256: sha256(buffer) };
 }
 
 async function press(client, key, code, holdMs = 70) {
-  await client.send('Input.dispatchKeyEvent', {
-    type: 'keyDown',
-    key,
-    code,
-    text: key.length === 1 ? key : undefined,
-  });
+  await client.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, text: key.length === 1 ? key : undefined });
   await delay(holdMs);
-  await client.send('Input.dispatchKeyEvent', {
-    type: 'keyUp',
-    key,
-    code,
-  });
+  await client.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code });
 }
 
 async function hold(client, key, code, holdMs) {
-  await client.send('Input.dispatchKeyEvent', {
-    type: 'keyDown',
-    key,
-    code,
-  });
+  await client.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code });
   await delay(holdMs);
-  await client.send('Input.dispatchKeyEvent', {
-    type: 'keyUp',
-    key,
-    code,
-  });
+  await client.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code });
 }
 
 const FORM_PARTY_AND_BEGIN = `(() => {
-  const norm = (value) => String(value || '').trim().toLowerCase();
-  const visible = (el) => {
-    const style = getComputedStyle(el);
-    const rect = el.getBoundingClientRect();
-    return style.visibility !== 'hidden' && style.display !== 'none' && rect.width > 0 && rect.height > 0;
-  };
-  const labelText = (el) => {
-    const label = el.id
-      ? document.querySelector('label[for="' + CSS.escape(el.id) + '"]')
-      : null;
-    return norm(
-      (label?.innerText || '') + ' ' +
-      (el.closest('label')?.innerText || '') + ' ' +
-      (el.name || '') + ' ' +
-      (el.value || '') + ' ' +
-      (el.getAttribute('aria-label') || '')
-    );
-  };
+  const select = document.querySelector('#companion-count');
+  if (select) {
+    select.value = '3';
+    select.dispatchEvent(new Event('input', { bubbles: true }));
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  const begin = document.querySelector('#begin-button');
+  begin?.click();
+  return { requestedCompanionCount: select?.value || null, began: Boolean(begin), bodyText: document.body.innerText.slice(0, 5000) };
+})()`;
 
-  for (const select of document.querySelectorAll('select')) {
-    const text = labelText(select);
-    if (text.includes('companion') || text.includes('party')) {
-      const scored = [...select.options]
-        .map((option) => ({
-          option,
-          score: Number.parseInt(option.value || option.textContent, 10),
-        }))
-        .filter((entry) => Number.isFinite(entry.score))
-        .sort((a, b) => b.score - a.score);
-      if (scored.length) {
-        select.value = scored[0].option.value;
-        select.dispatchEvent(new Event('input', { bubbles: true }));
-        select.dispatchEvent(new Event('change', { bubbles: true }));
-      }
+async function persistReceipt(receipt, runDir) {
+  await writeFile(join(runDir, 'receipt.json'), `${JSON.stringify(receipt, null, 2)}\n`);
+  await writeFile(join(OUTPUT_ROOT, 'latest.json'), `${JSON.stringify(receipt, null, 2)}\n`);
+  await writeFile(join(OUTPUT_ROOT, 'LATEST_RUN'), `${basename(runDir)}\n`);
+}
+
+function browserArgs({ debugPort, profilePath, url }) {
+  return [
+    `--remote-debugging-port=${debugPort}`,
+    `--user-data-dir=${profilePath}`,
+    '--disable-background-networking',
+    '--disable-component-update',
+    '--disable-default-apps',
+    '--disable-extensions',
+    '--disable-sync',
+    '--disable-dev-shm-usage',
+    '--metrics-recording-only',
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--window-size=1440,960',
+    '--force-device-scale-factor=1',
+    '--no-sandbox',
+    ...(HEADED ? [] : ['--headless=new', '--hide-scrollbars']),
+    url,
+  ];
+}
+
+async function launchBrowserTarget({ browserPath, debugPort, profileRoot, url, receipt }) {
+  const processGroup = process.platform !== 'win32';
+  receipt.harness = { browserUsesProcessGroup: processGroup, browserLaunchAttempts: [] };
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= MAX_BROWSER_LAUNCH_ATTEMPTS; attempt += 1) {
+    const profilePath = join(profileRoot, `attempt-${attempt}`);
+    const browser = spawn(
+      browserPath,
+      browserArgs({ debugPort, profilePath, url }),
+      { stdio: 'ignore', detached: processGroup },
+    );
+    const attemptRecord = { attempt, startedAt: new Date().toISOString(), targetReady: false };
+    receipt.harness.browserLaunchAttempts.push(attemptRecord);
+    try {
+      const target = await waitForPageTarget(debugPort, CDP_ATTEMPT_TIMEOUT_MS);
+      attemptRecord.targetReady = true;
+      attemptRecord.finishedAt = new Date().toISOString();
+      return { browser, target, processGroup };
+    } catch (error) {
+      lastError = error;
+      attemptRecord.error = error.message;
+      attemptRecord.finishedAt = new Date().toISOString();
+      attemptRecord.cleanup = await terminateChild(browser, { processGroup });
+      if (attempt < MAX_BROWSER_LAUNCH_ATTEMPTS) await delay(500);
     }
   }
 
-  const choices = [...document.querySelectorAll(
-    'button,input[type=radio],input[type=checkbox],[role=button]'
-  )].filter(visible);
-  const partyChoices = choices.filter((el) => {
-    const text = norm((el.innerText || '') + ' ' + labelText(el));
-    return (
-      (text.includes('3') || text.includes('three') || text.includes('full')) &&
-      (text.includes('companion') || text.includes('party'))
-    );
-  });
-  partyChoices.at(-1)?.click();
-
-  const begin = [...document.querySelectorAll(
-    'button,[role=button],input[type=submit]'
-  )]
-    .filter(visible)
-    .find((el) =>
-      /begin|start|enter|journey|continue/.test(
-        norm(el.innerText || el.value || el.getAttribute('aria-label'))
-      )
-    );
-  begin?.click();
-
-  return {
-    partyChoiceCount: partyChoices.length,
-    began: Boolean(begin),
-    bodyText: document.body.innerText.slice(0, 5000),
-  };
-})()`;
+  throw new Error(`Browser CDP readiness failed after ${MAX_BROWSER_LAUNCH_ATTEMPTS} bounded launch attempts: ${lastError?.message || 'unknown error'}`);
+}
 
 async function main() {
   await mkdir(OUTPUT_ROOT, { recursive: true });
   const runDir = join(OUTPUT_ROOT, RUN_REF.replaceAll(':', '-'));
   await mkdir(runDir, { recursive: true });
-  const profileDir = await mkdtemp(join(tmpdir(), 'vexworld-selfplay-'));
+  const profileRoot = await mkdtemp(join(tmpdir(), 'vexworld-selfplay-'));
   const browserPath = findBrowser();
   const debugPort = await freePort();
-  const server = spawn(
-    process.platform === 'win32' ? 'npm.cmd' : 'npm',
-    ['run', 'play'],
-    {
-      cwd: VERSION_ROOT,
-      env: {
-        ...process.env,
-        VEXWORLD_NO_OPEN: '1',
-        BROWSER: 'none',
-        CI: '1',
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    },
-  );
+  const serverScript = resolve(VERSION_ROOT, 'src', 'server', 'server.mjs');
+  const server = spawn(process.execPath, [serverScript], {
+    cwd: VERSION_ROOT,
+    env: { ...process.env, VEXWORLD_NO_OPEN: '1', BROWSER: 'none', CI: '1' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
 
   let browser;
+  let browserProcessGroup = false;
   let client;
   const receipt = {
     schemaVersion: 'vexworld.vex-relay-self-play-receipt/v1',
@@ -377,188 +391,71 @@ async function main() {
     screenshots: [],
     consoleErrors: [],
     pageErrors: [],
-    effects: {
-      modelCalled: false,
-      networkBeyondLoopback: false,
-      sourceMutatedByRun: false,
-      physicalActuation: false,
-      publication: false,
-    },
+    effects: { modelCalled: false, networkBeyondLoopback: false, sourceMutatedByRun: false, physicalActuation: false, publication: false },
   };
 
   try {
     const discovered = await waitForServerUrl(server);
     receipt.serverUrl = discovered.url;
 
-    const args = [
-      `--remote-debugging-port=${debugPort}`,
-      `--user-data-dir=${profileDir}`,
-      '--disable-background-networking',
-      '--disable-component-update',
-      '--disable-default-apps',
-      '--disable-extensions',
-      '--disable-sync',
-      '--metrics-recording-only',
-      '--no-first-run',
-      '--no-default-browser-check',
-      '--window-size=1440,960',
-      '--force-device-scale-factor=1',
-      '--no-sandbox',
-      ...(HEADED ? [] : ['--headless=new', '--hide-scrollbars']),
-      discovered.url,
-    ];
-    browser = spawn(browserPath, args, { stdio: 'ignore' });
+    const launched = await launchBrowserTarget({ browserPath, debugPort, profileRoot, url: discovered.url, receipt });
+    browser = launched.browser;
+    browserProcessGroup = launched.processGroup;
+    client = await CdpClient.connect(launched.target.webSocketDebuggerUrl);
+    await Promise.all([client.send('Page.enable'), client.send('Runtime.enable'), client.send('Log.enable'), client.send('Network.enable')]);
+    await client.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 960, deviceScaleFactor: 1, mobile: false });
 
-    let target = null;
-    const targetStarted = Date.now();
-    while (!target && Date.now() - targetStarted < 15000) {
-      const targets = await waitForJson(
-        `http://127.0.0.1:${debugPort}/json/list`,
-        3000,
-      );
-      target =
-        targets.find(
-          (entry) => entry.type === 'page' && entry.url.startsWith('http'),
-        ) || targets.find((entry) => entry.type === 'page');
-      if (!target) await delay(200);
-    }
-    if (!target?.webSocketDebuggerUrl) {
-      throw new Error('Could not find browser page target');
-    }
-
-    client = await CdpClient.connect(target.webSocketDebuggerUrl);
-    await Promise.all([
-      client.send('Page.enable'),
-      client.send('Runtime.enable'),
-      client.send('Log.enable'),
-      client.send('Network.enable'),
-    ]);
-    await client.send('Emulation.setDeviceMetricsOverride', {
-      width: 1440,
-      height: 960,
-      deviceScaleFactor: 1,
-      mobile: false,
-    });
-
-    const ready = await waitForCondition(
-      client,
-      `document.readyState === 'complete' && document.body && document.body.innerText.length > 0`,
-      20000,
-    );
+    const ready = await waitForCondition(client, `document.readyState === 'complete' && document.body && document.body.innerText.length > 0`, 20000);
     if (!ready) throw new Error('Page did not become ready');
 
-    receipt.observations.push({
-      stage: 'ARRIVAL',
-      bodyText: await client.evaluate('document.body.innerText.slice(0, 6000)'),
-    });
-    receipt.screenshots.push(
-      await screenshot(client, join(runDir, '00-arrival.png')),
-    );
+    receipt.observations.push({ stage: 'ARRIVAL', bodyText: await client.evaluate('document.body.innerText.slice(0, 6000)') });
+    receipt.screenshots.push(await screenshot(client, join(runDir, '00-arrival.png')));
 
     const beginResult = await client.evaluate(FORM_PARTY_AND_BEGIN);
     receipt.observations.push({ stage: 'FORMATION', ...beginResult });
     await delay(1800);
-    receipt.screenshots.push(
-      await screenshot(client, join(runDir, '01-world-entry.png')),
-    );
+    receipt.screenshots.push(await screenshot(client, join(runDir, '01-world-entry.png')));
 
-    await client.evaluate(`(() => {
-      const target = document.querySelector('canvas') ||
-        document.querySelector('[tabindex]') || document.body;
-      target?.focus?.();
-      target?.click?.();
-      return document.activeElement?.tagName || null;
-    })()`);
-
+    await client.evaluate(`(() => { const target = document.querySelector('canvas') || document.querySelector('[tabindex]') || document.body; target?.focus?.(); target?.click?.(); return document.activeElement?.tagName || null; })()`);
     await hold(client, 'd', 'KeyD', 900);
-    receipt.observations.push({
-      stage: 'MOVE_RIGHT',
-      at: new Date().toISOString(),
-    });
-    receipt.screenshots.push(
-      await screenshot(client, join(runDir, '02-move-right.png')),
-    );
+    receipt.observations.push({ stage: 'MOVE_RIGHT', at: new Date().toISOString() });
+    receipt.screenshots.push(await screenshot(client, join(runDir, '02-move-right.png')));
 
     await press(client, ' ', 'Space', 90);
     await delay(350);
     await press(client, 'j', 'KeyJ', 90);
     await delay(350);
-    receipt.observations.push({
-      stage: 'JUMP_ATTACK',
-      at: new Date().toISOString(),
-    });
-    receipt.screenshots.push(
-      await screenshot(client, join(runDir, '03-jump-attack.png')),
-    );
+    receipt.observations.push({ stage: 'JUMP_ATTACK', at: new Date().toISOString() });
+    receipt.screenshots.push(await screenshot(client, join(runDir, '03-jump-attack.png')));
 
     await press(client, 'k', 'KeyK', 90);
     await delay(500);
     await press(client, 'e', 'KeyE', 90);
     await delay(900);
-    receipt.observations.push({
-      stage: 'DASH_AND_COMBO_RESPONSE',
-      at: new Date().toISOString(),
-    });
-    receipt.screenshots.push(
-      await screenshot(client, join(runDir, '04-combat-response.png')),
-    );
+    receipt.observations.push({ stage: 'DASH_AND_COMBO_RESPONSE', at: new Date().toISOString() });
+    receipt.screenshots.push(await screenshot(client, join(runDir, '04-combat-response.png')));
 
     await press(client, 't', 'KeyT', 90);
     await delay(700);
-    receipt.observations.push({
-      stage: 'WEATHER_CHANGE',
-      at: new Date().toISOString(),
-    });
-    receipt.screenshots.push(
-      await screenshot(client, join(runDir, '05-weather.png')),
-    );
+    receipt.observations.push({ stage: 'WEATHER_CHANGE', at: new Date().toISOString() });
+    receipt.screenshots.push(await screenshot(client, join(runDir, '05-weather.png')));
 
     await press(client, 'Tab', 'Tab', 90);
     await delay(500);
     receipt.observations.push({
       stage: 'STATUS',
       bodyText: await client.evaluate('document.body.innerText.slice(0, 12000)'),
-      elementSummary: await client.evaluate(`(() => ({
-        buttons: document.querySelectorAll('button').length,
-        canvases: [...document.querySelectorAll('canvas')].map((canvas) => ({
-          width: canvas.width,
-          height: canvas.height,
-        })),
-        participantLike: document.querySelectorAll(
-          '[data-participant-ref], [class*=participant], [class*=companion], [class*=party]'
-        ).length,
-        visibleDialogs: [...document.querySelectorAll('[role=dialog], dialog')]
-          .filter((el) => {
-            const rect = el.getBoundingClientRect();
-            const style = getComputedStyle(el);
-            return rect.width > 0 && rect.height > 0 &&
-              style.display !== 'none' && style.visibility !== 'hidden';
-          }).length,
-      }))()`),
+      elementSummary: await client.evaluate(`(() => ({ buttons: document.querySelectorAll('button').length, canvases: [...document.querySelectorAll('canvas')].map((canvas) => ({ width: canvas.width, height: canvas.height })), participantLike: document.querySelectorAll('[data-participant-ref], [class*=participant], [class*=companion], [class*=party]').length, visibleDialogs: [...document.querySelectorAll('[role=dialog], dialog')].filter((el) => { const rect = el.getBoundingClientRect(); const style = getComputedStyle(el); return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden'; }).length }))()`),
     });
-    receipt.screenshots.push(
-      await screenshot(client, join(runDir, '06-status.png')),
-    );
+    receipt.screenshots.push(await screenshot(client, join(runDir, '06-status.png')));
 
     for (const event of client.events) {
-      if (event.method === 'Runtime.exceptionThrown') {
-        receipt.pageErrors.push(
-          event.params?.exceptionDetails?.text || 'Runtime exception',
-        );
-      }
-      if (
-        event.method === 'Log.entryAdded' &&
-        event.params?.entry?.level === 'error'
-      ) {
-        receipt.consoleErrors.push(event.params.entry.text);
-      }
+      if (event.method === 'Runtime.exceptionThrown') receipt.pageErrors.push(event.params?.exceptionDetails?.text || 'Runtime exception');
+      if (event.method === 'Log.entryAdded' && event.params?.entry?.level === 'error') receipt.consoleErrors.push(event.params.entry.text);
     }
 
-    const distinctHashes = new Set(
-      receipt.screenshots.map((entry) => entry.sha256),
-    );
-    const statusText =
-      receipt.observations.find((entry) => entry.stage === 'STATUS')?.bodyText || '';
+    const distinctHashes = new Set(receipt.screenshots.map((entry) => entry.sha256));
+    const statusText = receipt.observations.find((entry) => entry.stage === 'STATUS')?.bodyText || '';
     receipt.assertions = {
       arrivalRendered: receipt.screenshots[0]?.bytes > 1000,
       worldStateChangedVisually: distinctHashes.size >= 4,
@@ -567,35 +464,37 @@ async function main() {
       noConsoleErrors: receipt.consoleErrors.length === 0,
     };
     receipt.finishedAt = new Date().toISOString();
-    receipt.disposition = Object.values(receipt.assertions).every(Boolean)
-      ? 'PASS_WITH_HUMAN_FEEL_STILL_UNWITNESSED'
-      : 'ATTENTION_REQUIRED';
+    receipt.disposition = Object.values(receipt.assertions).every(Boolean) ? 'PASS_WITH_HUMAN_FEEL_STILL_UNWITNESSED' : 'ATTENTION_REQUIRED';
+    receipt.humanGameFeel = 'UNPROVEN';
+    await persistReceipt(receipt, runDir);
 
-    await writeFile(
-      join(runDir, 'receipt.json'),
-      `${JSON.stringify(receipt, null, 2)}\n`,
-    );
-    await writeFile(
-      join(OUTPUT_ROOT, 'latest.json'),
-      `${JSON.stringify(receipt, null, 2)}\n`,
-    );
-    await writeFile(join(OUTPUT_ROOT, 'LATEST_RUN'), `${basename(runDir)}\n`);
-
-    const markdown = `# Vex Relay self-play receipt\n\n\`[VXG RealForever]\`\n\n- Run: \`${receipt.runRef}\`\n- Disposition: **${receipt.disposition}**\n- Browser: \`${browserPath}\`\n- Started: ${receipt.startedAt}\n- Finished: ${receipt.finishedAt}\n- Screenshots: ${receipt.screenshots.length}\n- Distinct screenshot hashes: ${distinctHashes.size}\n- Page errors: ${receipt.pageErrors.length}\n- Console errors: ${receipt.consoleErrors.length}\n\n## Assertions\n\n\`\`\`json\n${JSON.stringify(receipt.assertions, null, 2)}\n\`\`\`\n\nThis scripted evidence proves browser reachability and observable state changes. It does not prove fun, aesthetic quality, accessibility, real-model behavior, multi-human networking, or long-session reliability.\n`;
+    const markdown = `# Vex Relay self-play receipt\n\n\`[VXG RealForever]\`\n\n- Run: \`${receipt.runRef}\`\n- Disposition: **${receipt.disposition}**\n- Browser: \`${browserPath}\`\n- Started: ${receipt.startedAt}\n- Finished: ${receipt.finishedAt}\n- Screenshots: ${receipt.screenshots.length}\n- Distinct screenshot hashes: ${distinctHashes.size}\n- Page errors: ${receipt.pageErrors.length}\n- Console errors: ${receipt.consoleErrors.length}\n\nThis scripted evidence proves browser reachability and observable state changes. It does not prove fun, final aesthetic quality, real-model behavior, production networking, or human game feel.\n`;
     await writeFile(join(runDir, 'README.md'), markdown);
-
-    if (receipt.disposition !== 'PASS_WITH_HUMAN_FEEL_STILL_UNWITNESSED') {
-      process.exitCode = 1;
-    }
+    if (receipt.disposition !== 'PASS_WITH_HUMAN_FEEL_STILL_UNWITNESSED') process.exitCode = 1;
   } finally {
-    client?.close();
     if (!KEEP) {
-      browser?.kill('SIGTERM');
-      server.kill('SIGTERM');
+      const cdpClosed = client ? await client.close() : true;
+      const browserResult = await terminateChild(browser, { processGroup: browserProcessGroup });
+      const serverResult = await terminateChild(server);
       await delay(250);
-      browser?.kill('SIGKILL');
-      server.kill('SIGKILL');
-      await rm(profileDir, { recursive: true, force: true });
+      const profile = await removeTemporaryProfile(profileRoot);
+      if (receipt.finishedAt) {
+        receipt.cleanup = {
+          cdpClosed,
+          browser: browserResult,
+          server: serverResult,
+          profileRemoved: profile.removed,
+          profileRemovalAttempts: profile.attempts,
+          profileRemovalError: profile.error,
+        };
+        receipt.cleanupFinishedAt = new Date().toISOString();
+        receipt.harnessDisposition = cdpClosed && browserResult.exited && serverResult.exited && profile.removed ? 'CLEAN' : 'ATTENTION_REQUIRED';
+        await persistReceipt(receipt, runDir);
+        if (receipt.harnessDisposition !== 'CLEAN' && !process.exitCode) process.exitCode = 3;
+      }
+    } else if (receipt.finishedAt) {
+      receipt.harnessDisposition = 'KEPT_BY_REQUEST';
+      await persistReceipt(receipt, runDir);
     }
   }
 }
@@ -609,10 +508,7 @@ main().catch(async (error) => {
     error: error instanceof Error ? error.stack || error.message : String(error),
     failedAt: new Date().toISOString(),
   };
-  await writeFile(
-    join(OUTPUT_ROOT, 'latest.json'),
-    `${JSON.stringify(failure, null, 2)}\n`,
-  ).catch(() => {});
+  await writeFile(join(OUTPUT_ROOT, 'latest.json'), `${JSON.stringify(failure, null, 2)}\n`).catch(() => {});
   console.error(failure.error);
   process.exitCode = 1;
 });
