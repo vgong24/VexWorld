@@ -42,7 +42,8 @@ export function npmInvocation({
   }
 
   if (platform === 'win32') {
-    const adjacentCli = path.join(path.dirname(execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+    const execDirectory = path.win32.dirname(execPath);
+    const adjacentCli = path.win32.join(execDirectory, 'node_modules', 'npm', 'bin', 'npm-cli.js');
     return Object.freeze({
       executable: execPath,
       prefixArgs: [adjacentCli],
