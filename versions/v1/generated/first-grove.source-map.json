@@ -1,7 +1,7 @@
 {
   "schemaVersion": "vexworld.generated-source-map/v1",
   "packageRef": "package.vexworld.first-grove.prototype.v1",
-  "integrityFingerprint": "c4bcd33bee0555f543960b3f6b6327f639a2208aaec73b933dd83796577afd2c",
+  "integrityFingerprint": "fefc085a5442ff2d84dcffad2a78024fd3e4a6904365740d741375620a5277c0",
   "sources": [
     {
       "relativePath": "world/abilities.json",
@@ -37,7 +37,7 @@
     },
     {
       "relativePath": "worlds/first-grove/laws.json",
-      "sha256": "658f392559ba9cf42e7c7d37027e678fc79e5784bfafeb26a6d4db4074f30265"
+      "sha256": "a2f6cb61c48967daa647d40d14dc5e2faad429457a355ff70d9542174ec0417c"
     },
     {
       "relativePath": "worlds/first-grove/manifest.json",
@@ -86,6 +86,10 @@
     {
       "relativePath": "worlds/first-grove/scenarios/status-orientation.json",
       "sha256": "9121be283aef8bf0ac69ad64cd30bdd7d01711122ad4e003cd90fc194680b316"
+    },
+    {
+      "relativePath": "worlds/first-grove/scenarios/updraft-return-margin.json",
+      "sha256": "dcd2b1cb81437b0ad061ca5745e2c1fe91562c92b1af9bcad90616ee04086466"
     },
     {
       "relativePath": "worlds/first-grove/scenarios/world-witness.json",

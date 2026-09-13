@@ -5,6 +5,13 @@ export function weatherCostMultiplier(weather, laws) {
   if (weather === 'SNOW') return 1.45;
   if (weather === 'SAND_WIND') return 1.55;
   if (weather === 'MIST') return 1.1;
+  if (weather === 'UPDRAFT') {
+    const multiplier = laws.resource.updraftMultiplier;
+    if (typeof multiplier !== 'number' || !Number.isFinite(multiplier) || multiplier <= 0) {
+      throw new TypeError('UPDRAFT requires finite positive laws.resource.updraftMultiplier');
+    }
+    return multiplier;
+  }
   return 1;
 }
 
