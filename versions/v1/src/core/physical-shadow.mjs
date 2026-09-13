@@ -28,7 +28,7 @@ function nonempty(value) {
 }
 
 function stringArray(value) {
-  return Array.isArray(value) && value.every(nonempty);
+  return Array.isArray(value) && value.length > 0 && value.every(nonempty);
 }
 
 function objectRecord(value) {
@@ -63,9 +63,9 @@ function validateScenario(scenario) {
   requireString(scenario, 'scenarioRef', 'scenario');
   requireString(scenario, 'purpose', 'scenario');
   if (!objectRecord(scenario.startingState)) throw new TypeError('scenario.startingState must be an object');
-  if (!stringArray(scenario.actions)) throw new TypeError('scenario.actions must be a string array');
-  if (!stringArray(scenario.expected)) throw new TypeError('scenario.expected must be a string array');
-  if (!stringArray(scenario.forbidden)) throw new TypeError('scenario.forbidden must be a string array');
+  if (!stringArray(scenario.actions)) throw new TypeError('scenario.actions must be a non-empty string array');
+  if (!stringArray(scenario.expected)) throw new TypeError('scenario.expected must be a non-empty string array');
+  if (!stringArray(scenario.forbidden)) throw new TypeError('scenario.forbidden must be a non-empty string array');
   rejectProtectedPhysicalClaims(scenario);
 }
 
