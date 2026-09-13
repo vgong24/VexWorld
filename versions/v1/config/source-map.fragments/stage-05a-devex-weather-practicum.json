@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "vexworld.source-map-fragment/v1",
+  "fragmentRef": "source-map-fragment.vexworld.v1.stage-05a-devex-weather-practicum",
+  "reason": "Register the VW-FWD-05A Devex UPDRAFT scenario without rewriting the historical Version 1 base source map.",
+  "entries": [
+    {
+      "path": "config/source-map.fragments/stage-05a-devex-weather-practicum.json",
+      "category": "navigation-and-coverage",
+      "owner": "Devex School",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "worlds/first-grove/scenarios/updraft-return-margin.json",
+      "category": "scenario-source",
+      "owner": "Devex School + World Semantics",
+      "sourceClass": "CANONICAL_SOURCE"
+    }
+  ]
+}
