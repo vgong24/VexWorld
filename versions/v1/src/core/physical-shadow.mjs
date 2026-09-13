@@ -10,18 +10,24 @@ const PHYSICAL_UNKNOWN_REFS = Object.freeze([
 const PROTECTED_PHYSICAL_KEYS = new Set([
   'actuatorcommand',
   'actuatorcommands',
+  'canonicalworldmutation',
+  'construction',
   'devicecommand',
   'devicecommands',
   'deviceref',
   'devicerefs',
   'measuredwindspeed',
+  'physicalactuation',
   'physicalequivalenceproven',
   'physicalimplementationmanifest',
   'physicalobservation',
   'physicalsafetycertified',
+  'physicalsensing',
+  'robotics',
   'roboticscommand',
   'sensorreading',
-  'sensorreadings'
+  'sensorreadings',
+  'venueoperation'
 ]);
 
 function nonempty(value) {
