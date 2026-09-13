@@ -5,8 +5,6 @@ import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const command = process.argv[2] || 'start';
-const forwardedArgs = process.argv.slice(3);
 
 function fail(message) {
   console.error(`\nVexWorld could not continue: ${message}\n`);
@@ -17,17 +15,57 @@ async function readJson(file) {
   return JSON.parse(await fs.readFile(file, 'utf8'));
 }
 
-function npmExecutable() {
-  return process.platform === 'win32' ? 'npm.cmd' : 'npm';
+/**
+ * Resolve npm through its JavaScript CLI instead of spawning npm.cmd directly.
+ *
+ * Node's Windows child_process spawn can reject a .cmd executable with EINVAL
+ * when shell=false. VexWorld does not need a broad shell escape hatch here:
+ * npm itself is a Node program, so invoke the exact npm CLI with the already
+ * trusted Node executable. On normal `npm run ...` entry, npm_execpath is the
+ * authoritative CLI location. The adjacent-node fallback matches the standard
+ * Windows Node/npm layout for direct `node scripts/vexworld-launch.mjs ...`
+ * use.
+ */
+export function npmInvocation({
+  platform = process.platform,
+  env = process.env,
+  execPath = process.execPath
+} = {}) {
+  const observedCli = typeof env?.npm_execpath === 'string' ? env.npm_execpath.trim() : '';
+  if (observedCli && !/\.cmd$/i.test(observedCli)) {
+    return Object.freeze({
+      executable: execPath,
+      prefixArgs: [observedCli],
+      shell: false,
+      strategy: 'NODE_NPM_CLI_FROM_ENV'
+    });
+  }
+
+  if (platform === 'win32') {
+    const adjacentCli = path.join(path.dirname(execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+    return Object.freeze({
+      executable: execPath,
+      prefixArgs: [adjacentCli],
+      shell: false,
+      strategy: 'NODE_ADJACENT_NPM_CLI'
+    });
+  }
+
+  return Object.freeze({
+    executable: 'npm',
+    prefixArgs: [],
+    shell: false,
+    strategy: 'PATH_NPM'
+  });
 }
 
-function run(executable, args, options = {}) {
+export function run(executable, args, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(executable, args, {
       cwd: options.cwd || repositoryRoot,
       env: options.env || process.env,
-      stdio: 'inherit',
-      shell: false
+      stdio: options.stdio || 'inherit',
+      shell: options.shell ?? false
     });
     child.once('error', reject);
     child.once('exit', (code, signal) => {
@@ -75,7 +113,12 @@ async function prepareHome(layout) {
 }
 
 async function runVersionScript(layout, script, args = []) {
-  await run(npmExecutable(), ['run', script, ...(args.length ? ['--', ...args] : [])], { cwd: layout.versionRoot });
+  const npm = npmInvocation();
+  await run(
+    npm.executable,
+    [...npm.prefixArgs, 'run', script, ...(args.length ? ['--', ...args] : [])],
+    { cwd: layout.versionRoot, shell: npm.shell }
+  );
 }
 
 async function launchServer(layout, { lan = false, setup = false } = {}) {
@@ -100,7 +143,9 @@ async function launchServer(layout, { lan = false, setup = false } = {}) {
   await run(process.execPath, args, { cwd: layout.versionRoot, env: { ...process.env, VEXWORLD_HOME: layout.homeRoot } });
 }
 
-try {
+export async function main(argv = process.argv.slice(2)) {
+  const command = argv[0] || 'start';
+  const forwardedArgs = argv.slice(1);
   if (nodeMajor() < 20) throw new Error(`Node.js 20 or newer is required; found ${process.versions.node}`);
   const layout = await resolveLayout();
   switch (command) {
@@ -149,6 +194,11 @@ try {
     default:
       throw new Error(`unknown launcher command ${command}`);
   }
-} catch (error) {
-  fail(error?.message || String(error));
+}
+
+const invokedDirectly =
+  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (invokedDirectly) {
+  main().catch((error) => fail(error?.message || String(error)));
 }
