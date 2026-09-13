@@ -8,11 +8,7 @@ const DISPOSITIONS = new Set([
   'UNKNOWN_BLOCKED'
 ]);
 
-function mappingFor(sourceRef, destinationAdapter) {
-  return destinationAdapter?.portabilityMappings?.[sourceRef]
-    ?? destinationAdapter?.capabilityMappings?.[sourceRef]
-    ?? null;
-}
+const PORTABLE_SEMANTIC_TYPES = new Set(['ITEM', 'ABILITY']);
 
 function assertDisposition(mapping) {
   if (!DISPOSITIONS.has(mapping.disposition)) throw new TypeError('invalid compatibility disposition');
@@ -20,8 +16,8 @@ function assertDisposition(mapping) {
 
 export function resolvePortableSemantic({ sourceRef, semanticType, destinationAdapter }) {
   if (typeof sourceRef !== 'string' || !sourceRef) throw new TypeError('sourceRef must be a non-empty string');
-  if (typeof semanticType !== 'string' || !semanticType) throw new TypeError('semanticType must be a non-empty string');
-  const mapping = mappingFor(sourceRef, destinationAdapter);
+  if (!PORTABLE_SEMANTIC_TYPES.has(semanticType)) throw new TypeError('semanticType must be ITEM or ABILITY');
+  const mapping = destinationAdapter?.portabilityMappings?.[sourceRef];
   if (!mapping) return {
     sourceRef,
     semanticType,
@@ -44,7 +40,7 @@ export function resolvePortableSemantic({ sourceRef, semanticType, destinationAd
 }
 
 export function resolvePortableCapability({ capability, destinationAdapter }) {
-  const mapping = mappingFor(capability.capabilityRef, destinationAdapter);
+  const mapping = destinationAdapter?.capabilityMappings?.[capability.capabilityRef];
   if (!mapping) return {
     capabilityRef: capability.capabilityRef,
     disposition: 'UNKNOWN_BLOCKED',
