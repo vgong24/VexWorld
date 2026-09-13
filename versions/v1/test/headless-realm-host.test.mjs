@@ -5,9 +5,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { compileFirstGrove } from '../src/compiler/world-compiler.mjs';
+import { compileFirstGrove, sha256 } from '../src/compiler/world-compiler.mjs';
 import { FIXED_STEP_MS } from '../src/core/constants.mjs';
 import { createInitialGame, serializeGameState } from '../src/core/engine.mjs';
+import { canonicalJson } from '../src/core/utils.mjs';
 import { HeadlessRealmHost } from '../src/server/headless-realm-host.mjs';
 import { SessionStore } from '../src/server/session-store.mjs';
 
@@ -93,6 +94,20 @@ function createHost(store, worldPackage, options = {}) {
   return { host, client, hostId };
 }
 
+function withRecomputedFingerprint(worldPackage) {
+  const { integrityFingerprint: _discardedFingerprint, ...packageBody } = structuredClone(worldPackage);
+  return {
+    ...packageBody,
+    integrityFingerprint: sha256(canonicalJson(packageBody))
+  };
+}
+
+async function assertRealmUntouched(store, expectedTick) {
+  const record = await store.read('realm.test');
+  assert.equal(record.hostLease, null);
+  assert.equal(record.checkpoint.tick, expectedTick);
+}
+
 test('headless realm host owns one lease, advances a bounded world clock, and never fabricates human input', async (t) => {
   const { store, worldPackage, state: initial } = await fixture(t);
   const { host, hostId } = createHost(store, worldPackage);
@@ -127,6 +142,38 @@ test('headless realm host owns one lease, advances a bounded world clock, and ne
   assert.equal(receipt.humanInputFabricated, false);
   assert.equal(receipt.physicalEffectPossible, false);
   assert.equal(receipt.disposition, 'PASS_BOUNDED_HEADLESS_REALM_CONTINUITY');
+});
+
+test('headless realm host binds canonical World Package integrity and checkpoint identity before taking a lease', async (t) => {
+  const { store, worldPackage, state } = await fixture(t);
+  const expectedTick = state.tick;
+
+  const tampered = structuredClone(worldPackage);
+  tampered.laws.gravity += 0.25;
+  const tamperedHost = createHost(store, tampered, { hostId: 'host.headless.tampered-package' }).host;
+  await assert.rejects(tamperedHost.start(), (error) => error?.code === 'WORLD_PACKAGE_INTEGRITY_MISMATCH');
+  await assertRealmUntouched(store, expectedTick);
+
+  const alternateBody = structuredClone(worldPackage);
+  alternateBody.laws.gravity += 0.25;
+  const validButDifferentPackage = withRecomputedFingerprint(alternateBody);
+  const alternateHost = createHost(store, validButDifferentPackage, { hostId: 'host.headless.package-fingerprint-mismatch' }).host;
+  await assert.rejects(alternateHost.start(), (error) => error?.code === 'CHECKPOINT_WORLD_PACKAGE_FINGERPRINT_MISMATCH');
+  await assertRealmUntouched(store, expectedTick);
+
+  const alternateWorldBody = structuredClone(worldPackage);
+  alternateWorldBody.manifest.worldRef = 'world.vexworld.first-grove.alternate-test';
+  const validButDifferentWorld = withRecomputedFingerprint(alternateWorldBody);
+  const alternateWorldHost = createHost(store, validButDifferentWorld, { hostId: 'host.headless.world-ref-mismatch' }).host;
+  await assert.rejects(alternateWorldHost.start(), (error) => error?.code === 'CHECKPOINT_WORLD_REF_MISMATCH');
+  await assertRealmUntouched(store, expectedTick);
+
+  const alternateRefBody = structuredClone(worldPackage);
+  alternateRefBody.packageRef = 'package.vexworld.first-grove.alternate-test';
+  const validButWrongPackageRef = withRecomputedFingerprint(alternateRefBody);
+  const alternateRefHost = createHost(store, validButWrongPackageRef, { hostId: 'host.headless.package-ref-mismatch' }).host;
+  await assert.rejects(alternateRefHost.start(), (error) => error?.code === 'WORLD_PACKAGE_REF_MISMATCH');
+  await assertRealmUntouched(store, expectedTick);
 });
 
 test('paused checkpoints require an explicit offscreen resume decision', async (t) => {

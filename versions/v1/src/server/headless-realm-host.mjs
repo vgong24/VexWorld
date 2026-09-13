@@ -10,6 +10,7 @@
  * HUMAN_ABSENCE != FABRICATED_HUMAN_INPUT
  * [VXG RealForever]
  */
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,11 +18,15 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { FIXED_STEP_MS } from '../core/constants.mjs';
 import { serializeGameState, stepGame, validateGameState } from '../core/engine.mjs';
+import { canonicalJson } from '../core/utils.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const VERSION_ROOT = path.resolve(HERE, '../..');
 const DEFAULT_WORLD_PACKAGE = path.join(VERSION_ROOT, 'generated', 'first-grove.world-package.json');
 const EMPTY_HUMAN_INPUT = Object.freeze({});
+const WORLD_PACKAGE_SCHEMA = 'vexworld.world-package/v1';
+const WORLD_PACKAGE_REF = 'package.vexworld.first-grove.prototype.v1';
+const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 
 function hostError(code, message, extra = {}) {
   const error = new Error(message);
@@ -36,6 +41,67 @@ function positiveInteger(value, label, { min = 1, max = Number.MAX_SAFE_INTEGER 
     throw new TypeError(`${label} must be an integer between ${min} and ${max}`);
   }
   return number;
+}
+
+function computeWorldPackageIntegrityFingerprint(worldPackage) {
+  const { integrityFingerprint: _claimedFingerprint, ...packageBody } = worldPackage;
+  return createHash('sha256').update(canonicalJson(packageBody)).digest('hex');
+}
+
+export function validateHeadlessWorldPackage(worldPackage) {
+  if (!worldPackage || typeof worldPackage !== 'object' || Array.isArray(worldPackage)) {
+    throw hostError('WORLD_PACKAGE_INVALID', 'headless realm host requires an object World Package');
+  }
+  if (worldPackage.schemaVersion !== WORLD_PACKAGE_SCHEMA) {
+    throw hostError('WORLD_PACKAGE_SCHEMA_MISMATCH', `headless realm host requires ${WORLD_PACKAGE_SCHEMA}`);
+  }
+  if (worldPackage.packageRef !== WORLD_PACKAGE_REF) {
+    throw hostError('WORLD_PACKAGE_REF_MISMATCH', `headless realm host requires ${WORLD_PACKAGE_REF}`);
+  }
+  const worldRef = worldPackage.manifest?.worldRef;
+  if (typeof worldRef !== 'string' || !worldRef) {
+    throw hostError('WORLD_PACKAGE_INVALID', 'headless realm World Package requires manifest.worldRef');
+  }
+  const claimedFingerprint = worldPackage.integrityFingerprint;
+  if (typeof claimedFingerprint !== 'string' || !SHA256_PATTERN.test(claimedFingerprint)) {
+    throw hostError('WORLD_PACKAGE_INVALID', 'headless realm World Package requires a sha256 integrityFingerprint');
+  }
+  const actualFingerprint = computeWorldPackageIntegrityFingerprint(worldPackage);
+  if (actualFingerprint !== claimedFingerprint) {
+    throw hostError(
+      'WORLD_PACKAGE_INTEGRITY_MISMATCH',
+      'headless realm World Package integrity fingerprint does not match its canonical body',
+      { claimedFingerprint, actualFingerprint }
+    );
+  }
+  return Object.freeze({ worldRef, integrityFingerprint: claimedFingerprint });
+}
+
+export function assertCheckpointWorldPackageCompatibility(checkpoint, packageIdentity) {
+  const checkpointWorldRef = checkpoint?.worldRef;
+  const realityWorldRef = checkpoint?.realityContext?.worldRef;
+  if (checkpointWorldRef !== packageIdentity.worldRef || realityWorldRef !== packageIdentity.worldRef) {
+    throw hostError(
+      'CHECKPOINT_WORLD_REF_MISMATCH',
+      'accepted checkpoint worldRef does not match the supplied canonical World Package',
+      {
+        checkpointWorldRef,
+        realityWorldRef,
+        packageWorldRef: packageIdentity.worldRef
+      }
+    );
+  }
+  const checkpointFingerprint = checkpoint?.prototype?.packageFingerprint;
+  if (checkpointFingerprint !== packageIdentity.integrityFingerprint) {
+    throw hostError(
+      'CHECKPOINT_WORLD_PACKAGE_FINGERPRINT_MISMATCH',
+      'accepted checkpoint package fingerprint does not match the supplied canonical World Package',
+      {
+        checkpointFingerprint,
+        packageFingerprint: packageIdentity.integrityFingerprint
+      }
+    );
+  }
 }
 
 export function parseHeadlessRealmArgs(argv) {
@@ -194,6 +260,8 @@ export class HeadlessRealmHost {
     if (!record?.checkpoint) throw hostError('CHECKPOINT_REQUIRED', 'headless realm host requires an existing accepted checkpoint');
     const checkpoint = structuredClone(record.checkpoint);
     validateGameState(checkpoint);
+    const packageIdentity = validateHeadlessWorldPackage(this.worldPackage);
+    assertCheckpointWorldPackageCompatibility(checkpoint, packageIdentity);
     if (checkpoint.flags?.paused && !this.resumePaused) {
       throw hostError('PAUSED_CHECKPOINT_REQUIRES_EXPLICIT_RESUME', 'paused checkpoint requires explicit --resume-paused authorization');
     }
