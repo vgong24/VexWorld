@@ -15,6 +15,7 @@
     "idleRegenPerSecond": 0.8,
     "moveCostPerSecond": 0.45,
     "rainMultiplier": 1.35,
+    "updraftMultiplier": 1.3,
     "jumpCost": 1.2,
     "attackCost": 3,
     "dashCost": 8,
@@ -29,7 +30,8 @@
       "RAIN",
       "MIST",
       "SNOW",
-      "SAND_WIND"
+      "SAND_WIND",
+      "UPDRAFT"
     ],
     "rainMovementMultiplier": 0.88
   },
