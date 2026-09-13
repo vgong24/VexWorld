@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 import { compileFirstGrove } from '../src/compiler/world-compiler.mjs';
 import { resolvePortableCapability, resolvePortableSemantic } from '../src/core/portal.mjs';
@@ -22,6 +25,38 @@ test('First Grove compiles a distinct portable item identity and preserves Twin 
   assert.equal(scenario.startingState.finalDestinationWorldSelected, false);
   assert.ok(worldPackage.compiledFrom.some((entry) => entry.relativePath === 'world/items.json'));
   assert.ok(worldPackage.compiledFrom.some((entry) => entry.relativePath === 'worlds/first-grove/scenarios/dimensional-portability.json'));
+});
+
+test('item catalog does not make First Grove discovery, First Grove origin, or portability universal item law', async (t) => {
+  const root = await mkdtemp(path.join(tmpdir(), 'vexworld-portable-item-catalog-'));
+  t.after(async () => rm(root, { recursive: true, force: true }));
+  await cp('world', path.join(root, 'world'), { recursive: true });
+  await cp('worlds', path.join(root, 'worlds'), { recursive: true });
+
+  const itemsPath = path.join(root, 'world/items.json');
+  const catalog = JSON.parse(await readFile(itemsPath, 'utf8'));
+  catalog.items.push({
+    itemRef: 'item.synthetic.foreign-keepsake',
+    title: 'Foreign Keepsake Fixture',
+    archetypeRef: 'archetype.world.item',
+    originWorldRef: 'world.synthetic.foreign-origin',
+    portable: false
+  });
+  await writeFile(itemsPath, JSON.stringify(catalog, null, 2) + '\n');
+
+  const packageWithForeignItem = await compileFirstGrove({ root });
+  const foreign = packageWithForeignItem.catalogs.items.items.find((entry) => entry.itemRef === 'item.synthetic.foreign-keepsake');
+  assert.ok(foreign);
+  assert.equal(foreign.originWorldRef, 'world.synthetic.foreign-origin');
+  assert.equal(foreign.portable, false);
+  assert.equal(Object.hasOwn(foreign, 'sourceDiscoveryRef'), false);
+
+  catalog.items[0].sourceDiscoveryRef = 'discovery.first-grove.missing';
+  await writeFile(itemsPath, JSON.stringify(catalog, null, 2) + '\n');
+  await assert.rejects(
+    compileFirstGrove({ root }),
+    /unknown item discovery discovery\.first-grove\.missing/
+  );
 });
 
 test('synthetic destination changes expression and restrictions without replacing source item or ability identity', async () => {
@@ -79,7 +114,7 @@ test('synthetic destination changes expression and restrictions without replacin
   assert.equal(destinationAdapter.finalDestinationWorldSelected, false);
 });
 
-test('undeclared portability mappings fail closed and invalid dispositions are rejected', () => {
+test('undeclared portability mappings fail closed and malformed declared mappings are rejected', () => {
   const destinationAdapter = {
     destinationRef: 'destination.synthetic.dim0.contract-proof',
     portabilityMappings: {}
@@ -101,6 +136,14 @@ test('undeclared portability mappings fail closed and invalid dispositions are r
 
   assert.throws(
     () => resolvePortableSemantic({
+      sourceRef: 'item.vexworld.unmapped',
+      semanticType: 'ITEM',
+      destinationAdapter: { portabilityMappings: {} }
+    }),
+    /destinationAdapter\.destinationRef must be a non-empty string/
+  );
+  assert.throws(
+    () => resolvePortableSemantic({
       sourceRef: 'ability.vexworld.twin-horizon',
       semanticType: 'ABILITY',
       destinationAdapter: {
@@ -111,6 +154,55 @@ test('undeclared portability mappings fail closed and invalid dispositions are r
       }
     }),
     /invalid compatibility disposition/
+  );
+  assert.throws(
+    () => resolvePortableSemantic({
+      sourceRef: 'ability.vexworld.twin-horizon',
+      semanticType: 'ABILITY',
+      destinationAdapter: {
+        destinationRef: destinationAdapter.destinationRef,
+        portabilityMappings: {
+          'ability.vexworld.twin-horizon': {
+            disposition: 'TRANSFORMED_RESTRICTED',
+            reason: 'MISSING_CHANGED_PROPERTIES'
+          }
+        }
+      }
+    }),
+    /portable mapping changedProperties must be an array/
+  );
+  assert.throws(
+    () => resolvePortableSemantic({
+      sourceRef: 'ability.vexworld.twin-horizon',
+      semanticType: 'ABILITY',
+      destinationAdapter: {
+        destinationRef: destinationAdapter.destinationRef,
+        portabilityMappings: {
+          'ability.vexworld.twin-horizon': {
+            disposition: 'TRANSFORMED_RESTRICTED',
+            changedProperties: [] ,
+            reason: 'EMPTY_TRANSFORM_EVIDENCE'
+          }
+        }
+      }
+    }),
+    /transformed portable mapping must declare changedProperties/
+  );
+  assert.throws(
+    () => resolvePortableSemantic({
+      sourceRef: 'ability.vexworld.twin-horizon',
+      semanticType: 'ABILITY',
+      destinationAdapter: {
+        destinationRef: destinationAdapter.destinationRef,
+        portabilityMappings: {
+          'ability.vexworld.twin-horizon': {
+            disposition: 'TRANSFORMED_RESTRICTED',
+            changedProperties: ['timingEnvelope']
+          }
+        }
+      }
+    }),
+    /portable mapping reason must be a non-empty string/
   );
   assert.throws(
     () => resolvePortableSemantic({
