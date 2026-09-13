@@ -1,3 +1,7 @@
+import { createHash } from 'node:crypto';
+
+import { canonicalJson } from './utils.mjs';
+
 const PHYSICAL_UNKNOWN_REFS = Object.freeze([
   'unknown.physical.actual-wind-and-force',
   'unknown.physical.human-balance-and-fatigue',
@@ -76,30 +80,50 @@ function validateScenario(scenario) {
   rejectProtectedPhysicalClaims(scenario);
 }
 
-function validateAcceptance(sourceAcceptance, sourceWorldRef, scenarioRef) {
+export function scenarioSemanticSha256(scenario) {
+  return createHash('sha256').update(canonicalJson(scenario)).digest('hex');
+}
+
+function validateAcceptance(sourceAcceptance, sourceWorldRef, scenario) {
   if (!objectRecord(sourceAcceptance)) throw new TypeError('sourceAcceptance must be an object');
   if (sourceAcceptance.disposition !== 'ACCEPTED') throw new TypeError('sourceAcceptance.disposition must be ACCEPTED');
-  for (const key of ['sourceWorldRef', 'sourceScenarioRef', 'closeReceiptRef', 'acceptedMainRef', 'foundationRunRef']) {
+  for (const key of [
+    'sourceWorldRef',
+    'sourceScenarioRef',
+    'sourceScenarioSemanticSha256',
+    'closeReceiptRef',
+    'acceptedMainRef',
+    'foundationRunRef'
+  ]) {
     requireString(sourceAcceptance, key, 'sourceAcceptance');
+  }
+  if (!/^[a-f0-9]{64}$/i.test(sourceAcceptance.sourceScenarioSemanticSha256)) {
+    throw new TypeError('sourceAcceptance.sourceScenarioSemanticSha256 must be a SHA-256 hex digest');
   }
   if (sourceAcceptance.sourceWorldRef !== sourceWorldRef) {
     throw new TypeError('sourceAcceptance.sourceWorldRef must match sourceWorldRef');
   }
-  if (sourceAcceptance.sourceScenarioRef !== scenarioRef) {
+  if (sourceAcceptance.sourceScenarioRef !== scenario.scenarioRef) {
     throw new TypeError('sourceAcceptance.sourceScenarioRef must match scenario.scenarioRef');
   }
+  const actualScenarioSemanticSha256 = scenarioSemanticSha256(scenario);
+  if (sourceAcceptance.sourceScenarioSemanticSha256.toLowerCase() !== actualScenarioSemanticSha256) {
+    throw new TypeError('sourceAcceptance.sourceScenarioSemanticSha256 must match scenario semantics');
+  }
+  return actualScenarioSemanticSha256;
 }
 
 export function projectPhysicalShadow({ sourceWorldRef, scenario, sourceAcceptance }) {
   if (!nonempty(sourceWorldRef)) throw new TypeError('sourceWorldRef must be a non-empty string');
   validateScenario(scenario);
-  validateAcceptance(sourceAcceptance, sourceWorldRef, scenario.scenarioRef);
+  const sourceScenarioSemanticSha256 = validateAcceptance(sourceAcceptance, sourceWorldRef, scenario);
 
   return {
     schemaVersion: 'vexworld.physical-shadow-projection/v1',
     shadowRef: `physical-shadow.${scenario.scenarioRef}`,
     sourceWorldRef,
     sourceScenarioRef: scenario.scenarioRef,
+    sourceScenarioSemanticSha256,
     sourceRealityClass: 'SIMULATION',
     projectionMode: 'READ_ONLY_PHYSICAL_SHADOW',
     abstractActivity: {
@@ -119,7 +143,7 @@ export function projectPhysicalShadow({ sourceWorldRef, scenario, sourceAcceptan
     physicalObservation: null,
     truthBoundary: {
       simulationValidated: true,
-      simulationValidationBasis: 'BOUND_ACCEPTED_SOURCE_EVIDENCE',
+      simulationValidationBasis: 'BOUND_ACCEPTED_SOURCE_EVIDENCE_AND_SCENARIO_DIGEST',
       physicalSafetyCertified: false,
       physicalEquivalenceProven: false
     },
