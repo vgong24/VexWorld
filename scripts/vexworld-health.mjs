@@ -285,6 +285,8 @@ export function validateAssetPolicy(policy) {
       errors.push(`${candidate.assetCandidateRef} has unsupported disposition ${candidate.disposition}`);
     }
 
+    // Health must enforce the actual intake contract for any checked-in candidate,
+    // especially when its disposition crosses into an ACCEPTED_* state.
     const intakeErrors = validateAssetIntake(policy, candidate);
     errors.push(...intakeErrors.map((error) => `${candidate.assetCandidateRef ?? 'asset candidate'}: ${error}`));
   }
