@@ -113,7 +113,7 @@ export async function buildHandoff({ root = repositoryRoot } = {}) {
     ],
     strongestCurrentClaim: projectState.currentStrongestClaim,
     whatItDoesNotProve: unique([
-      'SUCCESSOR_STAGE_ADMITTED',
+      terminalIdle ? 'SUCCESSOR_STAGE_ADMITTED' : 'ACTIVE_STAGE_ACCEPTED',
       'SELECTED_ENGINE_ADOPTED',
       'EXTERNAL_ASSET_LICENSE_ACCEPTED',
       'REAL_LOCAL_MODEL_BEHAVIOR_PROVEN',
