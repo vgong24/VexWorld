@@ -23,6 +23,8 @@ export async function buildHandoff({ root = repositoryRoot } = {}) {
     fs.readFile(path.join(root, 'config/asset-intake-policy.json'), 'utf8').then(JSON.parse)
   ]);
 
+  const routeDisposition = projectState.forwardRouteDisposition ?? 'ACTIVE_FORWARD_ROUTE';
+  const terminalIdle = routeDisposition === 'ATLAS_ROUTE_COMPLETE_IDLE';
   const activeStage = projectState.stages.find((stage) => stage.stageRef === projectState.activeStageRef) ?? null;
   const activeIndex = projectState.stages.findIndex((stage) => stage.stageRef === projectState.activeStageRef);
   const nextStage = activeIndex >= 0 ? projectState.stages[activeIndex + 1] ?? null : null;
@@ -45,8 +47,9 @@ export async function buildHandoff({ root = repositoryRoot } = {}) {
     crossRepoFoundationRef: projectState.crossRepoFoundationRef,
     currentVersionRef: projectState.currentVersionRef,
     currentVersionPath: projectState.currentVersionPath,
+    forwardRouteDisposition: routeDisposition,
     stage: activeStage,
-    nextStageRefOrNull: nextStage?.stageRef ?? null,
+    nextStageRefOrNull: terminalIdle ? null : nextStage?.stageRef ?? null,
     repositoryObservation: {
       branch: health.git.branch,
       headRef: health.git.head,
@@ -84,7 +87,7 @@ export async function buildHandoff({ root = repositoryRoot } = {}) {
     },
     reviewRequirements: {
       builderMaySelfCheck: true,
-      independentExactHeadReviewRequired: true,
+      independentExactHeadReviewRequired: !terminalIdle,
       sourceChangeInvalidatesPriorExactHeadReview: true,
       reviewOwnerRef: activeStage?.reviewOwnerRef ?? null
     },
@@ -110,7 +113,7 @@ export async function buildHandoff({ root = repositoryRoot } = {}) {
     ],
     strongestCurrentClaim: projectState.currentStrongestClaim,
     whatItDoesNotProve: unique([
-      'ACTIVE_STAGE_ACCEPTED',
+      'SUCCESSOR_STAGE_ADMITTED',
       'SELECTED_ENGINE_ADOPTED',
       'EXTERNAL_ASSET_LICENSE_ACCEPTED',
       'REAL_LOCAL_MODEL_BEHAVIOR_PROVEN',
@@ -128,14 +131,17 @@ export async function buildHandoff({ root = repositoryRoot } = {}) {
       commerce: false
     },
     disposition:
-      health.disposition === 'HEALTHY_FOR_CURRENT_STAGE'
-        ? 'READY_FOR_BOUNDED_STAGE_OR_REVIEW_CONTINUATION'
-        : 'BLOCKED_REPOSITORY_HEALTH_ATTENTION_REQUIRED'
+      health.disposition !== 'HEALTHY_FOR_CURRENT_STAGE'
+        ? 'BLOCKED_REPOSITORY_HEALTH_ATTENTION_REQUIRED'
+        : terminalIdle
+          ? 'ATLAS_ROUTE_COMPLETE_IDLE__NO_SUCCESSOR_ADMITTED'
+          : 'READY_FOR_BOUNDED_STAGE_OR_REVIEW_CONTINUATION'
   };
 }
 
 export function renderHandoffMarkdown(handoff) {
   const stage = handoff.stage ?? {};
+  const terminalIdle = handoff.forwardRouteDisposition === 'ATLAS_ROUTE_COMPLETE_IDLE';
   const lines = [
     '# VexWorld fresh-instance handoff',
     '',
@@ -143,9 +149,10 @@ export function renderHandoffMarkdown(handoff) {
     '',
     `- Project: \`${handoff.projectRef}\``,
     `- Program: \`${handoff.programEpicRef}\``,
-    `- Active stage: \`${stage.stageRef ?? 'UNKNOWN'}\``,
-    `- Stage issue: \`${stage.issueRef ?? 'UNKNOWN'}\``,
-    `- Stage state: \`${stage.state ?? 'UNKNOWN'}\``,
+    `- Forward route: \`${handoff.forwardRouteDisposition}\``,
+    `- Active stage: \`${terminalIdle ? 'NONE' : stage.stageRef ?? 'UNKNOWN'}\``,
+    `- Stage issue: \`${terminalIdle ? 'NONE' : stage.issueRef ?? 'UNKNOWN'}\``,
+    `- Stage state: \`${terminalIdle ? 'IDLE' : stage.state ?? 'UNKNOWN'}\``,
     `- Repository branch: \`${handoff.repositoryObservation.branch ?? 'UNKNOWN'}\``,
     `- Head: \`${handoff.repositoryObservation.headRef ?? 'UNKNOWN'}\``,
     `- Tree: \`${handoff.repositoryObservation.treeRef ?? 'UNKNOWN'}\``,
@@ -160,7 +167,7 @@ export function renderHandoffMarkdown(handoff) {
     '```',
     '',
     '## Owned paths',
-    ...handoff.activeOwnedPathPatterns.map((entry) => `- \`${entry}\``),
+    ...(handoff.activeOwnedPathPatterns.length ? handoff.activeOwnedPathPatterns.map((entry) => `- \`${entry}\``) : ['- None']),
     '',
     '## Allowed effects',
     ...(handoff.allowedEffects.length ? handoff.allowedEffects.map((entry) => `- \`${entry}\``) : ['- None']),
@@ -179,7 +186,9 @@ export function renderHandoffMarkdown(handoff) {
     '## What this does not prove',
     ...handoff.whatItDoesNotProve.map((entry) => `- \`${entry}\``),
     '',
-    'A fresh recipient must re-ground live repository state and bind all work or review to the exact observed head/tree. This packet is no-effect orientation, not inherited authority.',
+    terminalIdle
+      ? 'The ordered Atlas route represented by this project state is complete and idle. No successor stage is admitted by this packet; a fresh recipient must re-ground live repository state and require a newly admitted route before source-changing continuation.'
+      : 'A fresh recipient must re-ground live repository state and bind all work or review to the exact observed head/tree. This packet is no-effect orientation, not inherited authority.',
     '',
     '<!-- [VXG RealForever] -->'
   ];
