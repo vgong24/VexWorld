@@ -77,6 +77,12 @@ export function validateProjectState(state) {
   if (state.schemaVersion !== 'vexworld.project-state/v1') {
     errors.push('project state schemaVersion must be vexworld.project-state/v1');
   }
+
+  const routeDisposition = state.forwardRouteDisposition ?? 'ACTIVE_FORWARD_ROUTE';
+  if (!['ACTIVE_FORWARD_ROUTE', 'ATLAS_ROUTE_COMPLETE_IDLE'].includes(routeDisposition)) {
+    errors.push('project state forwardRouteDisposition must be ACTIVE_FORWARD_ROUTE or ATLAS_ROUTE_COMPLETE_IDLE');
+  }
+
   for (const key of [
     'projectRef',
     'repositoryRef',
@@ -106,7 +112,34 @@ export function validateProjectState(state) {
   const active = state.stages.filter(
     (stage) => stage?.state === 'ACTIVE_SINGLE_FORWARD_LANE' && stage?.sourceChanging === true
   );
-  if (active.length !== 1) {
+
+  if (routeDisposition === 'ATLAS_ROUTE_COMPLETE_IDLE') {
+    if (active.length !== 0) {
+      errors.push('terminal idle project state must have zero active source-changing stages');
+    }
+    if (state.activeStageRef !== 'NONE') {
+      errors.push('terminal idle activeStageRef must be NONE');
+    }
+    if (state.activeStageIssueRef !== 'NONE') {
+      errors.push('terminal idle activeStageIssueRef must be NONE');
+    }
+    const terminalStage = state.stages.at(-1);
+    if (!['ACCEPTED', 'ACCEPTED_COMPLETE'].includes(terminalStage?.state)) {
+      errors.push('terminal idle project state requires an accepted terminal stage');
+    }
+    if (terminalStage?.sourceChanging !== false) {
+      errors.push('terminal idle project state requires terminal sourceChanging=false');
+    }
+    if (!nonempty(terminalStage?.acceptedCloseReceiptRef)) {
+      errors.push('terminal idle project state requires terminal acceptedCloseReceiptRef');
+    }
+    if (!nonempty(terminalStage?.acceptedMainRef)) {
+      errors.push('terminal idle project state requires terminal acceptedMainRef');
+    }
+    if (nonempty(terminalStage?.acceptedMainRef) && state.lastAcceptedMainRef !== terminalStage.acceptedMainRef) {
+      errors.push('terminal idle lastAcceptedMainRef must equal terminal acceptedMainRef');
+    }
+  } else if (active.length !== 1) {
     errors.push('project state must have exactly one active source-changing stage');
   } else {
     if (active[0].stageRef !== state.activeStageRef) {
@@ -440,6 +473,7 @@ export async function runHealth({ root = repositoryRoot, includeInventory = true
   };
   if (git.status) warnings.push('working tree contains attributed or unattributed changes; inspect before claiming exact-head review');
 
+  const routeDisposition = projectState.forwardRouteDisposition ?? 'ACTIVE_FORWARD_ROUTE';
   const activeStage = projectState.stages.find((stage) => stage.stageRef === projectState.activeStageRef) ?? null;
   const receipt = {
     schemaVersion: 'vexworld.repository-health-receipt/v1',
@@ -447,9 +481,10 @@ export async function runHealth({ root = repositoryRoot, includeInventory = true
     repositoryRef: projectState.repositoryRef,
     currentVersionRef: projectState.currentVersionRef,
     currentVersionPath: projectState.currentVersionPath,
+    forwardRouteDisposition: routeDisposition,
     activeStageRef: projectState.activeStageRef,
     activeStageIssueRef: projectState.activeStageIssueRef,
-    activeStageState: activeStage?.state ?? 'UNKNOWN',
+    activeStageState: activeStage?.state ?? (routeDisposition === 'ATLAS_ROUTE_COMPLETE_IDLE' ? 'IDLE' : 'UNKNOWN'),
     programEpicRef: projectState.programEpicRef,
     git,
     inventory,
@@ -475,6 +510,7 @@ function renderMarkdown(receipt) {
     '# VexWorld repository health',
     '',
     `- Disposition: **${receipt.disposition}**`,
+    `- Forward route: \`${receipt.forwardRouteDisposition}\``,
     `- Active stage: \`${receipt.activeStageRef}\``,
     `- Stage issue: \`${receipt.activeStageIssueRef}\``,
     `- Current version: \`${receipt.currentVersionRef}\` at \`${receipt.currentVersionPath}\``,

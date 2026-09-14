@@ -13,6 +13,7 @@ import {
   validateTechnologyRegistry,
   validateVersionBinding
 } from '../scripts/vexworld-health.mjs';
+import { buildHandoff } from '../scripts/vexworld-handoff.mjs';
 import {
   classifyFiles,
   loadImpactMap,
@@ -29,6 +30,17 @@ async function readJson(relative) {
 
 function clone(value) {
   return structuredClone(value);
+}
+
+function activeRouteFixture(projectState) {
+  const active = clone(projectState);
+  const terminal = active.stages.at(-1);
+  active.forwardRouteDisposition = 'ACTIVE_FORWARD_ROUTE';
+  active.activeStageRef = terminal.stageRef;
+  active.activeStageIssueRef = terminal.issueRef;
+  terminal.state = 'ACTIVE_SINGLE_FORWARD_LANE';
+  terminal.sourceChanging = true;
+  return active;
 }
 
 function acceptedAssetFixture() {
@@ -79,19 +91,92 @@ test('repository health inventories every checked-in source through an explicit 
   assert.ok(receipt.inventory.fileCount > 0);
 });
 
-test('one-lane state rejects multiple active source-changing stages', async () => {
+test('terminal Atlas route is healthy only with zero active lanes and accepted terminal receipts', async () => {
   const projectState = await readJson('config/project-state.json');
-  const broken = clone(projectState);
-  const activeIndex = broken.stages.findIndex(
-    (stage) => stage.state === 'ACTIVE_SINGLE_FORWARD_LANE' && stage.sourceChanging === true
+  assert.equal(projectState.forwardRouteDisposition, 'ATLAS_ROUTE_COMPLETE_IDLE');
+  assert.equal(projectState.activeStageRef, 'NONE');
+  assert.equal(projectState.activeStageIssueRef, 'NONE');
+  assert.equal(
+    projectState.stages.filter(
+      (stage) => stage.state === 'ACTIVE_SINGLE_FORWARD_LANE' && stage.sourceChanging === true
+    ).length,
+    0
   );
-  const secondIndex = broken.stages.findIndex((_, index) => index !== activeIndex);
-  assert.ok(activeIndex >= 0, 'fixture requires one active source-changing stage');
+  assert.deepEqual(validateProjectState(projectState), []);
+
+  const staleActiveRef = clone(projectState);
+  staleActiveRef.activeStageRef = staleActiveRef.stages.at(-1).stageRef;
+  assert.ok(
+    validateProjectState(staleActiveRef)
+      .some((error) => error.includes('terminal idle activeStageRef must be NONE'))
+  );
+
+  const staleActiveIssue = clone(projectState);
+  staleActiveIssue.activeStageIssueRef = staleActiveIssue.stages.at(-1).issueRef;
+  assert.ok(
+    validateProjectState(staleActiveIssue)
+      .some((error) => error.includes('terminal idle activeStageIssueRef must be NONE'))
+  );
+
+  const activeTerminal = clone(projectState);
+  activeTerminal.stages.at(-1).state = 'ACTIVE_SINGLE_FORWARD_LANE';
+  activeTerminal.stages.at(-1).sourceChanging = true;
+  const activeTerminalErrors = validateProjectState(activeTerminal);
+  assert.ok(activeTerminalErrors.some((error) => error.includes('zero active source-changing stages')));
+  assert.ok(activeTerminalErrors.some((error) => error.includes('accepted terminal stage')));
+  assert.ok(activeTerminalErrors.some((error) => error.includes('terminal sourceChanging=false')));
+
+  const missingCloseReceipt = clone(projectState);
+  delete missingCloseReceipt.stages.at(-1).acceptedCloseReceiptRef;
+  assert.ok(
+    validateProjectState(missingCloseReceipt)
+      .some((error) => error.includes('terminal acceptedCloseReceiptRef'))
+  );
+
+  const missingAcceptedMain = clone(projectState);
+  delete missingAcceptedMain.stages.at(-1).acceptedMainRef;
+  assert.ok(
+    validateProjectState(missingAcceptedMain)
+      .some((error) => error.includes('terminal acceptedMainRef'))
+  );
+
+  const mismatchedAcceptedMain = clone(projectState);
+  mismatchedAcceptedMain.lastAcceptedMainRef = 'github.commit.vexworld.stale';
+  assert.ok(
+    validateProjectState(mismatchedAcceptedMain)
+      .some((error) => error.includes('lastAcceptedMainRef must equal terminal acceptedMainRef'))
+  );
+});
+
+test('ordinary active route still requires exactly one active source-changing stage', async () => {
+  const projectState = await readJson('config/project-state.json');
+  const zeroActive = clone(projectState);
+  zeroActive.forwardRouteDisposition = 'ACTIVE_FORWARD_ROUTE';
+  const zeroErrors = validateProjectState(zeroActive);
+  assert.ok(zeroErrors.some((error) => error.includes('exactly one active source-changing stage')));
+
+  const active = activeRouteFixture(projectState);
+  assert.deepEqual(validateProjectState(active), []);
+
+  const secondIndex = active.stages.findIndex((_, index) => index !== active.stages.length - 1);
   assert.ok(secondIndex >= 0, 'fixture requires at least two stages');
-  broken.stages[secondIndex].state = 'ACTIVE_SINGLE_FORWARD_LANE';
-  broken.stages[secondIndex].sourceChanging = true;
-  const errors = validateProjectState(broken);
-  assert.ok(errors.some((error) => error.includes('exactly one active source-changing stage')));
+  active.stages[secondIndex].state = 'ACTIVE_SINGLE_FORWARD_LANE';
+  active.stages[secondIndex].sourceChanging = true;
+  const multipleErrors = validateProjectState(active);
+  assert.ok(multipleErrors.some((error) => error.includes('exactly one active source-changing stage')));
+});
+
+test('terminal handoff describes idle route without inventing successor authority', async () => {
+  const handoff = await buildHandoff({ root });
+  assert.equal(handoff.forwardRouteDisposition, 'ATLAS_ROUTE_COMPLETE_IDLE');
+  assert.equal(handoff.stage, null);
+  assert.equal(handoff.nextStageRefOrNull, null);
+  assert.deepEqual(handoff.activeOwnedPathPatterns, []);
+  assert.deepEqual(handoff.allowedEffects, []);
+  assert.equal(handoff.reviewRequirements.independentExactHeadReviewRequired, false);
+  assert.equal(handoff.reviewRequirements.reviewOwnerRef, null);
+  assert.equal(handoff.disposition, 'ATLAS_ROUTE_COMPLETE_IDLE__NO_SUCCESSOR_ADMITTED');
+  assert.ok(handoff.whatItDoesNotProve.includes('SUCCESSOR_STAGE_ADMITTED'));
 });
 
 test('ordered stage breadcrumbs reject a broken immediate-predecessor edge', async () => {
