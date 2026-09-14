@@ -20,19 +20,52 @@ what remains unknown
 how to stop, review, close and continue
 ```
 
-The default topology is therefore:
+The default topology while admitted forward work exists is therefore:
 
 ```text
 one visible forward program
-+ one active source-changing stage
++ exactly one active source-changing stage
 + any number of blocked future breadcrumbs
 + bounded no-effect research and review
 + one accepted close receipt before activation moves
 ```
 
+When an explicitly ordered architecture route is fully accepted and **no successor has been admitted**, the project may instead enter:
+
+```text
+forwardRouteDisposition=ATLAS_ROUTE_COMPLETE_IDLE
+activeStageRef=NONE
+activeStageIssueRef=NONE
+active source-changing stage count=0
+```
+
+That terminal-idle state is navigation only. It does not invent a successor, reopen accepted work, or grant authority for a new product, physical, network, model, commercial, publication, or repository effect.
+
 This is a development-flow rule, not a claim that one person or one model must do every kind of work.
 
 ## Project and stage states
+
+Project forward-route dispositions:
+
+```text
+ACTIVE_FORWARD_ROUTE
+ATLAS_ROUTE_COMPLETE_IDLE
+```
+
+`ACTIVE_FORWARD_ROUTE` retains the ordinary one-lane invariant: exactly one stage is both `sourceChanging=true` and `state=ACTIVE_SINGLE_FORWARD_LANE`.
+
+`ATLAS_ROUTE_COMPLETE_IDLE` is the only zero-active exception. It requires:
+
+```text
+activeStageRef=NONE
+activeStageIssueRef=NONE
+zero ACTIVE_SINGLE_FORWARD_LANE + sourceChanging=true stages
+terminal stage accepted
+terminal stage sourceChanging=false
+terminal acceptedCloseReceiptRef present
+terminal acceptedMainRef present
+lastAcceptedMainRef == terminal acceptedMainRef
+```
 
 Permitted stage states:
 
@@ -60,7 +93,7 @@ A future stage may research options, collect official-source evidence, refine ac
 
 ## Exact entry route
 
-A fresh builder enters through:
+A fresh builder on an active route enters through:
 
 ```text
 config/project-state.json
@@ -72,6 +105,20 @@ config/project-state.json
 → exact current-version source implicated by the stage
 ```
 
+A fresh recipient in terminal-idle state enters through:
+
+```text
+config/project-state.json
+→ completed programEpicRef / terminal close receipt
+→ README.md
+→ CLAUDE.md
+→ this protocol
+→ config/change-impact-map.json
+→ exact accepted current-version source only as needed
+```
+
+No source-changing continuation is inferred from terminal idle. A newly admitted route must first establish its own exact source owner, authority, predecessor, scope and evidence contract.
+
 A Root occupancy descends through:
 
 ```text
@@ -80,7 +127,8 @@ Root current entry
 → Vextreme-SDK #1299
 → VexWorld #3
 → config/project-state.json
-→ active stage
+→ active stage when ACTIVE_FORWARD_ROUTE
+→ completed program/terminal receipt when ATLAS_ROUTE_COMPLETE_IDLE
 ```
 
 Do not select a different predecessor because a nearby issue looks more recent. Stage order is explicit in project state.
@@ -249,13 +297,28 @@ claimReleased=true
 closedAt
 ```
 
-Then, and only then:
+If an immediate successor is already admitted, then and only then:
 
 ```text
 current stage → ACCEPTED_COMPLETE
 immediate successor → READY_FOR_ADMISSION or ACTIVE_SINGLE_FORWARD_LANE
+project state's forwardRouteDisposition → ACTIVE_FORWARD_ROUTE
 project state's activeStageRef → exact successor
+project state's activeStageIssueRef → exact successor issue
 ```
+
+If the explicit ordered route is exhausted and no successor is admitted, then and only then:
+
+```text
+current stage → ACCEPTED_COMPLETE
+project state's forwardRouteDisposition → ATLAS_ROUTE_COMPLETE_IDLE
+project state's activeStageRef → NONE
+project state's activeStageIssueRef → NONE
+active source-changing stage count → 0
+lastAcceptedMainRef → terminal acceptedMainRef
+```
+
+Terminal idle is not a successor stage. It grants no source-changing authority and cannot be used to bypass formation/admission of later work.
 
 A merged commit without a current project-state transition leaves navigation debt. A project-state transition without accepted source evidence is false currentness.
 
@@ -264,7 +327,7 @@ A merged commit without a current project-state transition leaves navigation deb
 `npm run handoff` emits a bounded fresh-instance packet from live checked-in state. It should include:
 
 ```text
-project and stage identity
+project and stage identity or explicit terminal-idle state
 repository branch/head/tree observations
 required reading route
 changed/owned paths
@@ -275,6 +338,19 @@ current candidate technology/asset decisions
 close receipt shape
 exact next owner/action
 ```
+
+When `forwardRouteDisposition=ATLAS_ROUTE_COMPLETE_IDLE`, handoff must say explicitly:
+
+```text
+stage=null
+activeStageRef=NONE
+activeStageIssueRef=NONE
+stage state=IDLE
+nextStageRefOrNull=null
+disposition=ATLAS_ROUTE_COMPLETE_IDLE__NO_SUCCESSOR_ADMITTED
+```
+
+It must not call terminal idle “ready for continuation” or imply active owned-path authority.
 
 The generated packet does not grant authority and does not replace live repository grounding.
 
@@ -299,6 +375,6 @@ A missing timestamp, imperfect handoff phrase, or delayed playtest is a recovera
 
 ## Compact rule
 
-> Keep one source-changing lane visible, let future work remain mapped but blocked, make every delightful effect descend from owned source and scenarios, test the affected neighborhood, invite a fresh exact-head review, close with a replayable receipt, and move the active coordinate forward without asking Victor to reconstruct the road.
+> Keep exactly one source-changing lane visible while admitted forward work exists; let future work remain mapped but blocked; make every effect descend from owned source and scenarios; test the affected neighborhood; invite a fresh exact-head review; close with a replayable receipt; and move the active coordinate forward. When the explicit route is fully accepted and no successor is admitted, record `ATLAS_ROUTE_COMPLETE_IDLE` with zero active lanes rather than inventing work. Never ask Victor to reconstruct the road.
 
 <!-- [VXG RealForever] -->
