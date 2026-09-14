@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "vexworld.source-map-fragment/v1",
+  "fragmentRef": "source-map-fragment.vexworld.v1.stage-06a-physical-shadow",
+  "reason": "Register the VW-FWD-06A read-only physical-shadow projector and focused evidence without rewriting the historical Version 1 base source map.",
+  "entries": [
+    {
+      "path": "config/source-map.fragments/stage-06a-physical-shadow.json",
+      "category": "navigation-and-coverage",
+      "owner": "Physical Shadow",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "src/core/physical-shadow.mjs",
+      "category": "physical-shadow-projection",
+      "owner": "Physical Shadow",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "test/physical-shadow.test.mjs",
+      "category": "test-evidence",
+      "owner": "Assurance",
+      "sourceClass": "EVIDENCE_SOURCE"
+    }
+  ]
+}
