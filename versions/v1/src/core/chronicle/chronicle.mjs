@@ -144,6 +144,66 @@ function eventRef(branchRef, tick, ordinal) {
   return `${branchRef}.event.${pad(tick, 12)}.${pad(ordinal, 6)}`;
 }
 
+function validateChronicleEvent(event, chronicle, { priorSha256, priorTick, priorOrdinal }) {
+  assertExactKeys(event, [
+    'schemaVersion', 'eventRef', 'timelineRef', 'branchRef', 'tick', 'ordinal',
+    'simulationTimeMs', 'actorRef', 'eventClass', 'privacyClass', 'causationRefs',
+    'correlationRefOrNull', 'determinismEpochRef', 'determinismEpochSha256',
+    'payload', 'payloadSha256', 'priorEventSha256', 'eventSha256'
+  ], 'Chronicle event');
+
+  if (event.schemaVersion !== SCHEMA.event) throw new TypeError('event schema mismatch');
+  assertSafeRef(event.eventRef, 'event.eventRef');
+  assertSafeRef(event.timelineRef, 'event.timelineRef');
+  assertSafeRef(event.branchRef, 'event.branchRef');
+  assertNonNegativeInteger(event.tick, 'event.tick');
+  assertNonNegativeInteger(event.ordinal, 'event.ordinal');
+  assertFiniteNumber(event.simulationTimeMs, 'event.simulationTimeMs');
+  assertSafeRef(event.actorRef, 'event.actorRef');
+  assertSafeRef(event.eventClass, 'event.eventClass');
+  if (!PRIVACY.has(event.privacyClass)) throw new TypeError('unsupported privacy class');
+  assertUniqueSafeRefs(event.causationRefs, 'event.causationRefs');
+  if (event.correlationRefOrNull !== null) assertSafeRef(event.correlationRefOrNull, 'event.correlationRefOrNull');
+  assertSafeRef(event.determinismEpochRef, 'event.determinismEpochRef');
+  assertSha256(event.determinismEpochSha256, 'event.determinismEpochSha256');
+  assertPlainObject(event.payload, 'event.payload');
+  rejectHiddenReasoning(event.payload, 'event.payload');
+  assertSha256(event.payloadSha256, 'event.payloadSha256');
+  assertSha256(event.priorEventSha256, 'event.priorEventSha256');
+  assertSha256(event.eventSha256, 'event.eventSha256');
+
+  if (event.timelineRef !== chronicle.timelineRef || event.branchRef !== chronicle.branchRef) {
+    throw new TypeError('event owner mismatch');
+  }
+  if (event.eventRef !== eventRef(chronicle.branchRef, event.tick, event.ordinal)) {
+    throw new TypeError('event coordinate ref mismatch');
+  }
+  const expectedSimulationTimeMs = Number((event.tick * chronicle.epoch.fixedStepMs).toFixed(9));
+  if (event.simulationTimeMs !== expectedSimulationTimeMs) {
+    throw new TypeError('event simulation time mismatch');
+  }
+  if (
+    event.determinismEpochRef !== chronicle.epoch.epochRef ||
+    event.determinismEpochSha256 !== chronicle.epoch.epochSha256
+  ) {
+    throw new TypeError('event determinism epoch mismatch');
+  }
+  if (event.priorEventSha256 !== priorSha256) throw new TypeError('event prior hash mismatch');
+  if (hashCanonical(event.payload) !== event.payloadSha256) throw new TypeError('event payload digest mismatch');
+
+  const { eventSha256, ...body } = event;
+  if (hashCanonical(body) !== eventSha256) throw new TypeError('event hash mismatch');
+
+  if (
+    event.tick < priorTick ||
+    (event.tick === priorTick && event.ordinal !== priorOrdinal + 1) ||
+    (event.tick > priorTick && event.ordinal !== 0)
+  ) {
+    throw new TypeError('event order mismatch');
+  }
+  return event;
+}
+
 export function appendChronicleEvent(chronicle, input) {
   verifyChronicle(chronicle);
   assertExactKeys(input, [
@@ -197,23 +257,33 @@ export function appendFightChronologyEvent(chronicle, input) {
 }
 
 export function verifyChronicle(chronicle) {
-  assertPlainObject(chronicle, 'chronicle');
+  assertExactKeys(chronicle, [
+    'schemaVersion', 'timelineRef', 'branchRef', 'epoch', 'baseEventHeadSha256',
+    'baseTick', 'events', 'headSha256', 'lastTick', 'lastOrdinal'
+  ], 'chronicle');
   if (chronicle.schemaVersion !== SCHEMA.chronicle) throw new TypeError('chronicle schema mismatch');
+  assertSafeRef(chronicle.timelineRef, 'chronicle.timelineRef');
+  assertSafeRef(chronicle.branchRef, 'chronicle.branchRef');
   validateDeterminismEpoch(chronicle.epoch);
+  assertSha256(chronicle.baseEventHeadSha256, 'chronicle.baseEventHeadSha256');
+  assertNonNegativeInteger(chronicle.baseTick, 'chronicle.baseTick');
+  if (!Array.isArray(chronicle.events)) throw new TypeError('chronicle.events must be an array');
+  assertSha256(chronicle.headSha256, 'chronicle.headSha256');
+  assertNonNegativeInteger(chronicle.lastTick, 'chronicle.lastTick');
+  if (!Number.isSafeInteger(chronicle.lastOrdinal) || chronicle.lastOrdinal < -1) {
+    throw new TypeError('chronicle.lastOrdinal must be a safe integer >= -1');
+  }
+
   let prior = chronicle.baseEventHeadSha256;
   let tick = chronicle.baseTick;
   let ordinal = -1;
   for (const event of chronicle.events) {
-    if (event.schemaVersion !== SCHEMA.event) throw new TypeError('event schema mismatch');
-    if (event.timelineRef !== chronicle.timelineRef || event.branchRef !== chronicle.branchRef) throw new TypeError('event owner mismatch');
-    if (event.priorEventSha256 !== prior) throw new TypeError('event prior hash mismatch');
-    if (hashCanonical(event.payload) !== event.payloadSha256) throw new TypeError('event payload digest mismatch');
-    const { eventSha256, ...body } = event;
-    if (hashCanonical(body) !== eventSha256) throw new TypeError('event hash mismatch');
-    if (event.tick < tick || (event.tick === tick && event.ordinal !== ordinal + 1) || (event.tick > tick && event.ordinal !== 0)) {
-      throw new TypeError('event order mismatch');
-    }
-    prior = eventSha256;
+    validateChronicleEvent(event, chronicle, {
+      priorSha256: prior,
+      priorTick: tick,
+      priorOrdinal: ordinal
+    });
+    prior = event.eventSha256;
     tick = event.tick;
     ordinal = event.ordinal;
   }
@@ -247,17 +317,62 @@ export function sealWorldSnapshot({ chronicle, tick, canonicalState }) {
   return frozenCanonical({ ...body, snapshotSha256: hashCanonical(body) });
 }
 
-export function verifyWorldSnapshot(snapshot, { epoch = null } = {}) {
-  assertPlainObject(snapshot, 'snapshot');
+export function verifyWorldSnapshot(snapshot, { epoch = null, chronicle = null } = {}) {
+  assertExactKeys(snapshot, [
+    'schemaVersion', 'snapshotRef', 'timelineRef', 'branchRef', 'tick',
+    'determinismEpochRef', 'determinismEpochSha256', 'worldPackageFingerprint',
+    'eventCount', 'eventHeadSha256', 'canonicalState', 'canonicalStateSha256',
+    'snapshotSha256'
+  ], 'snapshot');
   if (snapshot.schemaVersion !== SCHEMA.snapshot) throw new TypeError('snapshot schema mismatch');
-  const { snapshotSha256, ...body } = snapshot;
-  if (hashCanonical(body) !== snapshotSha256 || hashCanonical(snapshot.canonicalState) !== snapshot.canonicalStateSha256) {
-    throw new TypeError('snapshot digest mismatch');
+  assertSafeRef(snapshot.snapshotRef, 'snapshot.snapshotRef');
+  assertSafeRef(snapshot.timelineRef, 'snapshot.timelineRef');
+  assertSafeRef(snapshot.branchRef, 'snapshot.branchRef');
+  assertNonNegativeInteger(snapshot.tick, 'snapshot.tick');
+  assertSafeRef(snapshot.determinismEpochRef, 'snapshot.determinismEpochRef');
+  assertSha256(snapshot.determinismEpochSha256, 'snapshot.determinismEpochSha256');
+  assertSha256(snapshot.worldPackageFingerprint, 'snapshot.worldPackageFingerprint');
+  assertNonNegativeInteger(snapshot.eventCount, 'snapshot.eventCount');
+  assertSha256(snapshot.eventHeadSha256, 'snapshot.eventHeadSha256');
+  assertPlainObject(snapshot.canonicalState, 'snapshot.canonicalState');
+  rejectHiddenReasoning(snapshot.canonicalState, 'snapshot.canonicalState');
+  assertSha256(snapshot.canonicalStateSha256, 'snapshot.canonicalStateSha256');
+  assertSha256(snapshot.snapshotSha256, 'snapshot.snapshotSha256');
+
+  const expectedStateSha256 = hashCanonical(snapshot.canonicalState);
+  if (expectedStateSha256 !== snapshot.canonicalStateSha256) {
+    throw new TypeError('snapshot canonical state digest mismatch');
   }
+  const expectedSnapshotRef = `${snapshot.branchRef}.snapshot.${pad(snapshot.tick, 12)}.${expectedStateSha256.slice(0, 12)}`;
+  if (snapshot.snapshotRef !== expectedSnapshotRef) throw new TypeError('snapshot coordinate ref mismatch');
+
+  const { snapshotSha256, ...body } = snapshot;
+  if (hashCanonical(body) !== snapshotSha256) throw new TypeError('snapshot digest mismatch');
+
   if (epoch) {
     validateDeterminismEpoch(epoch);
-    if (snapshot.determinismEpochSha256 !== epoch.epochSha256 || snapshot.worldPackageFingerprint !== epoch.worldPackageFingerprint) {
+    if (
+      snapshot.determinismEpochRef !== epoch.epochRef ||
+      snapshot.determinismEpochSha256 !== epoch.epochSha256 ||
+      snapshot.worldPackageFingerprint !== epoch.worldPackageFingerprint
+    ) {
       throw new TypeError('snapshot epoch mismatch');
+    }
+  }
+
+  if (chronicle) {
+    verifyChronicle(chronicle);
+    if (
+      snapshot.timelineRef !== chronicle.timelineRef ||
+      snapshot.branchRef !== chronicle.branchRef ||
+      snapshot.tick !== chronicle.lastTick ||
+      snapshot.eventCount !== chronicle.events.length ||
+      snapshot.eventHeadSha256 !== chronicle.headSha256 ||
+      snapshot.determinismEpochRef !== chronicle.epoch.epochRef ||
+      snapshot.determinismEpochSha256 !== chronicle.epoch.epochSha256 ||
+      snapshot.worldPackageFingerprint !== chronicle.epoch.worldPackageFingerprint
+    ) {
+      throw new TypeError('snapshot Chronicle ancestry mismatch');
     }
   }
   return snapshot;
@@ -265,16 +380,13 @@ export function verifyWorldSnapshot(snapshot, { epoch = null } = {}) {
 
 export function forkWorldline({ parentChronicle, snapshot, branchRef, branchClass, formedByRef, purposeRef, assumptionRefs = [] }) {
   verifyChronicle(parentChronicle);
-  verifyWorldSnapshot(snapshot, { epoch: parentChronicle.epoch });
+  verifyWorldSnapshot(snapshot, { epoch: parentChronicle.epoch, chronicle: parentChronicle });
   assertSafeRef(branchRef, 'branchRef');
   if (branchRef === parentChronicle.branchRef) throw new TypeError('fork must have a fresh branchRef');
   if (!BRANCH_CLASS.has(branchClass)) throw new TypeError('unsupported branch class');
   assertSafeRef(formedByRef, 'formedByRef');
   assertSafeRef(purposeRef, 'purposeRef');
   assertUniqueSafeRefs(assumptionRefs, 'assumptionRefs');
-  if (snapshot.branchRef !== parentChronicle.branchRef || snapshot.eventHeadSha256 !== parentChronicle.headSha256) {
-    throw new TypeError('fork snapshot does not bind current parent head');
-  }
   const body = {
     schemaVersion: SCHEMA.branch, branchRef, branchClass,
     timelineRef: parentChronicle.timelineRef,
@@ -325,8 +437,17 @@ export function formIntelligenceDecision(input) {
   return frozenCanonical({ ...body, decisionSha256: hashCanonical(body) });
 }
 
-export function replayWorldline({ snapshot, epoch, targetBranchRef, inputFrames, reducer, expectedStateSha256OrNull = null }) {
-  verifyWorldSnapshot(snapshot, { epoch });
+export function replayWorldline({
+  snapshot,
+  sourceChronicle,
+  epoch,
+  targetBranchRef,
+  inputFrames,
+  reducer,
+  expectedStateSha256OrNull = null
+}) {
+  verifyChronicle(sourceChronicle);
+  verifyWorldSnapshot(snapshot, { epoch, chronicle: sourceChronicle });
   assertSafeRef(targetBranchRef, 'targetBranchRef');
   if (!Array.isArray(inputFrames) || typeof reducer !== 'function') throw new TypeError('replay requires inputFrames and reducer');
   if (expectedStateSha256OrNull !== null) assertSha256(expectedStateSha256OrNull, 'expectedStateSha256OrNull');
