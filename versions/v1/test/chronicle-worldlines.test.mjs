@@ -165,6 +165,34 @@ function parentFrames(branchRef = 'worldline.first-grove.verified') {
   ];
 }
 
+function rehashEvent(event) {
+  const { eventSha256: _ignored, ...body } = event;
+  return { ...body, eventSha256: hashCanonical(body) };
+}
+
+function rehashSnapshot(snapshot) {
+  const clone = canonicalClone(snapshot);
+  clone.canonicalStateSha256 = hashCanonical(clone.canonicalState);
+  clone.snapshotRef = `${clone.branchRef}.snapshot.${String(clone.tick).padStart(12, '0')}.${clone.canonicalStateSha256.slice(0, 12)}`;
+  const { snapshotSha256: _ignored, ...body } = clone;
+  clone.snapshotSha256 = hashCanonical(body);
+  return clone;
+}
+
+function rehashMotionSample(sample) {
+  const clone = canonicalClone(sample);
+  const { sampleSha256: _ignored, ...body } = clone;
+  clone.sampleSha256 = hashCanonical(body);
+  return clone;
+}
+
+function rehashMotionWindow(window) {
+  const clone = canonicalClone(window);
+  const { motionWindowSha256: _ignored, ...body } = clone;
+  clone.motionWindowSha256 = hashCanonical(body);
+  return clone;
+}
+
 test('determinism epoch and input frame hashes are canonical across object key order', () => {
   const a = epoch();
   const b = formDeterminismEpoch({
@@ -229,7 +257,7 @@ test('Chronicle forms a contiguous hash-linked fight history and rejects tamper 
 
   const reordered = canonicalClone(chronicle);
   [reordered.events[1], reordered.events[2]] = [reordered.events[2], reordered.events[1]];
-  assert.throws(() => verifyChronicle(reordered), /prior hash mismatch|tick moved backward|ordinal/);
+  assert.throws(() => verifyChronicle(reordered), /prior hash mismatch|order mismatch/);
 
   assert.throws(() => appendChronicleEvent(chronicle, {
     tick: 5,
@@ -243,6 +271,44 @@ test('Chronicle forms a contiguous hash-linked fight history and rejects tamper 
   }), /contiguous/);
 });
 
+test('Chronicle verifier rejects rehashed event epoch, hidden-reasoning and contract drift', () => {
+  const determinismEpoch = epoch();
+  let chronicle = createChronicle({
+    timelineRef: 'timeline.first-grove.verifier.0001',
+    branchRef: 'worldline.first-grove.verified',
+    epoch: determinismEpoch
+  });
+  chronicle = appendChronicleEvent(chronicle, {
+    tick: 1,
+    ordinal: 0,
+    actorRef: 'participant.victor',
+    eventClass: 'INTENT_ACCEPTED',
+    privacyClass: 'PARTY_SHARED',
+    causationRefs: [],
+    correlationRefOrNull: null,
+    payload: { intentRef: 'intent.victor.test.0001' }
+  }).chronicle;
+
+  const crossedEpoch = canonicalClone(chronicle);
+  crossedEpoch.events[0].determinismEpochRef = 'epoch.crossed.invalid';
+  crossedEpoch.events[0] = rehashEvent(crossedEpoch.events[0]);
+  crossedEpoch.headSha256 = crossedEpoch.events[0].eventSha256;
+  assert.throws(() => verifyChronicle(crossedEpoch), /determinism epoch mismatch/);
+
+  const hiddenReasoning = canonicalClone(chronicle);
+  hiddenReasoning.events[0].payload.privateReasoning = 'rehashing must not make this admissible';
+  hiddenReasoning.events[0].payloadSha256 = hashCanonical(hiddenReasoning.events[0].payload);
+  hiddenReasoning.events[0] = rehashEvent(hiddenReasoning.events[0]);
+  hiddenReasoning.headSha256 = hiddenReasoning.events[0].eventSha256;
+  assert.throws(() => verifyChronicle(hiddenReasoning), /hidden-reasoning/);
+
+  const extraField = canonicalClone(chronicle);
+  extraField.events[0].uncontractedField = 'not-admitted';
+  extraField.events[0] = rehashEvent(extraField.events[0]);
+  extraField.headSha256 = extraField.events[0].eventSha256;
+  assert.throws(() => verifyChronicle(extraField), /fields do not match contract/);
+});
+
 test('snapshot replay is deterministic, invokes no model, and a fork cannot mutate its parent', () => {
   const determinismEpoch = epoch();
   const verifiedBranchRef = 'worldline.first-grove.verified';
@@ -253,11 +319,12 @@ test('snapshot replay is deterministic, invokes no model, and a fork cannot muta
     epoch: determinismEpoch
   });
   const snapshot0 = sealWorldSnapshot({ chronicle: parentAt0, tick: 0, canonicalState: initialFightState() });
-  verifyWorldSnapshot(snapshot0, { epoch: determinismEpoch });
+  verifyWorldSnapshot(snapshot0, { epoch: determinismEpoch, chronicle: parentAt0 });
 
   let modelCalls = 0;
   const replayTo3 = replayWorldline({
     snapshot: snapshot0,
+    sourceChronicle: parentAt0,
     epoch: determinismEpoch,
     targetBranchRef: verifiedBranchRef,
     inputFrames: frames.slice(0, 3),
@@ -305,6 +372,7 @@ test('snapshot replay is deterministic, invokes no model, and a fork cannot muta
 
   const verifiedResult = replayWorldline({
     snapshot: snapshot3,
+    sourceChronicle: parentAt0,
     epoch: determinismEpoch,
     targetBranchRef: verifiedBranchRef,
     inputFrames: frames.slice(3),
@@ -333,6 +401,7 @@ test('snapshot replay is deterministic, invokes no model, and a fork cannot muta
   ];
   const alternateResult = replayWorldline({
     snapshot: snapshot3,
+    sourceChronicle: parentAt0,
     epoch: determinismEpoch,
     targetBranchRef: fork.branch.branchRef,
     inputFrames: alternateFrames,
@@ -346,6 +415,7 @@ test('snapshot replay is deterministic, invokes no model, and a fork cannot muta
 
   const repeated = replayWorldline({
     snapshot: snapshot3,
+    sourceChronicle: parentAt0,
     epoch: determinismEpoch,
     targetBranchRef: verifiedBranchRef,
     inputFrames: frames.slice(3),
@@ -353,6 +423,65 @@ test('snapshot replay is deterministic, invokes no model, and a fork cannot muta
     expectedStateSha256OrNull: verifiedResult.finalStateSha256
   });
   assert.equal(repeated.finalStateSha256, verifiedResult.finalStateSha256);
+});
+
+test('snapshot ancestry verifier rejects rehashed false timeline, tick and eventCount before fork or replay', () => {
+  const determinismEpoch = epoch();
+  const branchRef = 'worldline.first-grove.verified';
+  let parent = createChronicle({
+    timelineRef: 'timeline.first-grove.snapshot-verifier.0001',
+    branchRef,
+    epoch: determinismEpoch
+  });
+  parent = appendChronicleEvent(parent, {
+    tick: 1,
+    ordinal: 0,
+    actorRef: 'participant.victor',
+    eventClass: 'INTENT_ACCEPTED',
+    privacyClass: 'PARTY_SHARED',
+    causationRefs: [],
+    correlationRefOrNull: null,
+    payload: { intentRef: 'intent.victor.snapshot-test.0001' }
+  }).chronicle;
+  const state = { ...initialFightState(), tick: 1 };
+  const snapshot = sealWorldSnapshot({ chronicle: parent, tick: 1, canonicalState: state });
+
+  const falseTimeline = canonicalClone(snapshot);
+  falseTimeline.timelineRef = 'timeline.forged.but-rehashed';
+  const rehashedTimeline = rehashSnapshot(falseTimeline);
+  assert.throws(() => forkWorldline({
+    parentChronicle: parent,
+    snapshot: rehashedTimeline,
+    branchRef: 'worldline.first-grove.private-rehearsal.timeline-forgery',
+    branchClass: 'PRIVATE_REHEARSAL',
+    formedByRef: 'participant.victor',
+    purposeRef: 'purpose.test',
+    assumptionRefs: []
+  }), /Chronicle ancestry mismatch/);
+
+  const falseTick = canonicalClone(snapshot);
+  falseTick.tick = 2;
+  const rehashedTick = rehashSnapshot(falseTick);
+  assert.throws(() => replayWorldline({
+    snapshot: rehashedTick,
+    sourceChronicle: parent,
+    epoch: determinismEpoch,
+    targetBranchRef: branchRef,
+    inputFrames: [],
+    reducer: fightReducer
+  }), /Chronicle ancestry mismatch/);
+
+  const falseEventCount = canonicalClone(snapshot);
+  falseEventCount.eventCount = 999;
+  const rehashedEventCount = rehashSnapshot(falseEventCount);
+  assert.throws(() => replayWorldline({
+    snapshot: rehashedEventCount,
+    sourceChronicle: parent,
+    epoch: determinismEpoch,
+    targetBranchRef: branchRef,
+    inputFrames: [],
+    reducer: fightReducer
+  }), /Chronicle ancestry mismatch/);
 });
 
 test('motion hot tail quantizes, bounds, expires and promotes only consented material windows', () => {
@@ -419,6 +548,54 @@ test('motion hot tail quantizes, bounds, expires and promotes only consented mat
   assert.equal(window.sampleCount, 3);
   const { motionWindowSha256, ...windowBody } = canonicalClone(window);
   assert.equal(motionWindowSha256, hashCanonical(windowBody));
+});
+
+test('motion verifiers reject rehashed durable live tails, invalid quantized samples and consent-stripped shared windows', () => {
+  let tail = createMotionTail({
+    tailRef: 'motion-tail.victor.verifier.0001',
+    participantRef: 'participant.victor',
+    coordinateSpaceRef: 'space.first-grove.arena',
+    maxSamples: 4,
+    maxAgeTicks: 4,
+    privacyClass: 'PARTICIPANT_PRIVATE',
+    retentionClass: 'EPHEMERAL_HOT_TAIL'
+  });
+  tail = appendMotionSample(tail, {
+    sequence: 1,
+    tick: 10,
+    sourceRef: 'sensor.synthetic.vr-headset',
+    pose: {
+      positionMeters: { x: 0.1, y: 1.7, z: -0.2 },
+      orientationQuaternion: { x: 0, y: 0, z: 0, w: 1 },
+      linearVelocityMetersPerSecondOrNull: null,
+      angularVelocityRadiansPerSecondOrNull: null
+    },
+    materialityRefs: ['materiality.fight.verifier']
+  }).tail;
+
+  const durableTail = canonicalClone(tail);
+  durableTail.retentionClass = 'EVENT_EVIDENCE';
+  assert.throws(() => verifyMotionTail(durableTail), /EPHEMERAL_HOT_TAIL/);
+
+  const invalidSampleTail = canonicalClone(tail);
+  invalidSampleTail.samples[0].pose.positionMillimeters.x = 12.5;
+  invalidSampleTail.samples[0] = rehashMotionSample(invalidSampleTail.samples[0]);
+  assert.throws(() => verifyMotionTail(invalidSampleTail), /safe integer/);
+
+  const sharedWindow = promoteMotionWindow(tail, {
+    windowRef: 'motion-window.victor.verifier.0001',
+    fromTick: 10,
+    toTick: 10,
+    reasonRef: 'reason.verifier-proof',
+    consentRefOrNull: 'consent.victor.party-replay.verifier',
+    privacyClass: 'PARTY_SHARED',
+    retentionClass: 'EVENT_EVIDENCE',
+    eventRefs: ['event.verifier.0001']
+  });
+  const consentStripped = canonicalClone(sharedWindow);
+  consentStripped.consentRefOrNull = null;
+  const rehashedWindow = rehashMotionWindow(consentStripped);
+  assert.throws(() => verifyMotionWindow(rehashedWindow), /consent/);
 });
 
 test('motion promotion digest is stable and expiry does not rewrite a promoted window', () => {
