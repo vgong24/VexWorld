@@ -134,7 +134,7 @@ reducerSource
 bindings
 ```
 
-`replayWorldline(...)` reconstructs the callable from the exact admitted `reducerSource`, revalidates the descriptor digest, and requires:
+`replayWorldline(...)` reconstructs execution from the exact admitted `reducerSource`, revalidates the descriptor digest, and requires:
 
 ```text
 executionKernel.kernelRef == epoch.kernelRef
@@ -145,11 +145,31 @@ before any reducer invocation.
 
 Caller lexical closures therefore do not cross the replay boundary. `Function#bind` / native-code source forms are not admitted. Behavior-affecting configuration that is intended to vary belongs in the explicit canonical `bindings` object, so changing that state changes the kernel identity.
 
-The reconstructed reducer is formed inside an ambient-denying lexical scope. Undeclared free lexical identifiers are not inherited from the caller; reducer behavior must come from its admitted source, replay inputs, epoch, and explicit bindings.
+For Stage 07A, each replay frame executes in a **fresh isolated Node `vm` context**. Only canonical JSON strings for state, frame, epoch and explicit bindings cross into that context. No caller object, function, prototype or mutable VM-global object is reused between frames.
+
+The isolated context disables string/wasm code generation and removes or disables ambient time/random/network-style surfaces used by this proof. In particular:
+
+```text
+Function/eval-style dynamic code generation
+Date
+Math.random
+process / require / module
+fetch / performance / crypto
+timer / microtask scheduler globals
+shared-memory / weak-finalization surfaces
+```
+
+are not available as ambient reducer inputs in the Stage-07A execution mechanism.
+
+This closes the reviewed `Object.constructor.constructor` recovery path because dynamic string compilation inside the isolated context is disabled, and a changed host global is not visible through the canonical JSON-only ingress.
+
+The context is intentionally recreated per frame so a reducer cannot smuggle hidden mutable state from one tick to the next through VM globals.
+
+This mechanism is a **determinism boundary for the Stage-07A proof**, not a general JavaScript security sandbox. It does not establish that `node:vm` is safe for arbitrary hostile code, and it does not authenticate arbitrary imported modules, native code, generated dependency graphs or an entire runtime image.
 
 Successful replay receipts bind `executedKernelRef` and `executedKernelSha256` alongside the determinism epoch.
 
-This is intentionally a **Stage-07A primitive boundary**, not a claim that the descriptor authenticates an arbitrary future module/dependency closure. A production runtime whose reducer semantics depend on imported modules, native code, generated code or external artifacts must bind the appropriate qualified artifact/content closure before this identity can be generalized.
+A production runtime whose reducer semantics depend on imported modules, native code, generated code or external artifacts must bind the appropriate qualified artifact/content closure before this identity can be generalized.
 
 ```text
 CALLER_FUNCTION_OBJECT != EXECUTION_KERNEL_IDENTITY
@@ -498,6 +518,10 @@ rehash-resistant event contract + exact epoch binding
 snapshot integrity + source-Chronicle ancestry
 execution-kernel descriptor binds reconstructed reducer source + explicit bindings
 caller closure objects and native/bound-function state are excluded from replay admission
+fresh per-frame isolated VM execution with canonical JSON-only ingress
+dynamic constructor/global recovery rejection before canonical state can change
+same descriptor + same input remains independent of changed host ambient values
+wall-clock and hidden-random ambient surfaces fail closed
 mismatched execution-kernel rejection before reducer execution
 recorded-input replay equality
 executed kernel identity in replay receipts
@@ -510,10 +534,10 @@ fight + environment fracture chronology
 hidden-reasoning rejection
 ```
 
-Passing this proof establishes a kernel contract. It does not yet prove live-world reconnection, cross-platform bit identity, whole-module/dependency-closure authentication or arbitrary ambient-runtime equivalence, production multiplayer, real XR capture, human game feel, fluid reversibility or VexHome UI.
+Passing this proof establishes the bounded Stage-07A replay determinism contract. It does not prove a general JavaScript security sandbox, live-world reconnection, cross-platform bit identity, whole-module/dependency-closure authentication, arbitrary future runtime equivalence, production multiplayer, real XR capture, human game feel, fluid reversibility or VexHome UI.
 
 ## Compact rule
 
-> Preserve verified history as an append-only causal Chronicle; let people revisit it through replay, create alternate futures through exact Worldline forks, retain only materially justified motion under explicit privacy/consent, bind reconstructed reducer source plus explicit behavior bindings to the declared determinism epoch, and keep renderer spectacle, model inference and external effects separate from canonical world truth.
+> Preserve verified history as an append-only causal Chronicle; let people revisit it through replay, create alternate futures through exact Worldline forks, retain only materially justified motion under explicit privacy/consent, bind reducer source plus explicit behavior bindings to the declared determinism epoch, execute the Stage-07A proof through a fresh canonical-input-only isolated context, and keep renderer spectacle, model inference and external effects separate from canonical world truth.
 
 <!-- [VEXWORLD][CHRONICLE][WORLDLINES][VXG RealForever] -->
