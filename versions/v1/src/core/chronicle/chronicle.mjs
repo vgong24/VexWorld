@@ -68,27 +68,80 @@ function rngState(value) {
   return value;
 }
 
-function reducerSourceSha256(reducer) {
-  if (typeof reducer !== 'function') throw new TypeError('execution kernel reducer must be a function');
-  return sha256Hex(Function.prototype.toString.call(reducer));
+const REDUCER_SOURCE_LIMIT = 65536;
+const REDUCER_ESCAPE_PATTERN = /\\[native code\\]|\\bthis\\b|\\b(?:eval|Function)\\b|\\b(?:constructor|__proto__|prototype)\\b|\\bimport\\s*\\(/u;
+
+function normalizeReducerSource(reducerSource) {
+  if (typeof reducerSource !== 'string') throw new TypeError('execution kernel reducerSource must be a string');
+  const source = reducerSource.trim();
+  if (!source || source.length > REDUCER_SOURCE_LIMIT || /[\\u0000\\u000b\\u000c\\u007f]/u.test(source)) {
+    throw new TypeError('execution kernel reducerSource must be bounded text');
+  }
+  if (REDUCER_ESCAPE_PATTERN.test(source)) {
+    throw new TypeError('execution kernel reducerSource uses a non-admitted native/bound or ambient escape surface');
+  }
+
+  const denyAmbientScope = new Proxy(Object.create(null), {
+    has() {
+      return true;
+    },
+    get(_target, property) {
+      if (property === Symbol.unscopables) return undefined;
+      throw new ReferenceError(`ambient reducer identifier "${String(property)}" is not admitted; use explicit bindings`);
+    }
+  });
+
+  let reducer;
+  try {
+    // The callable is reconstructed from the bound source inside an ambient-denying
+    // lexical scope. Caller closures and Function#bind state cannot cross this boundary.
+    reducer = Function('scope', `with (scope) { return (${source}\\n); }`)(denyAmbientScope);
+  } catch (error) {
+    throw new TypeError(`execution kernel reducerSource is not a valid reducer: ${error.message}`);
+  }
+  if (typeof reducer !== 'function') throw new TypeError('execution kernel reducerSource must evaluate to a function');
+
+  const normalizedSource = Function.prototype.toString.call(reducer);
+  if (/\\[native code\\]/u.test(normalizedSource)) {
+    throw new TypeError('native/bound reducer source is not admitted');
+  }
+  return Object.freeze({ reducerSource: normalizedSource, reducer });
 }
 
-export function bindExecutionKernel({ kernelRef, reducer }) {
-  assertSafeRef(kernelRef, 'execution kernel.kernelRef');
-  const kernelSha256 = reducerSourceSha256(reducer);
-  return Object.freeze({ kernelRef, kernelSha256, reducer });
+function executionKernelSha256(kernelRef, reducerSource, bindings) {
+  return hashCanonical({ kernelRef, reducerSource, bindings });
+}
+
+export function bindExecutionKernel(input) {
+  assertExactKeys(input, ['kernelRef', 'reducerSource', 'bindings'], 'execution kernel input');
+  assertSafeRef(input.kernelRef, 'execution kernel.kernelRef');
+  assertPlainObject(input.bindings, 'execution kernel.bindings');
+  rejectHiddenReasoning(input.bindings, 'execution kernel.bindings');
+
+  const compiled = normalizeReducerSource(input.reducerSource);
+  const bindings = canonicalClone(input.bindings);
+  const kernelSha256 = executionKernelSha256(input.kernelRef, compiled.reducerSource, bindings);
+  return frozenCanonical({
+    kernelRef: input.kernelRef,
+    kernelSha256,
+    reducerSource: compiled.reducerSource,
+    bindings
+  });
 }
 
 function validateExecutionKernel(executionKernel, epoch) {
   assertPlainObject(executionKernel, 'execution kernel');
-  assertExactKeys(executionKernel, ['kernelRef', 'kernelSha256', 'reducer'], 'execution kernel');
+  assertExactKeys(executionKernel, ['kernelRef', 'kernelSha256', 'reducerSource', 'bindings'], 'execution kernel');
   assertSafeRef(executionKernel.kernelRef, 'execution kernel.kernelRef');
   assertSha256(executionKernel.kernelSha256, 'execution kernel.kernelSha256');
-  if (typeof executionKernel.reducer !== 'function') throw new TypeError('execution kernel reducer must be a function');
+  assertPlainObject(executionKernel.bindings, 'execution kernel.bindings');
+  rejectHiddenReasoning(executionKernel.bindings, 'execution kernel.bindings');
 
-  const actualReducerSha256 = reducerSourceSha256(executionKernel.reducer);
-  if (actualReducerSha256 !== executionKernel.kernelSha256) {
-    throw new TypeError('execution kernel source digest mismatch');
+  const compiled = normalizeReducerSource(executionKernel.reducerSource);
+  const bindings = canonicalClone(executionKernel.bindings);
+  const actualKernelSha256 = executionKernelSha256(executionKernel.kernelRef, compiled.reducerSource, bindings);
+  if (actualKernelSha256 !== executionKernel.kernelSha256) {
+    throw new TypeError('execution kernel descriptor digest mismatch');
   }
   if (
     executionKernel.kernelRef !== epoch.kernelRef ||
@@ -96,7 +149,13 @@ function validateExecutionKernel(executionKernel, epoch) {
   ) {
     throw new TypeError('execution kernel does not match determinism epoch');
   }
-  return executionKernel;
+  return Object.freeze({
+    kernelRef: executionKernel.kernelRef,
+    kernelSha256: executionKernel.kernelSha256,
+    reducerSource: compiled.reducerSource,
+    bindings: frozenCanonical(bindings),
+    reducer: compiled.reducer
+  });
 }
 
 export function formDeterminismEpoch(input) {
@@ -483,7 +542,7 @@ export function replayWorldline({
   validateDeterminismEpoch(epoch);
   assertSafeRef(targetBranchRef, 'targetBranchRef');
   if (!Array.isArray(inputFrames)) throw new TypeError('replay requires inputFrames');
-  validateExecutionKernel(executionKernel, epoch);
+  const validatedKernel = validateExecutionKernel(executionKernel, epoch);
   if (expectedStateSha256OrNull !== null) assertSha256(expectedStateSha256OrNull, 'expectedStateSha256OrNull');
 
   let state = canonicalClone(snapshot.canonicalState);
@@ -492,7 +551,7 @@ export function replayWorldline({
   for (const frame of inputFrames) {
     validateWorldInputFrame(frame);
     if (frame.branchRef !== targetBranchRef || frame.tick !== expectedTick) throw new TypeError('replay frame coordinate mismatch');
-    const next = executionKernel.reducer(canonicalClone(state), frozenCanonical(frame), epoch);
+    const next = validatedKernel.reducer(canonicalClone(state), frozenCanonical(frame), epoch, validatedKernel.bindings);
     assertPlainObject(next, 'reducer result');
     rejectHiddenReasoning(next, 'reducer result');
     state = canonicalClone(next);
@@ -509,8 +568,8 @@ export function replayWorldline({
     targetBranchRef,
     determinismEpochRef: epoch.epochRef,
     determinismEpochSha256: epoch.epochSha256,
-    executedKernelRef: executionKernel.kernelRef,
-    executedKernelSha256: executionKernel.kernelSha256,
+    executedKernelRef: validatedKernel.kernelRef,
+    executedKernelSha256: validatedKernel.kernelSha256,
     startTick: snapshot.tick,
     finalTick: expectedTick - 1,
     frameCount: inputFrames.length,
