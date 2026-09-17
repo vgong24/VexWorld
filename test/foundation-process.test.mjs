@@ -43,6 +43,24 @@ function activeRouteFixture(projectState) {
   return active;
 }
 
+function terminalIdleFixture(projectState) {
+  const terminal = clone(projectState);
+  while (
+    terminal.stages.length > 1 &&
+    terminal.stages.at(-1).state === 'ACTIVE_SINGLE_FORWARD_LANE' &&
+    terminal.stages.at(-1).sourceChanging === true
+  ) {
+    terminal.stages.pop();
+    terminal.stageOrder.pop();
+  }
+  const acceptedTerminal = terminal.stages.at(-1);
+  terminal.forwardRouteDisposition = 'ATLAS_ROUTE_COMPLETE_IDLE';
+  terminal.activeStageRef = 'NONE';
+  terminal.activeStageIssueRef = 'NONE';
+  terminal.lastAcceptedMainRef = acceptedTerminal.acceptedMainRef;
+  return terminal;
+}
+
 function acceptedAssetFixture() {
   return {
     assetCandidateRef: 'asset-candidate.synthetic.fixture',
@@ -92,7 +110,7 @@ test('repository health inventories every checked-in source through an explicit 
 });
 
 test('terminal Atlas route is healthy only with zero active lanes and accepted terminal receipts', async () => {
-  const projectState = await readJson('config/project-state.json');
+  const projectState = terminalIdleFixture(await readJson('config/project-state.json'));
   assert.equal(projectState.forwardRouteDisposition, 'ATLAS_ROUTE_COMPLETE_IDLE');
   assert.equal(projectState.activeStageRef, 'NONE');
   assert.equal(projectState.activeStageIssueRef, 'NONE');
@@ -149,7 +167,7 @@ test('terminal Atlas route is healthy only with zero active lanes and accepted t
 });
 
 test('ordinary active route still requires exactly one active source-changing stage', async () => {
-  const projectState = await readJson('config/project-state.json');
+  const projectState = terminalIdleFixture(await readJson('config/project-state.json'));
   const zeroActive = clone(projectState);
   zeroActive.forwardRouteDisposition = 'ACTIVE_FORWARD_ROUTE';
   const zeroErrors = validateProjectState(zeroActive);
@@ -166,17 +184,35 @@ test('ordinary active route still requires exactly one active source-changing st
   assert.ok(multipleErrors.some((error) => error.includes('exactly one active source-changing stage')));
 });
 
-test('terminal handoff describes idle route without inventing successor authority', async () => {
+test('fresh handoff reflects the current route without inventing authority', async () => {
+  const projectState = await readJson('config/project-state.json');
   const handoff = await buildHandoff({ root });
-  assert.equal(handoff.forwardRouteDisposition, 'ATLAS_ROUTE_COMPLETE_IDLE');
-  assert.equal(handoff.stage, null);
+  assert.equal(handoff.forwardRouteDisposition, projectState.forwardRouteDisposition);
+
+  if (projectState.forwardRouteDisposition === 'ATLAS_ROUTE_COMPLETE_IDLE') {
+    assert.equal(handoff.stage, null);
+    assert.equal(handoff.nextStageRefOrNull, null);
+    assert.deepEqual(handoff.activeOwnedPathPatterns, []);
+    assert.deepEqual(handoff.allowedEffects, []);
+    assert.equal(handoff.reviewRequirements.independentExactHeadReviewRequired, false);
+    assert.equal(handoff.reviewRequirements.reviewOwnerRef, null);
+    assert.equal(handoff.disposition, 'ATLAS_ROUTE_COMPLETE_IDLE__NO_SUCCESSOR_ADMITTED');
+    assert.ok(handoff.whatItDoesNotProve.includes('SUCCESSOR_STAGE_ADMITTED'));
+    return;
+  }
+
+  const active = projectState.stages.find((stage) => stage.stageRef === projectState.activeStageRef);
+  assert.ok(active, 'active project state must resolve its active stage');
+  assert.equal(handoff.stage.stageRef, active.stageRef);
+  assert.equal(handoff.stage.issueRef, active.issueRef);
   assert.equal(handoff.nextStageRefOrNull, null);
-  assert.deepEqual(handoff.activeOwnedPathPatterns, []);
-  assert.deepEqual(handoff.allowedEffects, []);
-  assert.equal(handoff.reviewRequirements.independentExactHeadReviewRequired, false);
-  assert.equal(handoff.reviewRequirements.reviewOwnerRef, null);
-  assert.equal(handoff.disposition, 'ATLAS_ROUTE_COMPLETE_IDLE__NO_SUCCESSOR_ADMITTED');
-  assert.ok(handoff.whatItDoesNotProve.includes('SUCCESSOR_STAGE_ADMITTED'));
+  assert.deepEqual(handoff.activeOwnedPathPatterns, active.ownedPathPatterns);
+  assert.deepEqual(handoff.allowedEffects, active.allowedEffects ?? []);
+  assert.deepEqual(handoff.forbiddenEffects, active.forbiddenEffects ?? []);
+  assert.equal(handoff.reviewRequirements.independentExactHeadReviewRequired, true);
+  assert.equal(handoff.reviewRequirements.reviewOwnerRef, active.reviewOwnerRef);
+  assert.equal(handoff.disposition, 'READY_FOR_BOUNDED_STAGE_OR_REVIEW_CONTINUATION');
+  assert.ok(handoff.whatItDoesNotProve.includes('ACTIVE_STAGE_ACCEPTED'));
 });
 
 test('ordered stage breadcrumbs reject a broken immediate-predecessor edge', async () => {
