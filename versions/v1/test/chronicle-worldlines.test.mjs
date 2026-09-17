@@ -5,6 +5,7 @@ import {
   FIGHT_EVENT_CLASSES,
   appendChronicleEvent,
   appendFightChronologyEvent,
+  bindExecutionKernel,
   createChronicle,
   forkWorldline,
   formDeterminismEpoch,
@@ -26,13 +27,19 @@ import {
 import { canonicalClone, hashCanonical } from '../src/core/chronicle/canonical.mjs';
 
 const H = (character) => character.repeat(64);
+const KERNEL_REF = 'kernel.vexworld.chronicle-proof.v1';
+
+function executionKernel(reducer = fightReducer) {
+  return bindExecutionKernel({ kernelRef: KERNEL_REF, reducer });
+}
 
 function epoch() {
+  const kernel = executionKernel();
   return formDeterminismEpoch({
     epochRef: 'epoch.first-grove.chronicle-proof.v1',
     worldPackageFingerprint: H('a'),
-    kernelRef: 'kernel.vexworld.chronicle-proof.v1',
-    kernelSha256: H('b'),
+    kernelRef: kernel.kernelRef,
+    kernelSha256: kernel.kernelSha256,
     stateSchemaVersion: 'fixture.fight-state/v1',
     fixedStepMs: 1000 / 60,
     numericProfileRef: 'numeric.fixed-integer-millimeters.v1',
@@ -195,14 +202,15 @@ function rehashMotionWindow(window) {
 
 test('determinism epoch and input frame hashes are canonical across object key order', () => {
   const a = epoch();
+  const kernel = executionKernel();
   const b = formDeterminismEpoch({
     rngStreamRefs: ['rng.fight', 'rng.fracture', 'rng.presentation'],
     rootSeed: 424242,
     numericProfileRef: 'numeric.fixed-integer-millimeters.v1',
     fixedStepMs: 1000 / 60,
     stateSchemaVersion: 'fixture.fight-state/v1',
-    kernelSha256: H('b'),
-    kernelRef: 'kernel.vexworld.chronicle-proof.v1',
+    kernelSha256: kernel.kernelSha256,
+    kernelRef: kernel.kernelRef,
     worldPackageFingerprint: H('a'),
     epochRef: 'epoch.first-grove.chronicle-proof.v1'
   });
@@ -311,6 +319,7 @@ test('Chronicle verifier rejects rehashed event epoch, hidden-reasoning and cont
 
 test('snapshot replay is deterministic, invokes no model, and a fork cannot mutate its parent', () => {
   const determinismEpoch = epoch();
+  const kernel = executionKernel();
   const verifiedBranchRef = 'worldline.first-grove.verified';
   const frames = parentFrames(verifiedBranchRef);
   let parentAt0 = createChronicle({
@@ -328,13 +337,12 @@ test('snapshot replay is deterministic, invokes no model, and a fork cannot muta
     epoch: determinismEpoch,
     targetBranchRef: verifiedBranchRef,
     inputFrames: frames.slice(0, 3),
-    reducer(state, inputFrame) {
-      assert.equal(modelCalls, 0);
-      return fightReducer(state, inputFrame);
-    }
+    executionKernel: kernel
   });
   assert.equal(modelCalls, 0);
   assert.equal(replayTo3.inputMode, 'RECORDED_INPUT_FRAMES_ONLY');
+  assert.equal(replayTo3.executedKernelRef, determinismEpoch.kernelRef);
+  assert.equal(replayTo3.executedKernelSha256, determinismEpoch.kernelSha256);
   assert.equal(replayTo3.finalTick, 3);
 
   const chronology = [
@@ -376,7 +384,7 @@ test('snapshot replay is deterministic, invokes no model, and a fork cannot muta
     epoch: determinismEpoch,
     targetBranchRef: verifiedBranchRef,
     inputFrames: frames.slice(3),
-    reducer: fightReducer
+    executionKernel: kernel
   });
 
   const alternateFrames = [
@@ -405,7 +413,7 @@ test('snapshot replay is deterministic, invokes no model, and a fork cannot muta
     epoch: determinismEpoch,
     targetBranchRef: fork.branch.branchRef,
     inputFrames: alternateFrames,
-    reducer: fightReducer
+    executionKernel: kernel
   });
 
   assert.equal(verifiedResult.finalState.environment.arenaWall.fractured, true);
@@ -419,10 +427,58 @@ test('snapshot replay is deterministic, invokes no model, and a fork cannot muta
     epoch: determinismEpoch,
     targetBranchRef: verifiedBranchRef,
     inputFrames: frames.slice(3),
-    reducer: fightReducer,
+    executionKernel: kernel,
     expectedStateSha256OrNull: verifiedResult.finalStateSha256
   });
   assert.equal(repeated.finalStateSha256, verifiedResult.finalStateSha256);
+});
+
+test('replay rejects a mismatched execution kernel before reducer invocation', () => {
+  const determinismEpoch = epoch();
+  const verifiedBranchRef = 'worldline.first-grove.verified';
+  const sourceChronicle = createChronicle({
+    timelineRef: 'timeline.first-grove.kernel-binding.0001',
+    branchRef: verifiedBranchRef,
+    epoch: determinismEpoch
+  });
+  const snapshot = sealWorldSnapshot({
+    chronicle: sourceChronicle,
+    tick: 0,
+    canonicalState: initialFightState()
+  });
+
+  let mismatchedReducerCalls = 0;
+  function mismatchedReducer(prior, inputFrame) {
+    mismatchedReducerCalls += 1;
+    const next = canonicalClone(prior);
+    next.tick = inputFrame.tick;
+    next.environment.arenaWall.integrity = 17;
+    return next;
+  }
+
+  const mismatchedKernel = executionKernel(mismatchedReducer);
+  assert.notEqual(mismatchedKernel.kernelSha256, determinismEpoch.kernelSha256);
+
+  assert.throws(() => replayWorldline({
+    snapshot,
+    sourceChronicle,
+    epoch: determinismEpoch,
+    targetBranchRef: verifiedBranchRef,
+    inputFrames: parentFrames(verifiedBranchRef).slice(0, 1),
+    executionKernel: mismatchedKernel
+  }), /execution kernel does not match determinism epoch/);
+  assert.equal(mismatchedReducerCalls, 0, 'kernel mismatch must fail before reducer execution');
+
+  const accepted = replayWorldline({
+    snapshot,
+    sourceChronicle,
+    epoch: determinismEpoch,
+    targetBranchRef: verifiedBranchRef,
+    inputFrames: parentFrames(verifiedBranchRef).slice(0, 1),
+    executionKernel: executionKernel()
+  });
+  assert.equal(accepted.executedKernelRef, determinismEpoch.kernelRef);
+  assert.equal(accepted.executedKernelSha256, determinismEpoch.kernelSha256);
 });
 
 test('snapshot ancestry verifier rejects rehashed false timeline, tick and eventCount before fork or replay', () => {
@@ -468,7 +524,7 @@ test('snapshot ancestry verifier rejects rehashed false timeline, tick and event
     epoch: determinismEpoch,
     targetBranchRef: branchRef,
     inputFrames: [],
-    reducer: fightReducer
+    executionKernel: executionKernel()
   }), /Chronicle ancestry mismatch/);
 
   const falseEventCount = canonicalClone(snapshot);
@@ -480,7 +536,7 @@ test('snapshot ancestry verifier rejects rehashed false timeline, tick and event
     epoch: determinismEpoch,
     targetBranchRef: branchRef,
     inputFrames: [],
-    reducer: fightReducer
+    executionKernel: executionKernel()
   }), /Chronicle ancestry mismatch/);
 });
 
