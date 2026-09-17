@@ -44,6 +44,11 @@ function assertRetention(value, label) {
   return value;
 }
 
+function assertSafeInteger(value, label) {
+  if (!Number.isSafeInteger(value)) throw new TypeError(`${label} must be a safe integer`);
+  return value;
+}
+
 function quantize(value, scale, label) {
   assertFiniteNumber(value, label);
   const result = Math.round(value * scale);
@@ -75,6 +80,56 @@ function quantizeQuaternion(value, label) {
     throw new TypeError(`${label} must be approximately unit length before quantization`);
   }
   return result;
+}
+
+function validateQuantizedVec3(value, label) {
+  assertExactKeys(value, ['x', 'y', 'z'], label);
+  assertSafeInteger(value.x, `${label}.x`);
+  assertSafeInteger(value.y, `${label}.y`);
+  assertSafeInteger(value.z, `${label}.z`);
+  return value;
+}
+
+function validateQuantizedQuaternion(value, label) {
+  assertExactKeys(value, ['x', 'y', 'z', 'w'], label);
+  for (const component of ['x', 'y', 'z', 'w']) {
+    assertSafeInteger(value[component], `${label}.${component}`);
+  }
+  const magnitudeSquared = Object.values(value).reduce((sum, component) => sum + (component * component), 0);
+  const lower = 900_000 ** 2;
+  const upper = 1_100_000 ** 2;
+  if (magnitudeSquared < lower || magnitudeSquared > upper) {
+    throw new TypeError(`${label} must remain approximately unit length after quantization`);
+  }
+  return value;
+}
+
+function validateQuantizedPose(pose) {
+  assertExactKeys(pose, [
+    'quantizationProfileRef',
+    'positionMillimeters',
+    'orientationMicroQuaternion',
+    'linearVelocityMillimetersPerSecondOrNull',
+    'angularVelocityMicroradiansPerSecondOrNull'
+  ], 'quantized motion pose');
+  if (pose.quantizationProfileRef !== MOTION_QUANTIZATION_PROFILE) {
+    throw new TypeError('quantized motion pose profile mismatch');
+  }
+  validateQuantizedVec3(pose.positionMillimeters, 'positionMillimeters');
+  validateQuantizedQuaternion(pose.orientationMicroQuaternion, 'orientationMicroQuaternion');
+  if (pose.linearVelocityMillimetersPerSecondOrNull !== null) {
+    validateQuantizedVec3(
+      pose.linearVelocityMillimetersPerSecondOrNull,
+      'linearVelocityMillimetersPerSecondOrNull'
+    );
+  }
+  if (pose.angularVelocityMicroradiansPerSecondOrNull !== null) {
+    validateQuantizedVec3(
+      pose.angularVelocityMicroradiansPerSecondOrNull,
+      'angularVelocityMicroradiansPerSecondOrNull'
+    );
+  }
+  return pose;
 }
 
 export function quantizeMotionPose(input) {
@@ -173,20 +228,32 @@ export function appendMotionSample(tail, input) {
   return Object.freeze({ tail: next, sample });
 }
 
-function validateMotionSample(sample, tail) {
+function validateMotionSample(sample, owner) {
   assertExactKeys(sample, [
     'schemaVersion', 'sampleRef', 'tailRef', 'participantRef', 'coordinateSpaceRef',
     'sequence', 'tick', 'sourceRef', 'pose', 'materialityRefs', 'sampleSha256'
   ], 'motion sample');
   if (sample.schemaVersion !== MOTION_SAMPLE_SCHEMA) throw new TypeError('motion sample schema mismatch');
-  if (sample.tailRef !== tail.tailRef || sample.participantRef !== tail.participantRef || sample.coordinateSpaceRef !== tail.coordinateSpaceRef) {
+  assertSafeRef(sample.sampleRef, 'motion sample sampleRef');
+  assertSafeRef(sample.tailRef, 'motion sample tailRef');
+  assertSafeRef(sample.participantRef, 'motion sample participantRef');
+  assertSafeRef(sample.coordinateSpaceRef, 'motion sample coordinateSpaceRef');
+  if (
+    sample.tailRef !== owner.tailRef ||
+    sample.participantRef !== owner.participantRef ||
+    sample.coordinateSpaceRef !== owner.coordinateSpaceRef
+  ) {
     throw new TypeError('motion sample coordinate mismatch');
   }
   assertNonNegativeInteger(sample.sequence, 'motion sample sequence');
   assertNonNegativeInteger(sample.tick, 'motion sample tick');
+  const expectedSampleRef = `${owner.tailRef}.sample.${String(sample.sequence).padStart(10, '0')}`;
+  if (sample.sampleRef !== expectedSampleRef) throw new TypeError('motion sample ref mismatch');
   assertSafeRef(sample.sourceRef, 'motion sample sourceRef');
+  validateQuantizedPose(sample.pose);
   assertUniqueSafeRefs(sample.materialityRefs, 'motion sample materialityRefs');
   rejectHiddenReasoning(sample, 'motion sample');
+  assertSha256(sample.sampleSha256, 'motion sample sampleSha256');
   const { sampleSha256, ...body } = sample;
   if (hashCanonical(body) !== sampleSha256) throw new TypeError('motion sample digest mismatch');
   return sample;
@@ -207,6 +274,9 @@ export function verifyMotionTail(tail) {
   assertPositiveInteger(tail.maxAgeTicks, 'tail.maxAgeTicks');
   assertPrivacy(tail.privacyClass, 'tail.privacyClass');
   assertRetention(tail.retentionClass, 'tail.retentionClass');
+  if (tail.retentionClass !== 'EPHEMERAL_HOT_TAIL') {
+    throw new TypeError('a live motion tail must use EPHEMERAL_HOT_TAIL retention');
+  }
   if (!Array.isArray(tail.samples) || tail.samples.length > tail.maxSamples) throw new TypeError('motion tail sample count invalid');
   let priorSequence = -1;
   let priorTick = -1;
@@ -292,12 +362,49 @@ export function verifyMotionWindow(window) {
     'motionWindowSha256'
   ], 'motion window');
   if (window.schemaVersion !== MOTION_WINDOW_SCHEMA) throw new TypeError('motion window schema mismatch');
+  assertSafeRef(window.windowRef, 'motion window windowRef');
+  assertSafeRef(window.sourceTailRef, 'motion window sourceTailRef');
+  assertSafeRef(window.participantRef, 'motion window participantRef');
+  assertSafeRef(window.coordinateSpaceRef, 'motion window coordinateSpaceRef');
+  if (window.quantizationProfileRef !== MOTION_QUANTIZATION_PROFILE) {
+    throw new TypeError('motion window quantization profile mismatch');
+  }
+  assertNonNegativeInteger(window.fromTick, 'motion window fromTick');
+  assertNonNegativeInteger(window.toTick, 'motion window toTick');
+  if (window.toTick < window.fromTick) throw new TypeError('motion window toTick must be >= fromTick');
+  assertSafeRef(window.reasonRef, 'motion window reasonRef');
+  if (window.consentRefOrNull !== null) assertSafeRef(window.consentRefOrNull, 'motion window consentRefOrNull');
   assertPrivacy(window.privacyClass, 'motion window privacyClass');
   assertRetention(window.retentionClass, 'motion window retentionClass');
   if (window.retentionClass === 'EPHEMERAL_HOT_TAIL') throw new TypeError('promoted motion window cannot remain ephemeral');
-  if (!Array.isArray(window.samples) || window.samples.length !== window.sampleCount || window.sampleCount < 1) {
+  if (window.privacyClass !== 'PARTICIPANT_PRIVATE' && window.consentRefOrNull === null) {
+    throw new TypeError('shared/public promoted motion requires an explicit consentRef');
+  }
+  assertUniqueSafeRefs(window.eventRefs, 'motion window eventRefs', { allowEmpty: false });
+  assertPositiveInteger(window.sampleCount, 'motion window sampleCount');
+  if (!Array.isArray(window.samples) || window.samples.length !== window.sampleCount) {
     throw new TypeError('motion window sample count mismatch');
   }
+
+  const owner = {
+    tailRef: window.sourceTailRef,
+    participantRef: window.participantRef,
+    coordinateSpaceRef: window.coordinateSpaceRef
+  };
+  let priorSequence = -1;
+  let priorTick = -1;
+  for (const sample of window.samples) {
+    validateMotionSample(sample, owner);
+    if (sample.sequence <= priorSequence || sample.tick < priorTick) {
+      throw new TypeError('motion window sample order invalid');
+    }
+    if (sample.tick < window.fromTick || sample.tick > window.toTick) {
+      throw new TypeError('motion window contains sample outside selected interval');
+    }
+    priorSequence = sample.sequence;
+    priorTick = sample.tick;
+  }
+
   assertSha256(window.motionWindowSha256, 'motionWindowSha256');
   rejectHiddenReasoning(window, 'motion window');
   const { motionWindowSha256, ...body } = window;
