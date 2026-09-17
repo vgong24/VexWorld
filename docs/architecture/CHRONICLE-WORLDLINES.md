@@ -165,6 +165,17 @@ This closes the reviewed `Object.constructor.constructor` recovery path because 
 
 The context is intentionally recreated per frame so a reducer cannot smuggle hidden mutable state from one tick to the next through VM globals.
 
+V8 Error-stack metadata is also normalized inside the isolated realm before reducer execution:
+
+```text
+Error.stackTraceLimit = 0
+Error.prepareStackTrace = deterministic context-local formatter
+```
+
+Both properties are locked non-writable / non-configurable for the reducer invocation. Canonical reducer output therefore cannot depend on host caller-frame names, host source locations, or a host-process `Error.prepareStackTrace` hook. Reducer attempts to replace the formatter or increase the stack limit fail closed.
+
+This Error policy is part of the exact Stage-07A replay determinism boundary because `Error.stack` is an otherwise observable string that can enter canonical state. It is not generalized into a security claim about all V8 metadata surfaces.
+
 This mechanism is a **determinism boundary for the Stage-07A proof**, not a general JavaScript security sandbox. It does not establish that `node:vm` is safe for arbitrary hostile code, and it does not authenticate arbitrary imported modules, native code, generated dependency graphs or an entire runtime image.
 
 Successful replay receipts bind `executedKernelRef` and `executedKernelSha256` alongside the determinism epoch.
@@ -522,6 +533,8 @@ fresh per-frame isolated VM execution with canonical JSON-only ingress
 dynamic constructor/global recovery rejection before canonical state can change
 same descriptor + same input remains independent of changed host ambient values
 wall-clock and hidden-random ambient surfaces fail closed
+Error.stack is independent of host callsites and host Error.prepareStackTrace
+reducer attempts to replace the deterministic Error stack policy fail closed
 mismatched execution-kernel rejection before reducer execution
 recorded-input replay equality
 executed kernel identity in replay receipts
