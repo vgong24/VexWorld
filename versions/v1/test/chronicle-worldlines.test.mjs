@@ -1051,6 +1051,29 @@ test('intelligence decision records bounded causal evidence and rejects hidden r
   assert.equal(decision.controllerDisposition, 'OLLAMA');
   assert.equal(verifyIntelligenceDecision(decision), decision);
 
+  const rejected = formIntelligenceDecision({
+    decisionRef: 'decision.participant.vex.rejected.0001',
+    participantRef: 'participant.vex',
+    workerRef: 'worker.vex.local.0001',
+    sourceObservationRef: 'observation.vex.fight.0001',
+    sourceObservationSha256: H('c'),
+    visibleContextRefs: ['context.first-grove.fight-affordances'],
+    controllerRef: 'controller.vex.local-model.v1',
+    controllerDisposition: 'OLLAMA',
+    modelIdentityOrNull: {
+      modelRef: 'model.devex.g0',
+      modelDigest: H('d')
+    },
+    proposedIntent: { intentType: 'ATTACK_NEAREST', targetRef: 'entity.hidden', reason: 'MODEL_SELECTED_HIDDEN_TARGET' },
+    acceptedIntentOrNull: null,
+    rejectionReasonOrNull: 'reason.not-afforded',
+    fallbackReasonOrNull: null,
+    conciseReasonOrNull: null
+  });
+  assert.equal(rejected.acceptedIntentOrNull, null);
+  assert.equal(rejected.rejectionReasonOrNull, 'reason.not-afforded');
+  assert.equal(verifyIntelligenceDecision(rejected), rejected);
+
   const tampered = canonicalClone(decision);
   tampered.fallbackReasonOrNull = 'MODEL_TIMEOUT';
   assert.throws(() => verifyIntelligenceDecision(tampered), /decision digest mismatch/);
