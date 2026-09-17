@@ -484,10 +484,6 @@ export async function runWorkerCycle(options, state = {
       fallbackReason
     }
   };
-  await agentApi(options, `/api/v1/sessions/${encodeURIComponent(options.session)}/companions/${encodeURIComponent(options.companion)}/intent`, {
-    method: 'PUT', body: JSON.stringify(intent)
-  });
-
   const decision = formWorkerIntelligenceDecision({
     options,
     observation,
@@ -496,6 +492,10 @@ export async function runWorkerCycle(options, state = {
     modelIdentity,
     controllerDisposition,
     fallbackReason
+  });
+
+  await agentApi(options, `/api/v1/sessions/${encodeURIComponent(options.session)}/companions/${encodeURIComponent(options.companion)}/intent`, {
+    method: 'PUT', body: JSON.stringify(intent)
   });
 
   let utterance = null;
