@@ -657,6 +657,18 @@ function validateIntelligenceDecisionBody(body, label = 'decision') {
   if (body.acceptedIntentOrNull !== null) assertPlainObject(body.acceptedIntentOrNull, 'acceptedIntentOrNull');
   if (body.rejectionReasonOrNull !== null) assertSafeRef(body.rejectionReasonOrNull, 'rejectionReasonOrNull');
   if (body.fallbackReasonOrNull !== null) assertSafeRef(body.fallbackReasonOrNull, 'fallbackReasonOrNull');
+
+  const accepted = body.acceptedIntentOrNull !== null;
+  const rejected = body.rejectionReasonOrNull !== null;
+  if (accepted === rejected) {
+    throw new TypeError('decision must resolve to exactly one accepted intent or rejection reason');
+  }
+
+  const fallback = body.controllerDisposition === 'DETERMINISTIC_FALLBACK';
+  if (fallback !== (body.fallbackReasonOrNull !== null)) {
+    throw new TypeError('decision fallback disposition/reason mismatch');
+  }
+
   if (body.conciseReasonOrNull !== null) boundedText(body.conciseReasonOrNull, 'conciseReasonOrNull', 240);
   return body;
 }
