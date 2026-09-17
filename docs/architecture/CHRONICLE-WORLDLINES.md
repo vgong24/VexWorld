@@ -160,6 +160,8 @@ event hash
 
 Events form a contiguous append-only hash chain. Tampering, reordering, missing ordinals and divergent prior heads fail verification.
 
+The verifier preserves the same contract as formation: exact fields/domains, derived event coordinate/time, payload privacy boundary, hidden-reasoning rejection, and exact Chronicle epoch binding are revalidated even when an altered object has been consistently rehashed.
+
 The first fight-oriented vocabulary includes:
 
 ```text
@@ -183,16 +185,30 @@ branch coordinate
 tick
 epoch
 world-package fingerprint
+Chronicle event count
 Chronicle event head
 canonical state
 canonical state hash
 snapshot hash
 ```
 
+A snapshot consumed for fork/replay is revalidated against its source Chronicle tuple:
+
+```text
+timeline
+branch
+current Chronicle tick
+current event count
+current event head
+exact epoch
+world-package fingerprint
+```
+
 The minimum replay proof is:
 
 ```text
 same epoch
++ verified source Chronicle ancestry
 + same snapshot
 + same contiguous ordered input frames
 = same final canonical state hash
@@ -315,6 +331,8 @@ privacy and retention classification
 consent required for shared/public promotion
 ```
 
+Verifier paths preserve those same formation boundaries: live tails remain `EPHEMERAL_HOT_TAIL`, quantized samples are revalidated after readback, and shared/public promoted windows still require explicit consent even if altered bytes are consistently rehashed.
+
 Later real capture must additionally qualify device identity, clock alignment, calibration, transport loss, encryption, participant visibility and retention policy.
 
 ```text
@@ -401,6 +419,7 @@ versions/v1/src/core/chronicle/chronicle.mjs
 versions/v1/src/core/chronicle/motion-tail.mjs
 versions/v1/test/chronicle-worldlines.test.mjs
 config/project-state.json
+test/foundation-process.test.mjs
 ```
 
 The first implementation is intentionally isolated and reusable. It does not yet modify:
@@ -425,12 +444,14 @@ The focused test proves:
 canonical epoch/frame hashing
 contiguous Chronicle chain
 tamper/reorder rejection
-snapshot integrity
+rehash-resistant event contract + exact epoch binding
+snapshot integrity + source-Chronicle ancestry
 recorded-input replay equality
 zero model reinference in the replay fixture
 fork ancestry and parent immutability
 bounded motion tail eviction
-consent-bound window promotion
+rehash-resistant motion sample validation
+consent-bound window promotion + verification
 fight + environment fracture chronology
 hidden-reasoning rejection
 ```
