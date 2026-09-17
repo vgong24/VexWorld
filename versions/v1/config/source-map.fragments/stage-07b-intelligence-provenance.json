@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "vexworld.source-map-fragment/v1",
+  "fragmentRef": "source-map-fragment.vexworld.v1.stage-07b-intelligence-provenance",
+  "reason": "Register the VW-FWD-07B intelligence-decision provenance stage while reusing already-mapped Chronicle, remote-worker and test paths without duplicating canonical source-map ownership.",
+  "entries": [
+    {
+      "path": "config/source-map.fragments/stage-07b-intelligence-provenance.json",
+      "category": "navigation-and-coverage",
+      "owner": "Vex Chronicle",
+      "sourceClass": "CANONICAL_SOURCE"
+    }
+  ]
+}
