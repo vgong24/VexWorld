@@ -233,6 +233,18 @@ function controllerRefForDecision(options, controllerDisposition) {
     : 'controller.vexworld.remote.deterministic';
 }
 
+function conciseDecisionReasonOrNull(value) {
+  if (
+    typeof value !== 'string' ||
+    !value.trim() ||
+    value.length > 240 ||
+    /[\u0000-\u001f\u007f]/u.test(value)
+  ) {
+    return null;
+  }
+  return value;
+}
+
 export function formWorkerIntelligenceDecision({
   options,
   observation,
@@ -277,7 +289,7 @@ export function formWorkerIntelligenceDecision({
     acceptedIntentOrNull: accepted,
     rejectionReasonOrNull: null,
     fallbackReasonOrNull: fallbackReason || null,
-    conciseReasonOrNull: normalizedProposal.reason
+    conciseReasonOrNull: conciseDecisionReasonOrNull(normalizedProposal.reason)
   });
 }
 
