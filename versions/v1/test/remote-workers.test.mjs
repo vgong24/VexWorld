@@ -11,6 +11,7 @@ import { createInitialGame, makeParticipantObservation } from '../src/core/engin
 import { getCompanions } from '../src/core/party.mjs';
 import {
   agentApi,
+  formWorkerIntelligenceDecision,
   resolveOllamaModelIdentity,
   runWorkerCycle,
   validateModelProposal
@@ -131,6 +132,19 @@ test('one realm relays two independently controlled companion workers with exact
     assert.equal(miraResult.intent.controllerEvidence.modelIdentity.digest, MOCK_DIGEST);
     assert.ok(miraResult.intent.controllerEvidence.modelMetrics.roundTripMs >= 0);
 
+    assert.equal(vexResult.decision.controllerDisposition, 'DETERMINISTIC');
+    assert.equal(vexResult.decision.modelIdentityOrNull, null);
+    assert.equal(vexResult.decision.acceptedIntentOrNull.intentRef, vexResult.intent.intentRef);
+
+    assert.equal(miraResult.decision.controllerDisposition, 'OLLAMA');
+    assert.equal(miraResult.decision.fallbackReasonOrNull, null);
+    assert.equal(miraResult.decision.sourceObservationRef, miraResult.intent.sourceObservationRef);
+    assert.equal(miraResult.decision.acceptedIntentOrNull.intentRef, miraResult.intent.intentRef);
+    assert.equal(miraResult.decision.modelIdentityOrNull.modelDigest, MOCK_DIGEST);
+    assert.equal(miraResult.decision.modelIdentityOrNull.modelRef, `model.ollama.sha256.${MOCK_DIGEST}`);
+    assert.match(miraResult.decision.sourceObservationSha256, /^[a-f0-9]{64}$/);
+    assert.match(miraResult.decision.decisionSha256, /^[a-f0-9]{64}$/);
+
     const record = await agentApi(common, `/api/v1/sessions/${encodeURIComponent(state.sessionRef)}`);
     assert.deepEqual(Object.keys(record.intents).sort(), [mira.participantRef, vex.participantRef].sort());
     assert.equal(record.workers[vex.participantRef].workerId, 'worker.pc.vex');
@@ -226,6 +240,11 @@ test('out-of-scope Ollama output falls back deterministically instead of becomin
     assert.equal(result.intent.controllerDisposition, 'DETERMINISTIC_FALLBACK');
     assert.equal(result.intent.controllerEvidence.fallbackReason, 'MODEL_TARGET_OUT_OF_SCOPE');
     assert.notEqual(result.intent.targetRef, 'entity.not-observed');
+    assert.equal(result.decision.controllerDisposition, 'DETERMINISTIC_FALLBACK');
+    assert.equal(result.decision.fallbackReasonOrNull, 'MODEL_TARGET_OUT_OF_SCOPE');
+    assert.equal(result.decision.acceptedIntentOrNull.intentRef, result.intent.intentRef);
+    assert.notEqual(result.decision.proposedIntent.targetRef, 'entity.not-observed');
+    assert.equal(result.decision.modelIdentityOrNull.modelDigest, MOCK_DIGEST);
   } finally {
     await Promise.all([close(server), close(ollamaServer)]);
     await rm(directory, { recursive: true, force: true });
@@ -258,10 +277,76 @@ test('Ollama timeout becomes visible deterministic fallback with no stale model 
     });
     assert.equal(result.intent.controllerDisposition, 'DETERMINISTIC_FALLBACK');
     assert.equal(result.intent.controllerEvidence.fallbackReason, 'MODEL_TIMEOUT');
+    assert.equal(result.decision.controllerDisposition, 'DETERMINISTIC_FALLBACK');
+    assert.equal(result.decision.fallbackReasonOrNull, 'MODEL_TIMEOUT');
+    assert.equal(result.decision.acceptedIntentOrNull.intentRef, result.intent.intentRef);
   } finally {
     await Promise.all([close(server), close(ollamaServer)]);
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test('worker decision identity binds the exact received observation content and canonical model digest', async () => {
+  const worldPackage = await compileFirstGrove();
+  const state = createInitialGame(worldPackage, {
+    companions: [{ displayName: 'Vex', controllerClass: 'REMOTE_OLLAMA' }]
+  });
+  const [companion] = getCompanions(state.party);
+  state.tick = 7;
+  const observation = makeParticipantObservation(state, companion.participantRef, worldPackage);
+  const changedObservation = {
+    ...observation,
+    weather: observation.weather === 'CLEAR' ? 'RAIN' : 'CLEAR'
+  };
+  const options = {
+    companion: companion.participantRef,
+    workerId: 'worker.provenance.fixture',
+    mode: 'ollama'
+  };
+  const proposedIntent = {
+    intentType: 'HOLD_POSITION',
+    targetRef: null,
+    reason: 'WAIT'
+  };
+  const acceptedIntent = {
+    intentRef: `intent.${companion.participantRef}.7`,
+    participantRef: companion.participantRef,
+    sequence: 7,
+    intentType: 'HOLD_POSITION',
+    targetRef: null
+  };
+  const modelIdentity = {
+    resolvedModel: 'mock-qwen:latest',
+    digest: `sha256:${MOCK_DIGEST}`
+  };
+
+  const first = formWorkerIntelligenceDecision({
+    options,
+    observation,
+    proposedIntent,
+    acceptedIntent,
+    modelIdentity,
+    controllerDisposition: 'OLLAMA',
+    fallbackReason: null
+  });
+  const changed = formWorkerIntelligenceDecision({
+    options,
+    observation: changedObservation,
+    proposedIntent,
+    acceptedIntent,
+    modelIdentity,
+    controllerDisposition: 'OLLAMA',
+    fallbackReason: null
+  });
+
+  assert.equal(first.sourceObservationRef, observation.observationRef);
+  assert.equal(changed.sourceObservationRef, observation.observationRef);
+  assert.notEqual(first.sourceObservationSha256, changed.sourceObservationSha256);
+  assert.notEqual(first.decisionSha256, changed.decisionSha256);
+  assert.equal(first.modelIdentityOrNull.modelDigest, MOCK_DIGEST);
+  assert.equal(first.modelIdentityOrNull.modelRef, `model.ollama.sha256.${MOCK_DIGEST}`);
+  assert.ok(first.visibleContextRefs.includes(observation.worldRef));
+  assert.ok(first.visibleContextRefs.includes(observation.human.participantRef));
 });
 
 test('same companion identity survives worker-process rebind while intent sequence remains monotonic', async () => {
