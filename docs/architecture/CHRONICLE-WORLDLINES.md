@@ -113,22 +113,51 @@ An epoch change is explicit. A replay may not silently cross a world-package, re
 
 ### Stage 07A execution-kernel binding
 
-Stage 07A does not treat the epoch declaration alone as proof of the reducer that actually executed.
+Stage 07A does not treat the epoch declaration or a caller-supplied JavaScript function object as proof of the reducer that actually executes.
 
-`bindExecutionKernel(...)` binds one reducer to a safe kernel reference and derives `kernelSha256` from the reducer function's exact JavaScript source text (`Function.prototype.toString(...)`) using SHA-256. Before any replay reducer invocation, `replayWorldline(...)` recomputes that source digest and requires both:
+The public kernel boundary is a canonical descriptor:
+
+```text
+ExecutionKernel {
+  kernelRef
+  reducerSource
+  bindings
+  kernelSha256
+}
+```
+
+where `kernelSha256` binds the canonical tuple:
+
+```text
+kernelRef
+reducerSource
+bindings
+```
+
+`replayWorldline(...)` reconstructs the callable from the exact admitted `reducerSource`, revalidates the descriptor digest, and requires:
 
 ```text
 executionKernel.kernelRef == epoch.kernelRef
 executionKernel.kernelSha256 == epoch.kernelSha256
 ```
 
-A mismatch fails before the reducer executes. Successful replay receipts bind the `executedKernelRef` and `executedKernelSha256` alongside the determinism epoch.
+before any reducer invocation.
 
-This is intentionally a **Stage-07A primitive boundary**, not a claim that a function-source digest authenticates an arbitrary future module/dependency closure. A production runtime whose reducer semantics depend on imported modules, native code, generated code or external artifacts must bind the appropriate qualified artifact/content closure before this identity can be generalized.
+Caller lexical closures therefore do not cross the replay boundary. `Function#bind` / native-code source forms are not admitted. Behavior-affecting configuration that is intended to vary belongs in the explicit canonical `bindings` object, so changing that state changes the kernel identity.
+
+The reconstructed reducer is formed inside an ambient-denying lexical scope. Undeclared free lexical identifiers are not inherited from the caller; reducer behavior must come from its admitted source, replay inputs, epoch, and explicit bindings.
+
+Successful replay receipts bind `executedKernelRef` and `executedKernelSha256` alongside the determinism epoch.
+
+This is intentionally a **Stage-07A primitive boundary**, not a claim that the descriptor authenticates an arbitrary future module/dependency closure. A production runtime whose reducer semantics depend on imported modules, native code, generated code or external artifacts must bind the appropriate qualified artifact/content closure before this identity can be generalized.
 
 ```text
+CALLER_FUNCTION_OBJECT != EXECUTION_KERNEL_IDENTITY
+REDUCER_SOURCE_TEXT_ALONE != BEHAVIOR_IDENTITY
+REDUCER_SOURCE_PLUS_EXPLICIT_BINDINGS = STAGE_07A_KERNEL_DESCRIPTOR
+
 DECLARED_EPOCH != PROOF_OF_ARBITRARY_EXECUTED_CODE
-REDUCER_SOURCE_BINDING != WHOLE_DEPENDENCY_CLOSURE
+STAGE_07A_KERNEL_DESCRIPTOR != WHOLE_DEPENDENCY_CLOSURE
 ```
 
 ## Input frames
@@ -467,7 +496,8 @@ contiguous Chronicle chain
 tamper/reorder rejection
 rehash-resistant event contract + exact epoch binding
 snapshot integrity + source-Chronicle ancestry
-executed reducer-source / epoch binding before invocation
+execution-kernel descriptor binds reconstructed reducer source + explicit bindings
+caller closure objects and native/bound-function state are excluded from replay admission
 mismatched execution-kernel rejection before reducer execution
 recorded-input replay equality
 executed kernel identity in replay receipts
@@ -480,10 +510,10 @@ fight + environment fracture chronology
 hidden-reasoning rejection
 ```
 
-Passing this proof establishes a kernel contract. It does not yet prove live-world reconnection, cross-platform bit identity, whole-module/dependency-closure authentication, production multiplayer, real XR capture, human game feel, fluid reversibility or VexHome UI.
+Passing this proof establishes a kernel contract. It does not yet prove live-world reconnection, cross-platform bit identity, whole-module/dependency-closure authentication or arbitrary ambient-runtime equivalence, production multiplayer, real XR capture, human game feel, fluid reversibility or VexHome UI.
 
 ## Compact rule
 
-> Preserve verified history as an append-only causal Chronicle; let people revisit it through replay, create alternate futures through exact Worldline forks, retain only materially justified motion under explicit privacy/consent, bind the reducer source that actually executes to its declared determinism epoch, and keep renderer spectacle, model inference and external effects separate from canonical world truth.
+> Preserve verified history as an append-only causal Chronicle; let people revisit it through replay, create alternate futures through exact Worldline forks, retain only materially justified motion under explicit privacy/consent, bind reconstructed reducer source plus explicit behavior bindings to the declared determinism epoch, and keep renderer spectacle, model inference and external effects separate from canonical world truth.
 
 <!-- [VEXWORLD][CHRONICLE][WORLDLINES][VXG RealForever] -->
