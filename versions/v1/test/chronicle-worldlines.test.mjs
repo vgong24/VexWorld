@@ -29,12 +29,11 @@ import { canonicalClone, hashCanonical } from '../src/core/chronicle/canonical.m
 const H = (character) => character.repeat(64);
 const KERNEL_REF = 'kernel.vexworld.chronicle-proof.v1';
 
-function executionKernel(reducer = fightReducer) {
-  return bindExecutionKernel({ kernelRef: KERNEL_REF, reducer });
+function executionKernel(reducerSource = Function.prototype.toString.call(fightReducer), bindings = {}) {
+  return bindExecutionKernel({ kernelRef: KERNEL_REF, reducerSource, bindings });
 }
 
-function epoch() {
-  const kernel = executionKernel();
+function epoch(kernel = executionKernel()) {
   return formDeterminismEpoch({
     epochRef: 'epoch.first-grove.chronicle-proof.v1',
     worldPackageFingerprint: H('a'),
@@ -67,26 +66,46 @@ function initialFightState() {
 }
 
 function fightReducer(prior, frame) {
-  const state = canonicalClone(prior);
+  const state = prior;
   state.tick = frame.tick;
-  state.rngStateByStream = canonicalClone(frame.rngStateByStream);
+  state.rngStateByStream = {
+    'rng.fight': frame.rngStateByStream['rng.fight'],
+    'rng.fracture': frame.rngStateByStream['rng.fracture'],
+    'rng.presentation': frame.rngStateByStream['rng.presentation']
+  };
 
-  for (const action of [...frame.humanActionIntents, ...frame.companionIntents]) {
-    if (action.kind === 'NOTICE') {
-      if (!state.noticedRefs.includes(action.observationRef)) state.noticedRefs.push(action.observationRef);
-    } else if (action.kind === 'INTENT') {
-      if (!state.acceptedIntentRefs.includes(action.intentRef)) state.acceptedIntentRefs.push(action.intentRef);
-    } else if (action.kind === 'MOVE_START') {
-      state.fighters[action.fighterKey].lastMoveRefOrNull = action.moveRef;
-      state.fighters[action.fighterKey].xMillimeters += action.displacementMillimeters;
-    } else if (action.kind === 'HIT') {
-      state.fighters[action.targetKey].energy = Math.max(0, state.fighters[action.targetKey].energy - action.damage);
+  function appendUnique(array, value) {
+    for (let index = 0; index < array.length; index += 1) {
+      if (array[index] === value) return;
+    }
+    array[array.length] = value;
+  }
+
+  function applyActions(actions) {
+    for (let index = 0; index < actions.length; index += 1) {
+      const action = actions[index];
+      if (action.kind === 'NOTICE') {
+        appendUnique(state.noticedRefs, action.observationRef);
+      } else if (action.kind === 'INTENT') {
+        appendUnique(state.acceptedIntentRefs, action.intentRef);
+      } else if (action.kind === 'MOVE_START') {
+        state.fighters[action.fighterKey].lastMoveRefOrNull = action.moveRef;
+        state.fighters[action.fighterKey].xMillimeters += action.displacementMillimeters;
+      } else if (action.kind === 'HIT') {
+        const nextEnergy = state.fighters[action.targetKey].energy - action.damage;
+        state.fighters[action.targetKey].energy = nextEnergy < 0 ? 0 : nextEnergy;
+      }
     }
   }
 
-  for (const event of frame.scheduledWorldEvents) {
+  applyActions(frame.humanActionIntents);
+  applyActions(frame.companionIntents);
+
+  for (let index = 0; index < frame.scheduledWorldEvents.length; index += 1) {
+    const event = frame.scheduledWorldEvents[index];
     if (event.kind === 'FRACTURE') {
-      state.environment.arenaWall.integrity = Math.max(0, state.environment.arenaWall.integrity + event.integrityDelta);
+      const nextIntegrity = state.environment.arenaWall.integrity + event.integrityDelta;
+      state.environment.arenaWall.integrity = nextIntegrity < 0 ? 0 : nextIntegrity;
       if (state.environment.arenaWall.integrity === 0) {
         state.environment.arenaWall.fractured = true;
         state.environment.arenaWall.fractureSeedOrNull = event.fractureSeed;
@@ -94,8 +113,8 @@ function fightReducer(prior, frame) {
     }
   }
 
-  for (const motionWindowRef of frame.motionWindowRefs) {
-    if (!state.motionWindowRefs.includes(motionWindowRef)) state.motionWindowRefs.push(motionWindowRef);
+  for (let index = 0; index < frame.motionWindowRefs.length; index += 1) {
+    appendUnique(state.motionWindowRefs, frame.motionWindowRefs[index]);
   }
   return state;
 }
@@ -433,7 +452,7 @@ test('snapshot replay is deterministic, invokes no model, and a fork cannot muta
   assert.equal(repeated.finalStateSha256, verifiedResult.finalStateSha256);
 });
 
-test('replay rejects a mismatched execution kernel before reducer invocation', () => {
+test('replay rejects a mismatched execution-kernel descriptor before reducer invocation', () => {
   const determinismEpoch = epoch();
   const verifiedBranchRef = 'worldline.first-grove.verified';
   const sourceChronicle = createChronicle({
@@ -447,16 +466,11 @@ test('replay rejects a mismatched execution kernel before reducer invocation', (
     canonicalState: initialFightState()
   });
 
-  let mismatchedReducerCalls = 0;
-  function mismatchedReducer(prior, inputFrame) {
-    mismatchedReducerCalls += 1;
-    const next = canonicalClone(prior);
-    next.tick = inputFrame.tick;
-    next.environment.arenaWall.integrity = 17;
-    return next;
+  function mismatchedReducer() {
+    throw 'MISMATCHED_REDUCER_EXECUTED';
   }
 
-  const mismatchedKernel = executionKernel(mismatchedReducer);
+  const mismatchedKernel = executionKernel(Function.prototype.toString.call(mismatchedReducer));
   assert.notEqual(mismatchedKernel.kernelSha256, determinismEpoch.kernelSha256);
 
   assert.throws(() => replayWorldline({
@@ -467,7 +481,6 @@ test('replay rejects a mismatched execution kernel before reducer invocation', (
     inputFrames: parentFrames(verifiedBranchRef).slice(0, 1),
     executionKernel: mismatchedKernel
   }), /execution kernel does not match determinism epoch/);
-  assert.equal(mismatchedReducerCalls, 0, 'kernel mismatch must fail before reducer execution');
 
   const accepted = replayWorldline({
     snapshot,
@@ -479,6 +492,49 @@ test('replay rejects a mismatched execution kernel before reducer invocation', (
   });
   assert.equal(accepted.executedKernelRef, determinismEpoch.kernelRef);
   assert.equal(accepted.executedKernelSha256, determinismEpoch.kernelSha256);
+});
+
+test('execution-kernel admission excludes caller closure/bound state and hashes explicit bindings', () => {
+  function closureFactory(delta) {
+    return function hiddenReducer(state) {
+      state.value += delta;
+      return state;
+    };
+  }
+
+  const closureA = closureFactory(1);
+  const closureB = closureFactory(2);
+  assert.equal(Function.prototype.toString.call(closureA), Function.prototype.toString.call(closureB));
+  assert.equal(closureA({ value: 0 }).value, 1);
+  assert.equal(closureB({ value: 0 }).value, 2);
+
+  assert.throws(() => bindExecutionKernel({
+    kernelRef: KERNEL_REF,
+    reducer: closureA,
+    bindings: {}
+  }), /fields do not match contract/);
+
+  function boundBase(delta, state) {
+    state.value += delta;
+    return state;
+  }
+  const boundA = boundBase.bind(null, 1);
+  const boundB = boundBase.bind(null, 2);
+  assert.equal(Function.prototype.toString.call(boundA), Function.prototype.toString.call(boundB));
+  assert.throws(() => bindExecutionKernel({
+    kernelRef: KERNEL_REF,
+    reducerSource: Function.prototype.toString.call(boundA),
+    bindings: {}
+  }), /native\/bound/);
+
+  function explicitBindingReducer(state, _frame, _epoch, bindings) {
+    state.value += bindings.delta;
+    return state;
+  }
+  const explicitSource = Function.prototype.toString.call(explicitBindingReducer);
+  const kernelA = executionKernel(explicitSource, { delta: 1 });
+  const kernelB = executionKernel(explicitSource, { delta: 2 });
+  assert.notEqual(kernelA.kernelSha256, kernelB.kernelSha256);
 });
 
 test('snapshot ancestry verifier rejects rehashed false timeline, tick and eventCount before fork or replay', () => {
