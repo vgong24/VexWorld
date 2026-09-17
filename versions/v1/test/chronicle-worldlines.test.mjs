@@ -637,6 +637,23 @@ test('isolated replay cannot observe changed host ambient state or recover dynam
     delete globalThis.__vw78Ambient;
   }
 
+  const hiddenVmState = fixtureFor(`function (state) {
+    globalThis.__vexHiddenCounter = typeof globalThis.__vexHiddenCounter === 'number'
+      ? globalThis.__vexHiddenCounter + 1
+      : 1;
+    state.value = globalThis.__vexHiddenCounter;
+    return state;
+  }`, 'hidden-vm-state');
+  const hiddenStateReplay = replayWorldline({
+    snapshot: hiddenVmState.snapshot,
+    sourceChronicle: hiddenVmState.sourceChronicle,
+    epoch: hiddenVmState.determinismEpoch,
+    targetBranchRef: branchRef,
+    inputFrames: [frame(branchRef, 1), frame(branchRef, 2)],
+    executionKernel: hiddenVmState.kernel
+  });
+  assert.equal(hiddenStateReplay.finalState.value, 1, 'fresh VM context per frame must prevent hidden cross-tick globals');
+
   const hiddenRandom = fixtureFor(`function (state) {
     state.value = Math.random();
     return state;
