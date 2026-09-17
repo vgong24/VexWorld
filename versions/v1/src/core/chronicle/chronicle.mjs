@@ -69,7 +69,7 @@ function rngState(value) {
 }
 
 const REDUCER_SOURCE_LIMIT = 65536;
-const REDUCER_ESCAPE_PATTERN = /\\[native code\\]|\\bthis\\b|\\b(?:eval|Function)\\b|\\b(?:constructor|__proto__|prototype)\\b|\\bimport\\s*\\(/u;
+const REDUCER_ESCAPE_PATTERN = /\[native code\]|\bthis\b|\b(?:eval|Function)\b|\b(?:constructor|__proto__|prototype)\b|\bimport\s*\(/u;
 
 function normalizeReducerSource(reducerSource) {
   if (typeof reducerSource !== 'string') throw new TypeError('execution kernel reducerSource must be a string');
