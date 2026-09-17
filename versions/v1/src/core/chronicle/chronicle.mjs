@@ -114,6 +114,23 @@ function compileReducerInvocation(reducerSource) {
     globalThis.setImmediate = undefined;
     globalThis.queueMicrotask = undefined;
 
+    function deterministicErrorStack(error) {
+      const name = typeof error.name === 'string' && error.name ? error.name : 'Error';
+      const message = typeof error.message === 'string' ? error.message : '';
+      return message ? name + ': ' + message : name;
+    }
+
+    Object.defineProperty(Error, 'stackTraceLimit', {
+      value: 0,
+      configurable: false,
+      writable: false
+    });
+    Object.defineProperty(Error, 'prepareStackTrace', {
+      value: deterministicErrorStack,
+      configurable: false,
+      writable: false
+    });
+
     Object.defineProperty(Math, 'random', {
       value() {
         throw new TypeError('hidden random source is not admitted');
