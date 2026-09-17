@@ -1156,18 +1156,24 @@ test('accepted-intent events bind decision and observation refs while fresh alte
   });
 
   const alternateDecision = formIntelligenceDecision({
-    ...canonicalClone(decision),
     decisionRef: 'decision.participant.vex.alternate.0002',
+    participantRef: decision.participantRef,
+    workerRef: decision.workerRef,
+    sourceObservationRef: decision.sourceObservationRef,
+    sourceObservationSha256: decision.sourceObservationSha256,
+    visibleContextRefs: decision.visibleContextRefs,
+    controllerRef: decision.controllerRef,
+    controllerDisposition: decision.controllerDisposition,
+    modelIdentityOrNull: decision.modelIdentityOrNull,
     proposedIntent: { intentType: 'FOLLOW_HUMAN', targetRef: null, reason: 'PARTY_COHESION' },
     acceptedIntentOrNull: {
       intentRef: 'intent.vex.follow.alternate.0002',
       intentType: 'FOLLOW_HUMAN',
       targetRef: null
     },
-    conciseReasonOrNull: 'PARTY_COHESION',
-    fallbackReasonOrNull: null,
     rejectionReasonOrNull: null,
-    decisionSha256: undefined
+    fallbackReasonOrNull: null,
+    conciseReasonOrNull: 'PARTY_COHESION'
   });
   const alternateEvent = appendChronicleEvent(fork.chronicle, {
     tick: 3,
