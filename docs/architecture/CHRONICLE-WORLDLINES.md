@@ -111,6 +111,26 @@ DeterminismEpoch {
 
 An epoch change is explicit. A replay may not silently cross a world-package, reducer, state-schema, numeric-profile or random-stream change.
 
+### Stage 07A execution-kernel binding
+
+Stage 07A does not treat the epoch declaration alone as proof of the reducer that actually executed.
+
+`bindExecutionKernel(...)` binds one reducer to a safe kernel reference and derives `kernelSha256` from the reducer function's exact JavaScript source text (`Function.prototype.toString(...)`) using SHA-256. Before any replay reducer invocation, `replayWorldline(...)` recomputes that source digest and requires both:
+
+```text
+executionKernel.kernelRef == epoch.kernelRef
+executionKernel.kernelSha256 == epoch.kernelSha256
+```
+
+A mismatch fails before the reducer executes. Successful replay receipts bind the `executedKernelRef` and `executedKernelSha256` alongside the determinism epoch.
+
+This is intentionally a **Stage-07A primitive boundary**, not a claim that a function-source digest authenticates an arbitrary future module/dependency closure. A production runtime whose reducer semantics depend on imported modules, native code, generated code or external artifacts must bind the appropriate qualified artifact/content closure before this identity can be generalized.
+
+```text
+DECLARED_EPOCH != PROOF_OF_ARBITRARY_EXECUTED_CODE
+REDUCER_SOURCE_BINDING != WHOLE_DEPENDENCY_CLOSURE
+```
+
 ## Input frames
 
 One ordered input frame covers one simulation tick:
@@ -204,10 +224,11 @@ exact epoch
 world-package fingerprint
 ```
 
-The minimum replay proof is:
+The minimum Stage-07A replay proof is:
 
 ```text
 same epoch
++ same authenticated reducer-source identity
 + verified source Chronicle ancestry
 + same snapshot
 + same contiguous ordered input frames
@@ -446,7 +467,10 @@ contiguous Chronicle chain
 tamper/reorder rejection
 rehash-resistant event contract + exact epoch binding
 snapshot integrity + source-Chronicle ancestry
+executed reducer-source / epoch binding before invocation
+mismatched execution-kernel rejection before reducer execution
 recorded-input replay equality
+executed kernel identity in replay receipts
 zero model reinference in the replay fixture
 fork ancestry and parent immutability
 bounded motion tail eviction
@@ -456,10 +480,10 @@ fight + environment fracture chronology
 hidden-reasoning rejection
 ```
 
-Passing this proof establishes a kernel contract. It does not yet prove live-world reconnection, cross-platform bit identity, production multiplayer, real XR capture, human game feel, fluid reversibility or VexHome UI.
+Passing this proof establishes a kernel contract. It does not yet prove live-world reconnection, cross-platform bit identity, whole-module/dependency-closure authentication, production multiplayer, real XR capture, human game feel, fluid reversibility or VexHome UI.
 
 ## Compact rule
 
-> Preserve verified history as an append-only causal Chronicle; let people revisit it through replay, create alternate futures through exact Worldline forks, retain only materially justified motion under explicit privacy/consent, and keep renderer spectacle, model inference and external effects separate from canonical world truth.
+> Preserve verified history as an append-only causal Chronicle; let people revisit it through replay, create alternate futures through exact Worldline forks, retain only materially justified motion under explicit privacy/consent, bind the reducer source that actually executes to its declared determinism epoch, and keep renderer spectacle, model inference and external effects separate from canonical world truth.
 
 <!-- [VEXWORLD][CHRONICLE][WORLDLINES][VXG RealForever] -->
