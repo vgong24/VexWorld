@@ -95,7 +95,7 @@ function normalizeReducerSource(reducerSource) {
   try {
     // The callable is reconstructed from the bound source inside an ambient-denying
     // lexical scope. Caller closures and Function#bind state cannot cross this boundary.
-    reducer = Function('scope', `with (scope) { return (${source}\\n); }`)(denyAmbientScope);
+    reducer = Function('scope', `with (scope) { return (${source}\n); }`)(denyAmbientScope);
   } catch (error) {
     throw new TypeError(`execution kernel reducerSource is not a valid reducer: ${error.message}`);
   }
