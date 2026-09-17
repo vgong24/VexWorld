@@ -74,7 +74,7 @@ const REDUCER_ESCAPE_PATTERN = /\[native code\]|\bthis\b|\b(?:eval|Function)\b|\
 function normalizeReducerSource(reducerSource) {
   if (typeof reducerSource !== 'string') throw new TypeError('execution kernel reducerSource must be a string');
   const source = reducerSource.trim();
-  if (!source || source.length > REDUCER_SOURCE_LIMIT || /[\\u0000\\u000b\\u000c\\u007f]/u.test(source)) {
+  if (!source || source.length > REDUCER_SOURCE_LIMIT || /[\u0000\u000b\u000c\u007f]/u.test(source)) {
     throw new TypeError('execution kernel reducerSource must be bounded text');
   }
   if (REDUCER_ESCAPE_PATTERN.test(source)) {
