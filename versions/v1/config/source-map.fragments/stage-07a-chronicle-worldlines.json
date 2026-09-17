@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "vexworld.source-map-fragment/v1",
+  "fragmentRef": "source-map-fragment.vexworld.v1.stage-07a-chronicle-worldlines",
+  "reason": "Register the VW-FWD-07A append-only Chronicle, deterministic Worldline replay/fork kernel, bounded motion hot-tail contract and focused proof without rewriting the historical Version 1 base source map.",
+  "entries": [
+    {
+      "path": "config/source-map.fragments/stage-07a-chronicle-worldlines.json",
+      "category": "navigation-and-coverage",
+      "owner": "Vex Chronicle",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "src/core/chronicle/canonical.mjs",
+      "category": "chronicle-canonicalization",
+      "owner": "Vex Chronicle",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "src/core/chronicle/chronicle.mjs",
+      "category": "chronicle-and-worldline-kernel",
+      "owner": "Vex Chronicle",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "src/core/chronicle/motion-tail.mjs",
+      "category": "motion-hot-tail-and-promotion",
+      "owner": "Vex Chronicle",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "test/chronicle-worldlines.test.mjs",
+      "category": "test-evidence",
+      "owner": "Assurance",
+      "sourceClass": "EVIDENCE_SOURCE"
+    }
+  ]
+}
