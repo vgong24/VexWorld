@@ -628,29 +628,68 @@ export function forkWorldline({ parentChronicle, snapshot, branchRef, branchClas
   });
 }
 
+function validateIntelligenceDecisionBody(body, label = 'decision') {
+  assertExactKeys(body, [
+    'schemaVersion', 'decisionRef', 'participantRef', 'workerRef',
+    'sourceObservationRef', 'sourceObservationSha256', 'visibleContextRefs',
+    'controllerRef', 'controllerDisposition', 'modelIdentityOrNull',
+    'proposedIntent', 'acceptedIntentOrNull', 'rejectionReasonOrNull',
+    'fallbackReasonOrNull', 'conciseReasonOrNull'
+  ], label);
+  if (body.schemaVersion !== SCHEMA.decision) throw new TypeError('decision schema mismatch');
+  rejectHiddenReasoning(body, label);
+  for (const [key, value] of [
+    ['decisionRef', body.decisionRef],
+    ['participantRef', body.participantRef],
+    ['workerRef', body.workerRef],
+    ['sourceObservationRef', body.sourceObservationRef],
+    ['controllerRef', body.controllerRef],
+    ['controllerDisposition', body.controllerDisposition]
+  ]) assertSafeRef(value, key);
+  assertSha256(body.sourceObservationSha256, 'sourceObservationSha256');
+  assertUniqueSafeRefs(body.visibleContextRefs, 'visibleContextRefs');
+  if (body.modelIdentityOrNull !== null) {
+    assertExactKeys(body.modelIdentityOrNull, ['modelRef', 'modelDigest'], 'modelIdentityOrNull');
+    assertSafeRef(body.modelIdentityOrNull.modelRef, 'modelRef');
+    assertSha256(body.modelIdentityOrNull.modelDigest, 'modelDigest');
+  }
+  assertPlainObject(body.proposedIntent, 'proposedIntent');
+  if (body.acceptedIntentOrNull !== null) assertPlainObject(body.acceptedIntentOrNull, 'acceptedIntentOrNull');
+  if (body.rejectionReasonOrNull !== null) assertSafeRef(body.rejectionReasonOrNull, 'rejectionReasonOrNull');
+  if (body.fallbackReasonOrNull !== null) assertSafeRef(body.fallbackReasonOrNull, 'fallbackReasonOrNull');
+  if (body.conciseReasonOrNull !== null) boundedText(body.conciseReasonOrNull, 'conciseReasonOrNull', 240);
+  return body;
+}
+
+export function verifyIntelligenceDecision(decision) {
+  assertPlainObject(decision, 'decision');
+  assertExactKeys(decision, [
+    'schemaVersion', 'decisionRef', 'participantRef', 'workerRef',
+    'sourceObservationRef', 'sourceObservationSha256', 'visibleContextRefs',
+    'controllerRef', 'controllerDisposition', 'modelIdentityOrNull',
+    'proposedIntent', 'acceptedIntentOrNull', 'rejectionReasonOrNull',
+    'fallbackReasonOrNull', 'conciseReasonOrNull', 'decisionSha256'
+  ], 'decision');
+  assertSha256(decision.decisionSha256, 'decision.decisionSha256');
+  const body = canonicalClone(decision);
+  delete body.decisionSha256;
+  validateIntelligenceDecisionBody(body);
+  if (hashCanonical(body) !== decision.decisionSha256) {
+    throw new TypeError('decision digest mismatch');
+  }
+  return decision;
+}
+
 export function formIntelligenceDecision(input) {
   assertExactKeys(input, [
-    'participantRef', 'workerRef', 'sourceObservationRef', 'sourceObservationSha256',
-    'visibleContextRefs', 'controllerRef', 'modelIdentityOrNull', 'proposedIntent',
-    'acceptedIntentOrNull', 'rejectionReasonOrNull', 'conciseReasonOrNull'
+    'decisionRef', 'participantRef', 'workerRef',
+    'sourceObservationRef', 'sourceObservationSha256', 'visibleContextRefs',
+    'controllerRef', 'controllerDisposition', 'modelIdentityOrNull',
+    'proposedIntent', 'acceptedIntentOrNull', 'rejectionReasonOrNull',
+    'fallbackReasonOrNull', 'conciseReasonOrNull'
   ], 'decision input');
-  rejectHiddenReasoning(input, 'decision');
-  for (const [key, value] of [
-    ['participantRef', input.participantRef], ['workerRef', input.workerRef],
-    ['sourceObservationRef', input.sourceObservationRef], ['controllerRef', input.controllerRef]
-  ]) assertSafeRef(value, key);
-  assertSha256(input.sourceObservationSha256, 'sourceObservationSha256');
-  assertUniqueSafeRefs(input.visibleContextRefs, 'visibleContextRefs');
-  if (input.modelIdentityOrNull !== null) {
-    assertExactKeys(input.modelIdentityOrNull, ['modelRef', 'modelDigest'], 'modelIdentityOrNull');
-    assertSafeRef(input.modelIdentityOrNull.modelRef, 'modelRef');
-    assertSha256(input.modelIdentityOrNull.modelDigest, 'modelDigest');
-  }
-  assertPlainObject(input.proposedIntent, 'proposedIntent');
-  if (input.acceptedIntentOrNull !== null) assertPlainObject(input.acceptedIntentOrNull, 'acceptedIntentOrNull');
-  if (input.rejectionReasonOrNull !== null) assertSafeRef(input.rejectionReasonOrNull, 'rejectionReasonOrNull');
-  if (input.conciseReasonOrNull !== null) boundedText(input.conciseReasonOrNull, 'conciseReasonOrNull', 240);
   const body = { schemaVersion: SCHEMA.decision, ...canonicalClone(input) };
+  validateIntelligenceDecisionBody(body, 'decision input');
   return frozenCanonical({ ...body, decisionSha256: hashCanonical(body) });
 }
 
