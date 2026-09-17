@@ -681,6 +681,130 @@ test('isolated replay cannot observe changed host ambient state or recover dynam
   }), /Date|undefined/);
 });
 
+test('isolated replay Error stacks ignore host callsites and host stack formatters', () => {
+  const branchRef = 'worldline.first-grove.error-stack-isolation';
+
+  function fixtureFor(reducerSource, suffix) {
+    const kernel = executionKernel(reducerSource);
+    const determinismEpoch = epoch(kernel);
+    const sourceChronicle = createChronicle({
+      timelineRef: `timeline.first-grove.error-stack-isolation.${suffix}`,
+      branchRef,
+      epoch: determinismEpoch
+    });
+    const snapshot = sealWorldSnapshot({
+      chronicle: sourceChronicle,
+      tick: 0,
+      canonicalState: { value: '' }
+    });
+    return { kernel, determinismEpoch, sourceChronicle, snapshot };
+  }
+
+  function replayFixture(fixture) {
+    return replayWorldline({
+      snapshot: fixture.snapshot,
+      sourceChronicle: fixture.sourceChronicle,
+      epoch: fixture.determinismEpoch,
+      targetBranchRef: branchRef,
+      inputFrames: [frame(branchRef, 1)],
+      executionKernel: fixture.kernel
+    });
+  }
+
+  const directError = fixtureFor(`function (state) {
+    state.value = new Error('stable').stack;
+    return state;
+  }`, 'direct-error');
+
+  function hostCallsiteA() {
+    return replayFixture(directError);
+  }
+
+  function hostCallsiteB() {
+    return replayFixture(directError);
+  }
+
+  const callsiteA = hostCallsiteA();
+  const callsiteB = hostCallsiteB();
+  assert.equal(callsiteA.finalState.value, 'Error: stable');
+  assert.equal(callsiteB.finalState.value, 'Error: stable');
+  assert.equal(callsiteA.finalStateSha256, callsiteB.finalStateSha256);
+
+  const originalPrepareStackTrace = Object.getOwnPropertyDescriptor(Error, 'prepareStackTrace');
+  let host17;
+  let host29;
+  try {
+    Object.defineProperty(Error, 'prepareStackTrace', {
+      value() {
+        return 'HOST17';
+      },
+      configurable: true,
+      writable: true
+    });
+    host17 = replayFixture(directError);
+
+    Object.defineProperty(Error, 'prepareStackTrace', {
+      value() {
+        return 'HOST29';
+      },
+      configurable: true,
+      writable: true
+    });
+    host29 = replayFixture(directError);
+  } finally {
+    if (originalPrepareStackTrace) {
+      Object.defineProperty(Error, 'prepareStackTrace', originalPrepareStackTrace);
+    } else {
+      delete Error.prepareStackTrace;
+    }
+  }
+
+  assert.equal(host17.finalState.value, 'Error: stable');
+  assert.equal(host29.finalState.value, 'Error: stable');
+  assert.equal(host17.finalStateSha256, host29.finalStateSha256);
+
+  const intrinsicTypeError = fixtureFor(`function (state) {
+    try {
+      null.missing;
+    } catch (error) {
+      state.value = error.stack;
+    }
+    return state;
+  }`, 'intrinsic-type-error');
+
+  const typeA = replayFixture(intrinsicTypeError);
+  const typeB = replayFixture(intrinsicTypeError);
+  assert.equal(typeA.finalState.value, typeB.finalState.value);
+  assert.match(typeA.finalState.value, /^TypeError:/);
+
+  const formatterOverride = fixtureFor(`function (state) {
+    let overrideState = 'unexpected';
+    try {
+      Object.defineProperty(Error, 'prepareStackTrace', {
+        value(_error, callsites) {
+          return callsites;
+        },
+        configurable: true,
+        writable: true
+      });
+      overrideState = 'replaced';
+    } catch (_error) {
+      overrideState = 'blocked';
+    }
+    try {
+      Error.stackTraceLimit = 99;
+    } catch (_error) {
+      overrideState += ':limit-blocked';
+    }
+    state.value = overrideState + '|' + new Error('locked').stack;
+    return state;
+  }`, 'formatter-override');
+
+  const override = replayFixture(formatterOverride);
+  assert.match(override.finalState.value, /^blocked(?::limit-blocked)?\|Error: locked$/);
+  assert.doesNotMatch(override.finalState.value, /HOST17|HOST29|CallSite|vexworld-chronicle-reducer\.vm/);
+});
+
 test('snapshot ancestry verifier rejects rehashed false timeline, tick and eventCount before fork or replay', () => {
   const determinismEpoch = epoch();
   const branchRef = 'worldline.first-grove.verified';
