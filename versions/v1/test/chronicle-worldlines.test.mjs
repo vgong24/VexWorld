@@ -537,6 +537,133 @@ test('execution-kernel admission excludes caller closure/bound state and hashes 
   assert.notEqual(kernelA.kernelSha256, kernelB.kernelSha256);
 });
 
+test('isolated replay cannot observe changed host ambient state or recover dynamic global code', () => {
+  const branchRef = 'worldline.first-grove.ambient-isolation';
+
+  function fixtureFor(reducerSource, suffix) {
+    const kernel = executionKernel(reducerSource);
+    const determinismEpoch = epoch(kernel);
+    const sourceChronicle = createChronicle({
+      timelineRef: `timeline.first-grove.ambient-isolation.${suffix}`,
+      branchRef,
+      epoch: determinismEpoch
+    });
+    const snapshot = sealWorldSnapshot({
+      chronicle: sourceChronicle,
+      tick: 0,
+      canonicalState: { value: 0 }
+    });
+    return { kernel, determinismEpoch, sourceChronicle, snapshot };
+  }
+
+  const directAmbientSource = `function (state) {
+    state.value = typeof globalThis.__vw78Ambient === 'undefined' ? 0 : globalThis.__vw78Ambient;
+    return state;
+  }`;
+  const direct = fixtureFor(directAmbientSource, 'direct');
+  try {
+    globalThis.__vw78Ambient = 17;
+    const first = replayWorldline({
+      snapshot: direct.snapshot,
+      sourceChronicle: direct.sourceChronicle,
+      epoch: direct.determinismEpoch,
+      targetBranchRef: branchRef,
+      inputFrames: [frame(branchRef, 1)],
+      executionKernel: direct.kernel
+    });
+
+    globalThis.__vw78Ambient = 29;
+    const second = replayWorldline({
+      snapshot: direct.snapshot,
+      sourceChronicle: direct.sourceChronicle,
+      epoch: direct.determinismEpoch,
+      targetBranchRef: branchRef,
+      inputFrames: [frame(branchRef, 1)],
+      executionKernel: direct.kernel
+    });
+
+    assert.equal(first.finalState.value, 0);
+    assert.equal(second.finalState.value, 0);
+    assert.equal(first.finalStateSha256, second.finalStateSha256);
+  } finally {
+    delete globalThis.__vw78Ambient;
+  }
+
+  const undeclared = fixtureFor(`function (state) {
+    state.value = __vw78Ambient;
+    return state;
+  }`, 'undeclared');
+  globalThis.__vw78Ambient = 41;
+  try {
+    assert.throws(() => replayWorldline({
+      snapshot: undeclared.snapshot,
+      sourceChronicle: undeclared.sourceChronicle,
+      epoch: undeclared.determinismEpoch,
+      targetBranchRef: branchRef,
+      inputFrames: [frame(branchRef, 1)],
+      executionKernel: undeclared.kernel
+    }), /__vw78Ambient|not defined/);
+  } finally {
+    delete globalThis.__vw78Ambient;
+  }
+
+  const constructorEscape = fixtureFor(`function (state) {
+    const key = 'con' + 'structor';
+    const Fn = ({})[key][key];
+    const host = Fn('return globalThis')();
+    state.value = host.__vw78Ambient;
+    return state;
+  }`, 'constructor-escape');
+  globalThis.__vw78Ambient = 17;
+  try {
+    assert.throws(() => replayWorldline({
+      snapshot: constructorEscape.snapshot,
+      sourceChronicle: constructorEscape.sourceChronicle,
+      epoch: constructorEscape.determinismEpoch,
+      targetBranchRef: branchRef,
+      inputFrames: [frame(branchRef, 1)],
+      executionKernel: constructorEscape.kernel
+    }), /Code generation from strings disallowed/);
+    globalThis.__vw78Ambient = 29;
+    assert.throws(() => replayWorldline({
+      snapshot: constructorEscape.snapshot,
+      sourceChronicle: constructorEscape.sourceChronicle,
+      epoch: constructorEscape.determinismEpoch,
+      targetBranchRef: branchRef,
+      inputFrames: [frame(branchRef, 1)],
+      executionKernel: constructorEscape.kernel
+    }), /Code generation from strings disallowed/);
+  } finally {
+    delete globalThis.__vw78Ambient;
+  }
+
+  const hiddenRandom = fixtureFor(`function (state) {
+    state.value = Math.random();
+    return state;
+  }`, 'hidden-random');
+  assert.throws(() => replayWorldline({
+    snapshot: hiddenRandom.snapshot,
+    sourceChronicle: hiddenRandom.sourceChronicle,
+    epoch: hiddenRandom.determinismEpoch,
+    targetBranchRef: branchRef,
+    inputFrames: [frame(branchRef, 1)],
+    executionKernel: hiddenRandom.kernel
+  }), /hidden random source is not admitted/);
+
+  const wallClock = fixtureFor(`function (state) {
+    state.value = Date.now();
+    return state;
+  }`, 'wall-clock');
+  assert.throws(() => replayWorldline({
+    snapshot: wallClock.snapshot,
+    sourceChronicle: wallClock.sourceChronicle,
+    epoch: wallClock.determinismEpoch,
+    targetBranchRef: branchRef,
+    inputFrames: [frame(branchRef, 1)],
+    executionKernel: wallClock.kernel
+  }), /Date|undefined/);
+});
+
 test('snapshot ancestry verifier rejects rehashed false timeline, tick and eventCount before fork or replay', () => {
   const determinismEpoch = epoch();
   const branchRef = 'worldline.first-grove.verified';
