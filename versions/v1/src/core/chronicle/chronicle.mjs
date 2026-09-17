@@ -10,7 +10,8 @@ import {
   canonicalClone,
   frozenCanonical,
   hashCanonical,
-  rejectHiddenReasoning
+  rejectHiddenReasoning,
+  sha256Hex
 } from './canonical.mjs';
 
 export const SCHEMA = Object.freeze({
@@ -65,6 +66,37 @@ function rngState(value) {
     assertNonNegativeInteger(state, `rngStateByStream.${ref}`);
   }
   return value;
+}
+
+function reducerSourceSha256(reducer) {
+  if (typeof reducer !== 'function') throw new TypeError('execution kernel reducer must be a function');
+  return sha256Hex(Function.prototype.toString.call(reducer));
+}
+
+export function bindExecutionKernel({ kernelRef, reducer }) {
+  assertSafeRef(kernelRef, 'execution kernel.kernelRef');
+  const kernelSha256 = reducerSourceSha256(reducer);
+  return Object.freeze({ kernelRef, kernelSha256, reducer });
+}
+
+function validateExecutionKernel(executionKernel, epoch) {
+  assertPlainObject(executionKernel, 'execution kernel');
+  assertExactKeys(executionKernel, ['kernelRef', 'kernelSha256', 'reducer'], 'execution kernel');
+  assertSafeRef(executionKernel.kernelRef, 'execution kernel.kernelRef');
+  assertSha256(executionKernel.kernelSha256, 'execution kernel.kernelSha256');
+  if (typeof executionKernel.reducer !== 'function') throw new TypeError('execution kernel reducer must be a function');
+
+  const actualReducerSha256 = reducerSourceSha256(executionKernel.reducer);
+  if (actualReducerSha256 !== executionKernel.kernelSha256) {
+    throw new TypeError('execution kernel source digest mismatch');
+  }
+  if (
+    executionKernel.kernelRef !== epoch.kernelRef ||
+    executionKernel.kernelSha256 !== epoch.kernelSha256
+  ) {
+    throw new TypeError('execution kernel does not match determinism epoch');
+  }
+  return executionKernel;
 }
 
 export function formDeterminismEpoch(input) {
@@ -443,27 +475,31 @@ export function replayWorldline({
   epoch,
   targetBranchRef,
   inputFrames,
-  reducer,
+  executionKernel,
   expectedStateSha256OrNull = null
 }) {
   verifyChronicle(sourceChronicle);
   verifyWorldSnapshot(snapshot, { epoch, chronicle: sourceChronicle });
+  validateDeterminismEpoch(epoch);
   assertSafeRef(targetBranchRef, 'targetBranchRef');
-  if (!Array.isArray(inputFrames) || typeof reducer !== 'function') throw new TypeError('replay requires inputFrames and reducer');
+  if (!Array.isArray(inputFrames)) throw new TypeError('replay requires inputFrames');
+  validateExecutionKernel(executionKernel, epoch);
   if (expectedStateSha256OrNull !== null) assertSha256(expectedStateSha256OrNull, 'expectedStateSha256OrNull');
+
   let state = canonicalClone(snapshot.canonicalState);
   let expectedTick = snapshot.tick + 1;
   const frameHashes = [];
   for (const frame of inputFrames) {
     validateWorldInputFrame(frame);
     if (frame.branchRef !== targetBranchRef || frame.tick !== expectedTick) throw new TypeError('replay frame coordinate mismatch');
-    const next = reducer(canonicalClone(state), frozenCanonical(frame), epoch);
+    const next = executionKernel.reducer(canonicalClone(state), frozenCanonical(frame), epoch);
     assertPlainObject(next, 'reducer result');
     rejectHiddenReasoning(next, 'reducer result');
     state = canonicalClone(next);
     frameHashes.push(frame.inputFrameSha256);
     expectedTick += 1;
   }
+
   const finalStateSha256 = hashCanonical(state);
   if (expectedStateSha256OrNull !== null && finalStateSha256 !== expectedStateSha256OrNull) throw new TypeError('replay state hash mismatch');
   const body = {
@@ -473,6 +509,8 @@ export function replayWorldline({
     targetBranchRef,
     determinismEpochRef: epoch.epochRef,
     determinismEpochSha256: epoch.epochSha256,
+    executedKernelRef: executionKernel.kernelRef,
+    executedKernelSha256: executionKernel.kernelSha256,
     startTick: snapshot.tick,
     finalTick: expectedTick - 1,
     frameCount: inputFrames.length,
