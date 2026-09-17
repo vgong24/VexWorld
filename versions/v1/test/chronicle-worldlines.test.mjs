@@ -14,6 +14,7 @@ import {
   replayWorldline,
   sealWorldSnapshot,
   verifyChronicle,
+  verifyIntelligenceDecision,
   verifyWorldSnapshot
 } from '../src/core/chronicle/chronicle.mjs';
 import {
@@ -1024,31 +1025,45 @@ test('motion promotion digest is stable and expiry does not rewrite a promoted w
 
 test('intelligence decision records bounded causal evidence and rejects hidden reasoning', () => {
   const decision = formIntelligenceDecision({
+    decisionRef: 'decision.participant.vex.0001',
     participantRef: 'participant.vex',
     workerRef: 'worker.vex.local.0001',
     sourceObservationRef: 'observation.vex.fight.0001',
     sourceObservationSha256: H('c'),
     visibleContextRefs: ['context.first-grove.fight-affordances'],
     controllerRef: 'controller.vex.local-model.v1',
+    controllerDisposition: 'OLLAMA',
     modelIdentityOrNull: {
       modelRef: 'model.devex.g0',
       modelDigest: H('d')
     },
-    proposedIntent: { intentType: 'GUARD', targetRef: null },
-    acceptedIntentOrNull: { intentType: 'GUARD', targetRef: null },
+    proposedIntent: { intentType: 'GUARD', targetRef: null, reason: 'INCOMING_RUSH' },
+    acceptedIntentOrNull: {
+      intentRef: 'intent.vex.guard.0001',
+      intentType: 'GUARD',
+      targetRef: null
+    },
     rejectionReasonOrNull: null,
+    fallbackReasonOrNull: null,
     conciseReasonOrNull: 'The incoming rush is close; I guard.'
   });
   assert.equal(decision.acceptedIntentOrNull.intentType, 'GUARD');
-  assert.ok(decision.decisionSha256);
+  assert.equal(decision.controllerDisposition, 'OLLAMA');
+  assert.equal(verifyIntelligenceDecision(decision), decision);
+
+  const tampered = canonicalClone(decision);
+  tampered.fallbackReasonOrNull = 'MODEL_TIMEOUT';
+  assert.throws(() => verifyIntelligenceDecision(tampered), /decision digest mismatch/);
 
   assert.throws(() => formIntelligenceDecision({
+    decisionRef: 'decision.participant.vex.rejected.0001',
     participantRef: 'participant.vex',
     workerRef: 'worker.vex.local.0001',
     sourceObservationRef: 'observation.vex.fight.0001',
     sourceObservationSha256: H('c'),
     visibleContextRefs: [],
     controllerRef: 'controller.vex.local-model.v1',
+    controllerDisposition: 'OLLAMA',
     modelIdentityOrNull: null,
     proposedIntent: {
       intentType: 'GUARD',
@@ -1056,6 +1071,120 @@ test('intelligence decision records bounded causal evidence and rejects hidden r
     },
     acceptedIntentOrNull: null,
     rejectionReasonOrNull: 'reason.not-afforded',
+    fallbackReasonOrNull: null,
     conciseReasonOrNull: null
   }), /hidden-reasoning/);
+});
+
+test('accepted-intent events bind decision and observation refs while fresh alternate decisions stay on a fork', () => {
+  const determinismEpoch = epoch();
+  let parent = createChronicle({
+    timelineRef: 'timeline.first-grove.intelligence-provenance.0001',
+    branchRef: 'worldline.first-grove.verified',
+    epoch: determinismEpoch
+  });
+  const decision = formIntelligenceDecision({
+    decisionRef: 'decision.participant.vex.0002',
+    participantRef: 'participant.vex',
+    workerRef: 'worker.vex.local.0002',
+    sourceObservationRef: 'observation.vex.fight.0002',
+    sourceObservationSha256: H('e'),
+    visibleContextRefs: ['world.first-grove', 'participant.victor'],
+    controllerRef: 'controller.vex.remote.ollama',
+    controllerDisposition: 'OLLAMA',
+    modelIdentityOrNull: {
+      modelRef: 'model.ollama.sha256.' + H('f'),
+      modelDigest: H('f')
+    },
+    proposedIntent: { intentType: 'HOLD_POSITION', targetRef: null, reason: 'WAIT' },
+    acceptedIntentOrNull: {
+      intentRef: 'intent.vex.hold.0002',
+      intentType: 'HOLD_POSITION',
+      targetRef: null
+    },
+    rejectionReasonOrNull: null,
+    fallbackReasonOrNull: null,
+    conciseReasonOrNull: 'WAIT'
+  });
+
+  const observed = appendChronicleEvent(parent, {
+    tick: 1,
+    ordinal: 0,
+    actorRef: 'system.vexworld.observation',
+    eventClass: 'OBSERVATION_DELIVERED',
+    privacyClass: 'PARTY_SHARED',
+    causationRefs: [],
+    correlationRefOrNull: 'correlation.intelligence.0002',
+    payload: {
+      observationRef: decision.sourceObservationRef,
+      observationSha256: decision.sourceObservationSha256,
+      deliveredToRef: decision.participantRef
+    }
+  });
+  parent = observed.chronicle;
+
+  const accepted = appendChronicleEvent(parent, {
+    tick: 2,
+    ordinal: 0,
+    actorRef: decision.participantRef,
+    eventClass: 'INTENT_ACCEPTED',
+    privacyClass: 'PARTY_SHARED',
+    causationRefs: [observed.event.eventRef, decision.decisionRef],
+    correlationRefOrNull: 'correlation.intelligence.0002',
+    payload: {
+      intentRef: decision.acceptedIntentOrNull.intentRef,
+      decisionRef: decision.decisionRef,
+      sourceObservationRef: decision.sourceObservationRef
+    }
+  });
+  parent = accepted.chronicle;
+  verifyChronicle(parent);
+  assert.deepEqual(accepted.event.causationRefs, [observed.event.eventRef, decision.decisionRef]);
+
+  const snapshotState = initialFightState();
+  snapshotState.tick = 2;
+  const snapshot = sealWorldSnapshot({ chronicle: parent, tick: 2, canonicalState: snapshotState });
+  const parentBeforeFork = JSON.stringify(parent);
+  const fork = forkWorldline({
+    parentChronicle: parent,
+    snapshot,
+    branchRef: 'worldline.first-grove.private-rehearsal.intelligence.0001',
+    branchClass: 'PRIVATE_REHEARSAL',
+    formedByRef: 'participant.victor',
+    purposeRef: 'purpose.reconsider-companion-intent',
+    assumptionRefs: ['assumption.fresh-controller-invocation']
+  });
+
+  const alternateDecision = formIntelligenceDecision({
+    ...canonicalClone(decision),
+    decisionRef: 'decision.participant.vex.alternate.0002',
+    proposedIntent: { intentType: 'FOLLOW_HUMAN', targetRef: null, reason: 'PARTY_COHESION' },
+    acceptedIntentOrNull: {
+      intentRef: 'intent.vex.follow.alternate.0002',
+      intentType: 'FOLLOW_HUMAN',
+      targetRef: null
+    },
+    conciseReasonOrNull: 'PARTY_COHESION',
+    fallbackReasonOrNull: null,
+    rejectionReasonOrNull: null,
+    decisionSha256: undefined
+  });
+  const alternateEvent = appendChronicleEvent(fork.chronicle, {
+    tick: 3,
+    ordinal: 0,
+    actorRef: alternateDecision.participantRef,
+    eventClass: 'INTENT_ACCEPTED',
+    privacyClass: 'PARTICIPANT_PRIVATE',
+    causationRefs: [alternateDecision.decisionRef],
+    correlationRefOrNull: 'correlation.intelligence.alternate.0002',
+    payload: {
+      intentRef: alternateDecision.acceptedIntentOrNull.intentRef,
+      decisionRef: alternateDecision.decisionRef,
+      sourceObservationRef: alternateDecision.sourceObservationRef
+    }
+  });
+
+  assert.equal(JSON.stringify(parent), parentBeforeFork, 'fresh inference must not rewrite verified parent history');
+  assert.equal(alternateEvent.chronicle.branchRef, fork.branch.branchRef);
+  assert.notEqual(alternateDecision.decisionRef, decision.decisionRef);
 });
