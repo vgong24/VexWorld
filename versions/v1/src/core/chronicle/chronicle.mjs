@@ -184,10 +184,11 @@ export function appendChronicleEvent(chronicle, input) {
     priorEventSha256: chronicle.headSha256
   };
   const event = frozenCanonical({ ...body, eventSha256: hashCanonical(body) });
-  return frozenCanonical({
+  const nextChronicle = frozenCanonical({
     ...canonicalClone(chronicle), events: [...chronicle.events, event],
     headSha256: event.eventSha256, lastTick: event.tick, lastOrdinal: event.ordinal
   });
+  return Object.freeze({ chronicle: nextChronicle, event });
 }
 
 export function appendFightChronologyEvent(chronicle, input) {
@@ -206,7 +207,7 @@ export function verifyChronicle(chronicle) {
     if (event.schemaVersion !== SCHEMA.event) throw new TypeError('event schema mismatch');
     if (event.timelineRef !== chronicle.timelineRef || event.branchRef !== chronicle.branchRef) throw new TypeError('event owner mismatch');
     if (event.priorEventSha256 !== prior) throw new TypeError('event prior hash mismatch');
-    if (hashCanonical(event.payload) !== event.payloadSha256) throw new TypeError('event payload hash mismatch');
+    if (hashCanonical(event.payload) !== event.payloadSha256) throw new TypeError('event payload digest mismatch');
     const { eventSha256, ...body } = event;
     if (hashCanonical(body) !== eventSha256) throw new TypeError('event hash mismatch');
     if (event.tick < tick || (event.tick === tick && event.ordinal !== ordinal + 1) || (event.tick > tick && event.ordinal !== 0)) {
