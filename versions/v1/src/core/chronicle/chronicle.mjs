@@ -1,3 +1,4 @@
+import { createContext, Script } from 'node:vm';
 import {
   ZERO_SHA256,
   assertExactKeys,
@@ -8,6 +9,7 @@ import {
   assertSha256,
   assertUniqueSafeRefs,
   canonicalClone,
+  canonicalJson,
   frozenCanonical,
   hashCanonical,
   rejectHiddenReasoning,
@@ -69,7 +71,8 @@ function rngState(value) {
 }
 
 const REDUCER_SOURCE_LIMIT = 65536;
-const REDUCER_ESCAPE_PATTERN = /\[native code\]|\bthis\b|\b(?:eval|Function)\b|\b(?:constructor|__proto__|prototype)\b|\bimport\s*\(/u;
+const REDUCER_VM_TIMEOUT_MS = 100;
+const REDUCER_VM_FILENAME = 'vexworld-chronicle-reducer.vm';
 
 function normalizeReducerSource(reducerSource) {
   if (typeof reducerSource !== 'string') throw new TypeError('execution kernel reducerSource must be a string');
@@ -77,35 +80,141 @@ function normalizeReducerSource(reducerSource) {
   if (!source || source.length > REDUCER_SOURCE_LIMIT || /[\u0000\u000b\u000c\u007f]/u.test(source)) {
     throw new TypeError('execution kernel reducerSource must be bounded text');
   }
-  if (REDUCER_ESCAPE_PATTERN.test(source)) {
-    throw new TypeError('execution kernel reducerSource uses a non-admitted native/bound or ambient escape surface');
+  if (source.includes('[native code]')) {
+    throw new TypeError('native/bound reducer source is not admitted');
   }
-
-  const denyAmbientScope = new Proxy(Object.create(null), {
-    has() {
-      return true;
-    },
-    get(_target, property) {
-      if (property === Symbol.unscopables) return undefined;
-      throw new ReferenceError(`ambient reducer identifier "${String(property)}" is not admitted; use explicit bindings`);
-    }
-  });
-
-  let reducer;
   try {
-    // The callable is reconstructed from the bound source inside an ambient-denying
-    // lexical scope. Caller closures and Function#bind state cannot cross this boundary.
-    reducer = Function('scope', `with (scope) { return (${source}\n); }`)(denyAmbientScope);
+    new Script(`(${source}\n)`, { filename: REDUCER_VM_FILENAME });
   } catch (error) {
     throw new TypeError(`execution kernel reducerSource is not a valid reducer: ${error.message}`);
   }
-  if (typeof reducer !== 'function') throw new TypeError('execution kernel reducerSource must evaluate to a function');
+  return source;
+}
 
-  const normalizedSource = Function.prototype.toString.call(reducer);
-  if (/\\[native code\\]/u.test(normalizedSource)) {
-    throw new TypeError('native/bound reducer source is not admitted');
+function compileReducerInvocation(reducerSource) {
+  const source = normalizeReducerSource(reducerSource);
+  const invocationSource = `(() => {
+    "use strict";
+
+    globalThis.Date = undefined;
+    globalThis.Intl = undefined;
+    globalThis.WeakRef = undefined;
+    globalThis.FinalizationRegistry = undefined;
+    globalThis.Atomics = undefined;
+    globalThis.SharedArrayBuffer = undefined;
+    globalThis.WebAssembly = undefined;
+    globalThis.process = undefined;
+    globalThis.require = undefined;
+    globalThis.module = undefined;
+    globalThis.fetch = undefined;
+    globalThis.performance = undefined;
+    globalThis.crypto = undefined;
+    globalThis.setTimeout = undefined;
+    globalThis.setInterval = undefined;
+    globalThis.setImmediate = undefined;
+    globalThis.queueMicrotask = undefined;
+
+    Object.defineProperty(Math, 'random', {
+      value() {
+        throw new TypeError('hidden random source is not admitted');
+      },
+      configurable: false,
+      writable: false
+    });
+
+    const parseJson = JSON.parse;
+    const stringifyJson = JSON.stringify;
+    const objectKeys = Object.keys;
+    const getPrototypeOf = Object.getPrototypeOf;
+    const isArray = Array.isArray;
+    const isFiniteNumber = Number.isFinite;
+    const isNegativeZero = Object.is;
+
+    function canonicalizeResult(value, path = '$') {
+      if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+      if (typeof value === 'number') {
+        if (!isFiniteNumber(value)) throw new TypeError(path + ' contains a non-finite number');
+        return isNegativeZero(value, -0) ? 0 : value;
+      }
+      if (isArray(value)) {
+        const output = [];
+        for (let index = 0; index < value.length; index += 1) {
+          output[index] = canonicalizeResult(value[index], path + '[' + index + ']');
+        }
+        return output;
+      }
+      if (typeof value !== 'object') throw new TypeError(path + ' contains a non-canonical value');
+      const prototype = getPrototypeOf(value);
+      if (prototype !== Object.prototype && prototype !== null) {
+        throw new TypeError(path + ' contains a non-canonical object');
+      }
+      const output = {};
+      const keys = objectKeys(value).sort();
+      for (let index = 0; index < keys.length; index += 1) {
+        const key = keys[index];
+        output[key] = canonicalizeResult(value[key], path + '.' + key);
+      }
+      return output;
+    }
+
+    const reducer = (${source});
+    if (typeof reducer !== 'function') {
+      throw new TypeError('execution kernel reducerSource must evaluate to a function');
+    }
+
+    const state = parseJson(__vexStateJson);
+    const frame = parseJson(__vexFrameJson);
+    const epoch = parseJson(__vexEpochJson);
+    const bindings = parseJson(__vexBindingsJson);
+    const result = reducer(state, frame, epoch, bindings);
+    return stringifyJson(canonicalizeResult(result));
+  })()`;
+
+  try {
+    return Object.freeze({
+      reducerSource: source,
+      script: new Script(invocationSource, { filename: REDUCER_VM_FILENAME })
+    });
+  } catch (error) {
+    throw new TypeError(`execution kernel reducerSource cannot be compiled for isolated replay: ${error.message}`);
   }
-  return Object.freeze({ reducerSource: normalizedSource, reducer });
+}
+
+function executeReducerInIsolatedContext(compiledScript, { state, frame, epoch, bindings }) {
+  const sandbox = Object.create(null);
+  sandbox.__vexStateJson = canonicalJson(state);
+  sandbox.__vexFrameJson = canonicalJson(frame);
+  sandbox.__vexEpochJson = canonicalJson(epoch);
+  sandbox.__vexBindingsJson = canonicalJson(bindings);
+
+  const context = createContext(sandbox, {
+    name: 'vexworld-chronicle-reducer',
+    codeGeneration: { strings: false, wasm: false }
+  });
+
+  let resultJson;
+  try {
+    resultJson = compiledScript.runInContext(context, {
+      timeout: REDUCER_VM_TIMEOUT_MS,
+      displayErrors: true
+    });
+  } catch (error) {
+    throw new TypeError(`execution kernel reducer failed in isolated replay: ${error.message}`);
+  }
+
+  if (typeof resultJson !== 'string') {
+    throw new TypeError('execution kernel reducer did not return canonical JSON');
+  }
+
+  let result;
+  try {
+    result = JSON.parse(resultJson);
+  } catch (error) {
+    throw new TypeError(`execution kernel reducer returned invalid JSON: ${error.message}`);
+  }
+  assertPlainObject(result, 'reducer result');
+  rejectHiddenReasoning(result, 'reducer result');
+  return result;
 }
 
 function executionKernelSha256(kernelRef, reducerSource, bindings) {
@@ -118,13 +227,13 @@ export function bindExecutionKernel(input) {
   assertPlainObject(input.bindings, 'execution kernel.bindings');
   rejectHiddenReasoning(input.bindings, 'execution kernel.bindings');
 
-  const compiled = normalizeReducerSource(input.reducerSource);
+  const reducerSource = normalizeReducerSource(input.reducerSource);
   const bindings = canonicalClone(input.bindings);
-  const kernelSha256 = executionKernelSha256(input.kernelRef, compiled.reducerSource, bindings);
+  const kernelSha256 = executionKernelSha256(input.kernelRef, reducerSource, bindings);
   return frozenCanonical({
     kernelRef: input.kernelRef,
     kernelSha256,
-    reducerSource: compiled.reducerSource,
+    reducerSource,
     bindings
   });
 }
@@ -137,7 +246,7 @@ function validateExecutionKernel(executionKernel, epoch) {
   assertPlainObject(executionKernel.bindings, 'execution kernel.bindings');
   rejectHiddenReasoning(executionKernel.bindings, 'execution kernel.bindings');
 
-  const compiled = normalizeReducerSource(executionKernel.reducerSource);
+  const compiled = compileReducerInvocation(executionKernel.reducerSource);
   const bindings = canonicalClone(executionKernel.bindings);
   const actualKernelSha256 = executionKernelSha256(executionKernel.kernelRef, compiled.reducerSource, bindings);
   if (actualKernelSha256 !== executionKernel.kernelSha256) {
@@ -154,7 +263,7 @@ function validateExecutionKernel(executionKernel, epoch) {
     kernelSha256: executionKernel.kernelSha256,
     reducerSource: compiled.reducerSource,
     bindings: frozenCanonical(bindings),
-    reducer: compiled.reducer
+    script: compiled.script
   });
 }
 
@@ -551,9 +660,12 @@ export function replayWorldline({
   for (const frame of inputFrames) {
     validateWorldInputFrame(frame);
     if (frame.branchRef !== targetBranchRef || frame.tick !== expectedTick) throw new TypeError('replay frame coordinate mismatch');
-    const next = validatedKernel.reducer(canonicalClone(state), frozenCanonical(frame), epoch, validatedKernel.bindings);
-    assertPlainObject(next, 'reducer result');
-    rejectHiddenReasoning(next, 'reducer result');
+    const next = executeReducerInIsolatedContext(validatedKernel.script, {
+      state,
+      frame,
+      epoch,
+      bindings: validatedKernel.bindings
+    });
     state = canonicalClone(next);
     frameHashes.push(frame.inputFrameSha256);
     expectedTick += 1;
