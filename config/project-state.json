@@ -7,10 +7,10 @@
   "crossRepoFoundationRef": "github.issue.vextreme-sdk.1299",
   "currentVersionRef": "version.vexworld.v1",
   "currentVersionPath": "versions/v1",
-  "forwardRouteDisposition": "ATLAS_ROUTE_COMPLETE_IDLE",
+  "forwardRouteDisposition": "ACTIVE_FORWARD_ROUTE",
   "lastAcceptedMainRef": "github.commit.vexworld.6b61ab1a6661b5857bf5bf11a895acc6adf1a3f9",
-  "activeStageRef": "NONE",
-  "activeStageIssueRef": "NONE",
+  "activeStageRef": "stage.vexworld.vw-fwd-07f",
+  "activeStageIssueRef": "github.issue.vexworld.108",
   "stageOrder": [
     "stage.vexworld.vw-fwd-01a",
     "stage.vexworld.vw-fwd-01b",
@@ -30,7 +30,8 @@
     "stage.vexworld.vw-fwd-07b",
     "stage.vexworld.vw-fwd-07c",
     "stage.vexworld.vw-fwd-07d",
-    "stage.vexworld.vw-fwd-07e"
+    "stage.vexworld.vw-fwd-07e",
+    "stage.vexworld.vw-fwd-07f"
   ],
   "stages": [
     {
@@ -691,6 +692,66 @@
         "github.issue.vexworld.104.comment.5725361737",
         "github.pull.vexworld.100.comment.5725363555"
       ]
+    },
+    {
+      "stageRef": "stage.vexworld.vw-fwd-07f",
+      "issueRef": "github.issue.vexworld.108",
+      "title": "Cinematic capture and branch-aware media continuity",
+      "state": "ACTIVE_SINGLE_FORWARD_LANE",
+      "predecessorStageRef": "stage.vexworld.vw-fwd-07e",
+      "parentStageRefs": [
+        "stage.vexworld.vw-fwd-07e"
+      ],
+      "sourceChanging": true,
+      "meaningOwnerRef": "project.vextreme.vexworld",
+      "implementationOwnerRef": "role.vexworld.cinematic-media-continuity-builder",
+      "reviewOwnerRef": "role.vexworld.cinematic-media-continuity-reviewer",
+      "ownedPathPatterns": [
+        "config/project-state.json",
+        "docs/architecture/CHRONICLE-WORLDLINES.md",
+        "versions/v1/config/source-map.fragments/stage-07f-cinematic-media-continuity.json",
+        "versions/v1/src/core/chronicle/media-continuity.mjs",
+        "versions/v1/test/media-continuity.test.mjs"
+      ],
+      "activationReceiptRef": "github.issue.vexworld.108.comment.5725842360",
+      "startingMainRef": "github.commit.vexworld.62533b101b986024448cab7714d7f6f25045c892",
+      "predecessorCloseReceiptRef": "github.issue.vexworld.97.comment.5725488555",
+      "claimRef": "claim.vexworld.chronicle-worldlines.stage-07f.20260918",
+      "allowedEffects": [
+        "SOURCE_MUTATION_WITHIN_EXACT_MEMBRANE",
+        "LOCAL_SYNTHETIC_TEST_EXECUTION",
+        "DRAFT_PR_FORMATION"
+      ],
+      "forbiddenEffects": [
+        "VEX_STUDIO_SOURCE_MUTATION",
+        "BROWSER_RENDERER_MUTATION",
+        "GODOT_ADAPTER_MUTATION",
+        "REAL_CAMERA_CAPTURE",
+        "REAL_MICROPHONE_CAPTURE",
+        "REAL_SCREEN_OR_GPU_CAPTURE",
+        "RUNTIME_MEDIA_FILE_WRITE",
+        "MEDIA_BINARY_EXPORT",
+        "PUBLIC_MEDIA_PUBLICATION",
+        "VEXLIFE_SOURCE_MUTATION",
+        "HOME_SOURCE_MUTATION",
+        "HOME_WRITE",
+        "MEMORY_WRITE",
+        "VAULT_COMMIT",
+        "RELATIONSHIP_MUTATION",
+        "REAL_NETWORK_DELIVERY",
+        "PRODUCTION_NETWORKING",
+        "MODEL_INVOCATION",
+        "MODEL_TRAINING",
+        "WEIGHT_MUTATION",
+        "PERSISTENT_MEMORY_PROMOTION",
+        "PHYSICAL_SENSING",
+        "PHYSICAL_ACTUATION",
+        "PUBLIC_RELEASE",
+        "COMMERCE",
+        "CANONICAL_HISTORY_MUTATION",
+        "WORLDLINE_CANONICAL_MERGE",
+        "MERGE_WITHOUT_INDEPENDENT_REVIEW"
+      ]
     }
   ],
   "requiredReadOrder": [
@@ -724,8 +785,8 @@
     "unknown.vexworld.motion-capture-real-device-clock-alignment",
     "unknown.vexworld.world-memory-shared-replay-consent-defaults"
   ],
-  "currentStrongestClaim": "VW_FWD_07A_ACCEPTED__VW_FWD_07B_ACCEPTED__VW_FWD_07C_ACCEPTED__VW_FWD_07D_ACCEPTED__VW_FWD_07E_ACCEPTED__ATLAS_ROUTE_COMPLETE_IDLE__NO_SUCCESSOR_ADMITTED__VEXLIFE_HOME_MEMORY_NETWORK_EFFECTS_HELD",
-  "observedAt": "2026-09-18T05:09:11Z",
+  "currentStrongestClaim": "VW_FWD_07A_ACCEPTED__VW_FWD_07B_ACCEPTED__VW_FWD_07C_ACCEPTED__VW_FWD_07D_ACCEPTED__VW_FWD_07E_ACCEPTED__VW_FWD_07F_ACTIVE_CINEMATIC_MEDIA_CONTINUITY_SOURCE_MUTATION_ADMITTED__VEX_STUDIO_RENDER_CAPTURE_PUBLICATION_EFFECTS_HELD",
+  "observedAt": "2026-09-18T05:57:41Z",
   "effects": {
     "modelTraining": false,
     "productionNetwork": false,
