@@ -1361,7 +1361,7 @@ export function formAuthoritativeResyncReceipt(input) {
     acceptedStateVersion: input.acceptedStateVersion,
     acceptedCheckpointSha256: input.acceptedCheckpointSha256,
     reconciledStateSha256: input.rollbackReceipt.reconciledStateSha256,
-    authorityClass: 'ONE_ACTIVE_AUTHORITATIVE_HOST_LEASE'
+    evidenceScope: 'LOCAL_RESYNC_RECEIPT_REQUIRES_ACCEPTED_SESSIONSTORE_WRITE'
   };
   return frozenCanonical({ ...body, resyncReceiptSha256: hashCanonical(body) });
 }
@@ -1373,11 +1373,13 @@ export function verifyAuthoritativeResyncReceipt(receipt, { verifiedHead = null,
     'sourceVerifiedHeadRef', 'sourceVerifiedHeadSha256', 'rollbackRef',
     'rollbackReceiptSha256', 'hostId', 'hostLeaseGeneration',
     'expectedStateVersion', 'acceptedStateVersion', 'acceptedCheckpointSha256',
-    'reconciledStateSha256', 'authorityClass', 'resyncReceiptSha256'
+    'reconciledStateSha256', 'evidenceScope', 'resyncReceiptSha256'
   ], 'authoritative resync receipt');
   if (receipt.schemaVersion !== SCHEMA.resync) throw new TypeError('authoritative resync receipt schema mismatch');
   if (receipt.resyncMode !== 'LOCAL_SYNTHETIC_AUTHORITATIVE_RESYNC') throw new TypeError('authoritative resync mode mismatch');
-  if (receipt.authorityClass !== 'ONE_ACTIVE_AUTHORITATIVE_HOST_LEASE') throw new TypeError('authoritative resync authority class mismatch');
+  if (receipt.evidenceScope !== 'LOCAL_RESYNC_RECEIPT_REQUIRES_ACCEPTED_SESSIONSTORE_WRITE') {
+    throw new TypeError('authoritative resync evidence scope mismatch');
+  }
   assertSafeRef(receipt.resyncRef, 'authoritative resync.resyncRef');
   assertSafeRef(receipt.sessionRef, 'authoritative resync.sessionRef');
   assertSafeRef(receipt.sourceVerifiedHeadRef, 'authoritative resync.sourceVerifiedHeadRef');
