@@ -402,9 +402,6 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
     chronicle: f.chronicle,
     snapshot: f.snapshot,
     motionWindows: [f.motionWindow],
-    chronicle: f.chronicle,
-    snapshot: f.snapshot,
-    motionWindows: [f.motionWindow],
     requesterParticipantRef: 'participant.victor',
     subjectParticipantRefs: ['participant.victor', 'participant.mira'],
     requestedCapabilityRefs: ['capability.world-memory.view'],
@@ -433,10 +430,6 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
 
   const viewAllow = formSyntheticExternalPolicyDecision({
     request: viewRequest,
-    projection: f.projection,
-    chronicle: f.chronicle,
-    snapshot: f.snapshot,
-    motionWindows: [f.motionWindow],
     projection: f.projection,
     chronicle: f.chronicle,
     snapshot: f.snapshot,
@@ -515,9 +508,6 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
     chronicle: f.chronicle,
     snapshot: f.snapshot,
     motionWindows: [f.motionWindow],
-    chronicle: f.chronicle,
-    snapshot: f.snapshot,
-    motionWindows: [f.motionWindow],
     requesterParticipantRef: 'participant.victor',
     subjectParticipantRefs: ['participant.victor', 'participant.mira'],
     requestedCapabilityRefs: [
@@ -533,10 +523,6 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
 
   const narrowed = formSyntheticExternalPolicyDecision({
     request: wideRequest,
-    projection: f.projection,
-    chronicle: f.chronicle,
-    snapshot: f.snapshot,
-    motionWindows: [f.motionWindow],
     projection: f.projection,
     chronicle: f.chronicle,
     snapshot: f.snapshot,
@@ -586,6 +572,31 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
   });
   assert.equal(revokedAuth.authorizationClass, 'REVOKED');
   assert.deepEqual(revokedAuth.effectiveCapabilityRefs, []);
+
+  const denied = formSyntheticExternalPolicyDecision({
+    request: viewRequest,
+    projection: f.projection,
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow],
+    policyDecisionRef: 'policy-decision.world-memory.deny.0001',
+    decisionClass: 'DENY',
+    grantedCapabilityRefs: [],
+    audienceRefs: [],
+    currentnessRef: 'currentness.vexlife.relationships.denied.0001',
+    consentRefOrNull: null
+  });
+  const deniedAuth = evaluateWorldMemoryAuthorization({
+    request: viewRequest,
+    decision: denied,
+    projection: f.projection,
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow]
+  });
+  assert.equal(deniedAuth.authorizationClass, 'DENIED');
+  assert.deepEqual(deniedAuth.effectiveCapabilityRefs, []);
+
   assert.equal(JSON.stringify(f.projection), projectionBefore);
   assert.equal(verifyWorldMemoryProjection(f.projection, {
     chronicle: f.chronicle,
