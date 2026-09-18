@@ -1762,7 +1762,10 @@ test('verified and predicted heads reconcile local speculation without rewriting
     acceptedStateVersion: verifiedHead.stateVersion + 1,
     acceptedCheckpointSha256: divergent.rollbackReceipt.reconciledStateSha256
   });
-  assert.equal(resync.authorityClass, 'ONE_ACTIVE_AUTHORITATIVE_HOST_LEASE');
+  assert.equal(
+    resync.evidenceScope,
+    'LOCAL_RESYNC_RECEIPT_REQUIRES_ACCEPTED_SESSIONSTORE_WRITE'
+  );
   assert.equal(verifyAuthoritativeResyncReceipt(resync, {
     verifiedHead,
     rollbackReceipt: divergent.rollbackReceipt
