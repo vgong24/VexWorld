@@ -582,7 +582,7 @@ calibrationRef
 calibrationCoordinateSpaceRef
 
 transportProfileRef
-privacyClass
+privacyClass = PARTICIPANT_PRIVATE
 retentionClass = EPHEMERAL_HOT_TAIL
 
 captureSourceSha256
@@ -591,6 +591,9 @@ captureSourceSha256
 The descriptor fails closed when its clock-alignment domain does not match its declared
 device-clock domain or its calibration coordinate space does not match its declared
 motion coordinate space.
+
+Qualified synthetic capture also begins `PARTICIPANT_PRIVATE`. Sharing is not a live-tail
+capture mode; it is a later explicit promoted-window decision that requires consent.
 
 Those refs prove only that the synthetic fixture carries explicit alignment/calibration
 evidence coordinates. They do **not** prove that a real headset, controller or tracker
@@ -647,7 +650,7 @@ retentionClass
 consentRefOrNull
 ```
 
-Material event refs may include causal events such as:
+Material event refs may bind actual formed Chronicle events such as:
 
 ```text
 HIT_RESOLVED
