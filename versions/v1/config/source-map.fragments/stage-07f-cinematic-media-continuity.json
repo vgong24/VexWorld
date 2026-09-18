@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "vexworld.source-map-fragment/v1",
+  "fragmentRef": "source-map-fragment.vexworld.v1.stage-07f-cinematic-media-continuity",
+  "reason": "Register VW-FWD-07F adapter-neutral cinematic shot, branch-aware edit, synthetic presentation evidence, capture-manifest and redistribution-request source without granting renderer, Vex Studio, media-file or publication authority.",
+  "entries": [
+    {
+      "path": "config/source-map.fragments/stage-07f-cinematic-media-continuity.json",
+      "category": "navigation-and-coverage",
+      "owner": "Vex Chronicle",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "src/core/chronicle/media-continuity.mjs",
+      "category": "cinematic-media-continuity",
+      "owner": "Vex Chronicle",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "test/media-continuity.test.mjs",
+      "category": "test-evidence",
+      "owner": "Assurance",
+      "sourceClass": "EVIDENCE_SOURCE"
+    }
+  ]
+}
