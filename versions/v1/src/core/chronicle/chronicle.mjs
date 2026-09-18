@@ -742,6 +742,47 @@ export function formIntelligenceDecision(input) {
   return frozenCanonical({ ...body, decisionSha256: hashCanonical(body) });
 }
 
+export function verifyReplayReceipt(receipt) {
+  assertPlainObject(receipt, 'replay receipt');
+  assertExactKeys(receipt, [
+    'schemaVersion', 'sourceSnapshotRef', 'sourceSnapshotSha256', 'targetBranchRef',
+    'determinismEpochRef', 'determinismEpochSha256', 'executedKernelRef',
+    'executedKernelSha256', 'startTick', 'finalTick', 'frameCount', 'frameHashes',
+    'finalState', 'finalStateSha256', 'inputMode', 'replayReceiptSha256'
+  ], 'replay receipt');
+  if (receipt.schemaVersion !== SCHEMA.replay) throw new TypeError('replay receipt schema mismatch');
+  assertSafeRef(receipt.sourceSnapshotRef, 'replay receipt.sourceSnapshotRef');
+  assertSha256(receipt.sourceSnapshotSha256, 'replay receipt.sourceSnapshotSha256');
+  assertSafeRef(receipt.targetBranchRef, 'replay receipt.targetBranchRef');
+  assertSafeRef(receipt.determinismEpochRef, 'replay receipt.determinismEpochRef');
+  assertSha256(receipt.determinismEpochSha256, 'replay receipt.determinismEpochSha256');
+  assertSafeRef(receipt.executedKernelRef, 'replay receipt.executedKernelRef');
+  assertSha256(receipt.executedKernelSha256, 'replay receipt.executedKernelSha256');
+  assertNonNegativeInteger(receipt.startTick, 'replay receipt.startTick');
+  assertNonNegativeInteger(receipt.finalTick, 'replay receipt.finalTick');
+  assertNonNegativeInteger(receipt.frameCount, 'replay receipt.frameCount');
+  shaArray(receipt.frameHashes, 'replay receipt.frameHashes');
+  if (receipt.frameHashes.length !== receipt.frameCount) {
+    throw new TypeError('replay receipt frame count mismatch');
+  }
+  if (receipt.finalTick !== receipt.startTick + receipt.frameCount) {
+    throw new TypeError('replay receipt final tick mismatch');
+  }
+  assertPlainObject(receipt.finalState, 'replay receipt.finalState');
+  rejectHiddenReasoning(receipt.finalState, 'replay receipt.finalState');
+  assertSha256(receipt.finalStateSha256, 'replay receipt.finalStateSha256');
+  if (hashCanonical(receipt.finalState) !== receipt.finalStateSha256) {
+    throw new TypeError('replay receipt final state digest mismatch');
+  }
+  if (receipt.inputMode !== 'RECORDED_INPUT_FRAMES_ONLY') {
+    throw new TypeError('replay receipt input mode mismatch');
+  }
+  assertSha256(receipt.replayReceiptSha256, 'replay receipt.replayReceiptSha256');
+  const { replayReceiptSha256, ...body } = receipt;
+  if (hashCanonical(body) !== replayReceiptSha256) throw new TypeError('replay receipt digest mismatch');
+  return receipt;
+}
+
 export function replayWorldline({
   snapshot,
   sourceChronicle,
@@ -965,7 +1006,11 @@ export function formPredictedHead(input) {
   });
 }
 
-export function verifyPredictedHead(head, { verifiedHead = null } = {}) {
+export function verifyPredictedHead(head, {
+  verifiedHead = null,
+  inputFrames = null,
+  replayReceipt = null
+} = {}) {
   assertPlainObject(head, 'predicted head');
   assertExactKeys(head, [
     'schemaVersion', 'headClass', 'predictionRef', 'sessionRef',
@@ -1020,6 +1065,43 @@ export function verifyPredictedHead(head, { verifiedHead = null } = {}) {
       head.predictionBranchRef === verifiedHead.branchRef
     ) {
       throw new TypeError('predicted head parent coordinate mismatch');
+    }
+  }
+
+  if (inputFrames !== null || replayReceipt !== null) {
+    if (!Array.isArray(inputFrames) || replayReceipt === null) {
+      throw new TypeError('predicted head contextual verification requires inputFrames and replayReceipt together');
+    }
+    verifyReplayReceipt(replayReceipt);
+    if (inputFrames.length !== head.frameCount) {
+      throw new TypeError('predicted head contextual frame count mismatch');
+    }
+    const frameHashes = [];
+    const semanticHashes = [];
+    let expectedTick = head.parentTick + 1;
+    for (const frame of inputFrames) {
+      validateWorldInputFrame(frame);
+      if (frame.branchRef !== head.predictionBranchRef || frame.tick !== expectedTick) {
+        throw new TypeError('predicted head contextual frame coordinate mismatch');
+      }
+      frameHashes.push(frame.inputFrameSha256);
+      semanticHashes.push(worldInputSemanticSha256(frame));
+      expectedTick += 1;
+    }
+    if (
+      canonicalJson(frameHashes) !== canonicalJson(head.inputFrameSha256s) ||
+      canonicalJson(semanticHashes) !== canonicalJson(head.inputSemanticSha256s) ||
+      replayReceipt.targetBranchRef !== head.predictionBranchRef ||
+      replayReceipt.startTick !== head.parentTick ||
+      replayReceipt.finalTick !== head.finalTick ||
+      replayReceipt.frameCount !== head.frameCount ||
+      canonicalJson(replayReceipt.frameHashes) !== canonicalJson(head.inputFrameSha256s) ||
+      replayReceipt.finalStateSha256 !== head.predictedStateSha256 ||
+      replayReceipt.replayReceiptSha256 !== head.replayReceiptSha256 ||
+      replayReceipt.determinismEpochRef !== head.determinismEpochRef ||
+      replayReceipt.determinismEpochSha256 !== head.determinismEpochSha256
+    ) {
+      throw new TypeError('predicted head replay evidence mismatch');
     }
   }
   return head;
@@ -1122,7 +1204,12 @@ export function reconcilePredictedHead(input) {
   });
 }
 
-export function verifyRollbackReceipt(receipt, { predictedHead = null, verifiedHead = null } = {}) {
+export function verifyRollbackReceipt(receipt, {
+  predictedHead = null,
+  verifiedHead = null,
+  authoritativeInputFrames = null,
+  authoritativeReplay = null
+} = {}) {
   assertPlainObject(receipt, 'rollback receipt');
   assertExactKeys(receipt, [
     'schemaVersion', 'rollbackRef', 'mode', 'parentVerifiedHeadRef',
@@ -1206,6 +1293,30 @@ export function verifyRollbackReceipt(receipt, { predictedHead = null, verifiedH
       receipt.authoritativeBranchRef !== verifiedHead.branchRef ||
       receipt.verifiedParentEventHeadSha256 !== verifiedHead.eventHeadSha256
     ) throw new TypeError('rollback receipt verified parent mismatch');
+  }
+
+  if (authoritativeInputFrames !== null || authoritativeReplay !== null) {
+    if (!Array.isArray(authoritativeInputFrames) || authoritativeReplay === null) {
+      throw new TypeError('rollback contextual verification requires authoritativeInputFrames and authoritativeReplay together');
+    }
+    verifyReplayReceipt(authoritativeReplay);
+    const frameHashes = authoritativeInputFrames.map((frame) => {
+      validateWorldInputFrame(frame);
+      return frame.inputFrameSha256;
+    });
+    const semanticHashes = authoritativeInputFrames.map(worldInputSemanticSha256);
+    if (
+      canonicalJson(frameHashes) !== canonicalJson(receipt.authoritativeInputFrameSha256s) ||
+      canonicalJson(semanticHashes) !== canonicalJson(receipt.authoritativeInputSemanticSha256s) ||
+      authoritativeReplay.targetBranchRef !== receipt.authoritativeBranchRef ||
+      authoritativeReplay.startTick !== receipt.startTick ||
+      authoritativeReplay.finalTick !== receipt.finalTick ||
+      canonicalJson(authoritativeReplay.frameHashes) !== canonicalJson(receipt.authoritativeInputFrameSha256s) ||
+      authoritativeReplay.finalStateSha256 !== receipt.reconciledStateSha256 ||
+      authoritativeReplay.replayReceiptSha256 !== receipt.authoritativeReplayReceiptSha256
+    ) {
+      throw new TypeError('rollback receipt authoritative replay evidence mismatch');
+    }
   }
   return receipt;
 }
