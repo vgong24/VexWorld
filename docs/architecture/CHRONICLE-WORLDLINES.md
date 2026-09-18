@@ -335,7 +335,23 @@ SOURCE_OBSERVATION_SHA256
 SEMANTIC_EQUIVALENCE_CLASS
 ```
 
-Changing any canonical field changes the decision identity even when `observationRef` is unchanged.
+Changing any canonical field changes the decision content hash even when `observationRef` is unchanged.
+
+Worker-generated `decisionRef` coordinates are separately namespaced by a canonical hash of:
+
+```text
+sessionRef
+participantRef
+accepted intent ref
+accepted intent sequence
+```
+
+so two sessions do not collide merely because the same companion reaches the same local intent sequence.
+
+```text
+DECISION_REF = STABLE CAUSAL COORDINATE
+DECISION_SHA256 = EXACT DECISION CONTENT IDENTITY
+```
 
 The worker does not claim a digest for hidden model context, private Home context, server bytes it did not receive, or subjective awareness.
 
@@ -365,15 +381,33 @@ acceptedIntentOrNull=<intent actually relayed>
 
 The raw invalid/unbounded model output is **not** admitted into Chronicle decision evidence. This preserves the hidden-reasoning/private-context boundary and avoids treating rejected untrusted output as durable world truth.
 
-A generic Chronicle decision may also represent:
+A resolved Chronicle decision has exactly one outcome:
 
 ```text
-proposedIntent
-acceptedIntentOrNull=null
-rejectionReasonOrNull=<bounded reason ref>
+ACCEPTED
+  acceptedIntentOrNull=<accepted intent>
+  rejectionReasonOrNull=null
+
+or
+
+REJECTED
+  acceptedIntentOrNull=null
+  rejectionReasonOrNull=<bounded reason ref>
 ```
 
-so proposal and acceptance remain distinct facts.
+Both accepted+rejected and neither accepted nor rejected fail the decision contract.
+
+Likewise:
+
+```text
+controllerDisposition=DETERMINISTIC_FALLBACK
+↔
+fallbackReasonOrNull is present
+```
+
+so fallback provenance cannot silently disappear or be attached to an ordinary-success disposition.
+
+Proposal and acceptance therefore remain distinct facts.
 
 ### Result-local integration boundary
 
@@ -393,15 +427,33 @@ Historical replay continues to consume recorded accepted input frames and makes 
 
 A fresh inference made from an old observation belongs to a new Worldline. It cannot replace the original historical choice.
 
-Where Chronicle events later bind the decision, exact causal refs may connect:
+Where Chronicle events later bind the decision, the causal payload should retain both coordinates and exact content identities:
 
 ```text
-OBSERVATION_DELIVERED event
-→ decisionRef
-→ INTENT_ACCEPTED event
+OBSERVATION_DELIVERED {
+  observationRef
+  observationSha256
+}
+
+→ decision {
+     decisionRef
+     decisionSha256
+     sourceObservationRef
+     sourceObservationSha256
+   }
+
+→ INTENT_ACCEPTED {
+     intentRef
+     decisionRef
+     decisionSha256
+     sourceObservationRef
+     sourceObservationSha256
+   }
 ```
 
-without claiming:
+This keeps a later event from ambiguously referring only to a reusable coordinate if decision bytes differ.
+
+It still does not claim:
 
 ```text
 OBSERVATION_DELIVERED
