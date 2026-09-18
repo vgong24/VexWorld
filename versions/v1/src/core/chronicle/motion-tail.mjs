@@ -95,6 +95,9 @@ export function verifySyntheticMotionCaptureSource(source) {
     throw new TypeError('motion capture source calibration coordinate-space mismatch');
   }
   assertPrivacy(source.privacyClass, 'motion capture source.privacyClass');
+  if (source.privacyClass !== 'PARTICIPANT_PRIVATE') {
+    throw new TypeError('qualified synthetic capture source must begin PARTICIPANT_PRIVATE');
+  }
   assertRetention(source.retentionClass, 'motion capture source.retentionClass');
   if (source.retentionClass !== 'EPHEMERAL_HOT_TAIL') {
     throw new TypeError('motion capture source must begin with EPHEMERAL_HOT_TAIL retention');
