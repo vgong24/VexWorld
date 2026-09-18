@@ -1027,18 +1027,20 @@ test('synthetic motion capture qualification binds clock/calibration/transport a
     materialityRefs: []
   }), /source time must increase strictly/);
 
-  const alternateSource = formSyntheticMotionCaptureSource({
+  const wrongOwnerSource = formSyntheticMotionCaptureSource({
     ...sourceInput,
-    captureSourceRef: 'capture.synthetic.victor.headset.other'
+    captureSourceRef: 'capture.synthetic.victor.wrong-space',
+    coordinateSpaceRef: 'space.first-grove.wrong',
+    calibrationCoordinateSpaceRef: 'space.first-grove.wrong'
   });
-  assert.throws(() => appendQualifiedMotionSample(tail, alternateSource, {
+  assert.throws(() => appendQualifiedMotionSample(tail, wrongOwnerSource, {
     sequence: 4,
     tick: 13,
     sourceTimeMicroseconds: 4_000,
     transportQuality: 'DIRECT_OBSERVED',
     poseOrNull: pose(0.4),
     materialityRefs: []
-  }), /cannot switch qualified capture source/);
+  }), /does not match tail owner/);
 
   tail = appendQualifiedMotionSample(tail, source, {
     sequence: 4,
