@@ -922,8 +922,15 @@ reconciled state hash
 ```
 
 The pure Chronicle resync receipt is **not independently a lease grant** and is not a
-distributed-consensus certificate. Its authority claim is justified by composing it
-with the accepted SessionStore write evidence.
+distributed-consensus certificate. It carries:
+
+```text
+evidenceScope =
+  LOCAL_RESYNC_RECEIPT_REQUIRES_ACCEPTED_SESSIONSTORE_WRITE
+```
+
+so the object itself does not self-assert store authority. The 07D authority proof is
+the composition of this receipt with the observed accepted SessionStore write evidence.
 
 ### Headless host continuity
 
