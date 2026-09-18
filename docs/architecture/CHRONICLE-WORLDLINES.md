@@ -1093,6 +1093,30 @@ projection context rather than trusting a self-consistent digest alone. Rehashin
 permission request or fork request cannot detach it from the Chronicle/snapshot evidence
 that produced its source projection.
 
+Projection/source verification also preserves these exact boundaries:
+
+```text
+historical scrub source
+  = an exact verified Chronicle prefix ending at projection.toTick
+  + its exact snapshot at that same tick
+
+PARTICIPANT_PRIVATE Chronicle event
+  = projectable only for the participant who owns/received that private evidence
+
+PARTICIPANT_PRIVATE promoted motion window
+  = projectable only for its participantRef
+
+promoted motion window
+  = must be bound to an included MOTION_WINDOW_PROMOTED Chronicle event
+    whose payload names that exact windowRef
+
+projection/fork/saved-moment/permission/authorization coordinate refs
+  = re-derived from their exact semantic coordinates during readback
+```
+
+A valid outer digest therefore cannot rescue a renamed coordinate or detach a projected
+motion window from its exact promotion event.
+
 Replay/scrub projections are always explicit about:
 
 ```text
@@ -1121,6 +1145,17 @@ REDISTRIBUTE
 
 The decision must come from explicit external policy evidence. Relationship labels,
 invitation state, delivery status, or Chronicle participation are not permission.
+
+Stage 07E's executable proof admits only:
+
+```text
+evidenceClass=SYNTHETIC_EXTERNAL_POLICY_FIXTURE
+```
+
+This proves the adapter-neutral decision semantics without claiming live VexLife policy
+integration. Relabeling that synthetic evidence as a live VexLife decision and consistently
+rehashing it fails verification.
+
 `DENY` / `REVOKE` remove effective future grants without deleting accepted history.
 
 Stage 07E consumes only already-promoted motion windows. A live
