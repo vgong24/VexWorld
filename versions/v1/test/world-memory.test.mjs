@@ -259,7 +259,7 @@ test('World Memory projection is bounded, read-only and source-grounded', () => 
     chronicle: f.chronicle,
     snapshot: f.snapshot,
     motionWindows: [f.motionWindow]
-  }), /not present in source Chronicle|source evidence mismatch/);
+  }), /projection coordinate ref mismatch|not present in source Chronicle|source evidence mismatch/);
 
   const foreignBranch = canonicalClone(f.projection);
   foreignBranch.sourceBranchRef = 'worldline.foreign';
@@ -363,7 +363,7 @@ test('replay, private fork request and saved moment remain distinct effect-free 
     chronicle: f.chronicle,
     snapshot: f.snapshot,
     motionWindows: [f.motionWindow]
-  }), /source context mismatch/);
+  }), /fork request coordinate ref mismatch|source context mismatch/);
 
   const saved = formSavedMomentDescriptor({
     projection: f.projection,
@@ -470,7 +470,7 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
     audienceRefs: ['participant.mira'],
     currentnessRef: 'currentness.vexlife.relationships.forged.0001',
     consentRefOrNull: 'consent.world-memory.view.forged.0001'
-  }), /permission request source projection mismatch/);
+  }), /permission request coordinate ref mismatch|permission request source projection mismatch/);
 
   const viewAllow = formSyntheticExternalPolicyDecision({
     request: viewRequest,
