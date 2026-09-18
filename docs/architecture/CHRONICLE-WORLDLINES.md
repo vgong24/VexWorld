@@ -559,12 +559,144 @@ consent required for shared/public promotion
 
 Verifier paths preserve those same formation boundaries: live tails remain `EPHEMERAL_HOT_TAIL`, quantized samples are revalidated after readback, and shared/public promoted windows still require explicit consent even if altered bytes are consistently rehashed.
 
-Later real capture must additionally qualify device identity, clock alignment, calibration, transport loss, encryption, participant visibility and retention policy.
+### Stage 07C synthetic capture qualification
+
+Stage 07C does **not** open a hardware sensor stream. It adds a pure-data qualification
+contract that future real capture would have to satisfy before its motion could be
+represented as source-qualified Chronicle evidence.
+
+A synthetic capture-source descriptor binds:
 
 ```text
+captureMode = SYNTHETIC_FIXTURE_ONLY
+captureSourceRef
+participantRef
+sourceClassRef
+coordinateSpaceRef
+
+deviceClockDomainRef
+clockAlignmentRef
+clockAlignmentDomainRef
+
+calibrationRef
+calibrationCoordinateSpaceRef
+
+transportProfileRef
+privacyClass
+retentionClass = EPHEMERAL_HOT_TAIL
+
+captureSourceSha256
+```
+
+The descriptor fails closed when its clock-alignment domain does not match its declared
+device-clock domain or its calibration coordinate space does not match its declared
+motion coordinate space.
+
+Those refs prove only that the synthetic fixture carries explicit alignment/calibration
+evidence coordinates. They do **not** prove that a real headset, controller or tracker
+was actually calibrated or time-synchronized.
+
+Qualified samples add:
+
+```text
+captureSource
+sourceTimeMicroseconds
+transportQuality =
+  DIRECT_OBSERVED
+  | INTERPOLATED_ESTIMATE
+  | GAP_MARKER
+
+poseOrNull
+materialityRefs[]
+```
+
+Transport quality is world-visible evidence:
+
+```text
+DIRECT_OBSERVED
+  pose required
+
+INTERPOLATED_ESTIMATE
+  pose required
+  pose is explicitly not represented as direct physical observation
+
+GAP_MARKER
+  pose must be null
+  missing transport cannot be silently fabricated as an exact pose
+```
+
+For each capture source that remains inside the bounded hot tail,
+`sourceTimeMicroseconds` must increase strictly. This is a **retained-tail**
+monotonicity statement only; once old samples expire, Stage 07C does not claim to
+possess or reconstruct a complete device-clock history.
+
+A qualified sample embeds the exact synthetic capture-source descriptor, so a promoted
+window retains the capture qualification that applied to the selected material
+interval.
+
+### Stage 07C material promotion / consent
+
+Promotion continues to select only currently retained samples inside an exact
+`fromTick..toTick` interval and binds:
+
+```text
+reasonRef
+eventRefs[]
+privacyClass
+retentionClass
+consentRefOrNull
+```
+
+Material event refs may include causal events such as:
+
+```text
+HIT_RESOLVED
+ENVIRONMENT_FRACTURED
+MOTION_WINDOW_PROMOTED
+```
+
+without converting unrelated session motion into durable history.
+
+```text
+PARTICIPANT_PRIVATE
+  may be promoted without a shared-consent ref
+
+PARTY_SHARED / PUBLIC_WORLD
+  require explicit consent evidence
+```
+
+Removing shared/public consent and consistently rehashing the object still fails
+verification.
+
+Promoted windows are immutable content-addressed evidence: later hot-tail expiry does
+not rewrite an already promoted exact window.
+
+### Real capture remains a later protected effect
+
+Real capture must still separately qualify actual device identity, clock accuracy,
+calibration procedure, transport loss behavior, encryption/local storage, participant
+visibility, consent lifecycle and retention policy.
+
+Stage 07C synthetic work does not access or authorize:
+
+```text
+camera
+microphone
+headset/controller device
+body tracker
+OS sensor
+real-user motion stream
+background sensing
+biometric classification
+physical actuation
+```
+
+```text
+REAL_DEVICE_CAPTURE != SYNTHETIC_CAPTURE_CONTRACT
 HOT_TAIL != SESSION_ARCHIVE
 GAZE_OR_POSE != PUBLIC_HISTORY
 MOTION_CAPTURE != BIOMETRIC_CLASSIFICATION
+MOTION_STREAM != IDENTITY_OR_WORTH
 ```
 
 ## Particles, destruction and fluids
