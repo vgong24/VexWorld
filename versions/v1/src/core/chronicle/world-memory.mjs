@@ -143,7 +143,11 @@ function normalizeMotionWindows(windows) {
     seen.add(window.windowRef);
     normalized.push(window);
   }
-  return normalized;
+  return normalized.sort((left, right) =>
+    (left.fromTick - right.fromTick) ||
+    (left.toTick - right.toTick) ||
+    left.windowRef.localeCompare(right.windowRef, 'en')
+  );
 }
 
 function resolveProjectionEvidence({
@@ -154,7 +158,8 @@ function resolveProjectionEvidence({
   includedEventRefs,
   includedDecisionRefs,
   includedMotionWindows,
-  privacyClass
+  privacyClass,
+  viewerParticipantRef
 }) {
   verifyChronicle(chronicle);
   verifyWorldSnapshot(snapshot, { epoch: chronicle.epoch, chronicle });
@@ -183,6 +188,13 @@ function resolveProjectionEvidence({
     if (!PROJECTABLE_PRIVACY.has(event.privacyClass)) {
       throw new TypeError('projection cannot include a protected/non-user-facing Chronicle event');
     }
+    if (
+      event.privacyClass === 'PARTICIPANT_PRIVATE' &&
+      event.actorRef !== viewerParticipantRef &&
+      event.payload?.deliveredToRef !== viewerParticipantRef
+    ) {
+      throw new TypeError('projection cannot include another participant private Chronicle event');
+    }
     selectedEvents.push(event);
   }
 
@@ -206,6 +218,12 @@ function resolveProjectionEvidence({
   for (const window of windows) {
     if (window.fromTick < fromTick || window.toTick > toTick) {
       throw new TypeError('projection motion window falls outside selected interval');
+    }
+    if (
+      window.privacyClass === 'PARTICIPANT_PRIVATE' &&
+      window.participantRef !== viewerParticipantRef
+    ) {
+      throw new TypeError('projection cannot include another participant private motion window');
     }
     for (const eventRef of window.eventRefs) {
       if (!selectedSet.has(eventRef)) {
@@ -246,7 +264,8 @@ export function formWorldMemoryProjection(input) {
     includedEventRefs: input.includedEventRefs,
     includedDecisionRefs: input.includedDecisionRefs,
     includedMotionWindows: input.includedMotionWindows,
-    privacyClass: input.privacyClass
+    privacyClass: input.privacyClass,
+    viewerParticipantRef: input.viewerParticipantRef
   });
 
   const coordinateSha256 = hashCanonical({
@@ -366,7 +385,8 @@ export function verifyWorldMemoryProjection(projection, {
       includedEventRefs: projection.includedEventRefs,
       includedDecisionRefs: projection.includedDecisionRefs,
       includedMotionWindows: motionWindows,
-      privacyClass: projection.privacyClass
+      privacyClass: projection.privacyClass,
+      viewerParticipantRef: projection.viewerParticipantRef
     });
     if (
       projection.sourceTimelineRef !== chronicle.timelineRef ||
