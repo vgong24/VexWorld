@@ -268,7 +268,7 @@ test('World Memory projection is bounded, read-only and source-grounded', () => 
     chronicle: f.chronicle,
     snapshot: f.snapshot,
     motionWindows: [f.motionWindow]
-  }), /source evidence mismatch/);
+  }), /coordinate ref mismatch|source evidence mismatch/);
 
   assert.throws(() => formWorldMemoryProjection({
     chronicle: f.chronicle,
@@ -303,6 +303,29 @@ test('World Memory projection is bounded, read-only and source-grounded', () => 
     includedMotionWindows: [f.motionWindow],
     privacyClass: 'PARTICIPANT_PRIVATE'
   }), /another participant private Chronicle event/);
+
+  const promotionEventMismatch = promoteMotionWindow(f.tail, {
+    windowRef: 'motion-window.world-memory.unbound.0001',
+    fromTick: 2,
+    toTick: 3,
+    reasonRef: 'reason.world-memory.unbound-promotion-proof',
+    consentRefOrNull: 'consent.world-memory.party.unbound.0001',
+    privacyClass: 'PARTY_SHARED',
+    retentionClass: 'EVENT_EVIDENCE',
+    eventRefs: [f.intent.eventRef, f.promoted.eventRef]
+  });
+  verifyMotionWindow(promotionEventMismatch);
+  assert.throws(() => formWorldMemoryProjection({
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    viewerParticipantRef: 'participant.victor',
+    fromTick: 1,
+    toTick: 3,
+    includedEventRefs: [f.observed.eventRef, f.intent.eventRef, f.promoted.eventRef],
+    includedDecisionRefs: [f.decisionRef],
+    includedMotionWindows: [promotionEventMismatch],
+    privacyClass: 'PARTY_SHARED'
+  }), /not bound to an included MOTION_WINDOW_PROMOTED event for its exact windowRef/);
 
   assert.throws(() => formWorldMemoryProjection({
     chronicle: f.chronicle,
