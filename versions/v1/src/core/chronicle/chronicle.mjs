@@ -45,6 +45,31 @@ const BRANCH_CLASS = new Set([
 const FIGHT = new Set(FIGHT_EVENT_CLASSES);
 const pad = (n, width) => String(n).padStart(width, '0');
 
+function validateNullableSafeRef(value, label) {
+  if (value !== null) assertSafeRef(value, label);
+  return value;
+}
+
+function validateDecisionProposedIntent(value) {
+  assertPlainObject(value, 'proposedIntent');
+  rejectHiddenReasoning(value, 'proposedIntent');
+  assertExactKeys(value, ['intentType', 'targetRef', 'reason'], 'proposedIntent');
+  assertSafeRef(value.intentType, 'proposedIntent.intentType');
+  validateNullableSafeRef(value.targetRef, 'proposedIntent.targetRef');
+  boundedText(value.reason, 'proposedIntent.reason', 180);
+  return value;
+}
+
+function validateDecisionAcceptedIntent(value) {
+  assertPlainObject(value, 'acceptedIntentOrNull');
+  rejectHiddenReasoning(value, 'acceptedIntentOrNull');
+  assertExactKeys(value, ['intentRef', 'intentType', 'targetRef'], 'acceptedIntentOrNull');
+  assertSafeRef(value.intentRef, 'acceptedIntentOrNull.intentRef');
+  assertSafeRef(value.intentType, 'acceptedIntentOrNull.intentType');
+  validateNullableSafeRef(value.targetRef, 'acceptedIntentOrNull.targetRef');
+  return value;
+}
+
 function boundedText(value, label, max = 160) {
   if (typeof value !== 'string' || !value.trim() || value.length > max || /[\u0000-\u001f\u007f]/u.test(value)) {
     throw new TypeError(`${label} must be bounded printable text`);
@@ -653,8 +678,8 @@ function validateIntelligenceDecisionBody(body, label = 'decision') {
     assertSafeRef(body.modelIdentityOrNull.modelRef, 'modelRef');
     assertSha256(body.modelIdentityOrNull.modelDigest, 'modelDigest');
   }
-  assertPlainObject(body.proposedIntent, 'proposedIntent');
-  if (body.acceptedIntentOrNull !== null) assertPlainObject(body.acceptedIntentOrNull, 'acceptedIntentOrNull');
+  validateDecisionProposedIntent(body.proposedIntent);
+  if (body.acceptedIntentOrNull !== null) validateDecisionAcceptedIntent(body.acceptedIntentOrNull);
   if (body.rejectionReasonOrNull !== null) assertSafeRef(body.rejectionReasonOrNull, 'rejectionReasonOrNull');
   if (body.fallbackReasonOrNull !== null) assertSafeRef(body.fallbackReasonOrNull, 'fallbackReasonOrNull');
 
