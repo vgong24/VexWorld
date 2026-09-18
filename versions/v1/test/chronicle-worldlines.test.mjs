@@ -22,6 +22,7 @@ import {
   verifyChronicle,
   verifyIntelligenceDecision,
   verifyPredictedHead,
+  verifyReplayReceipt,
   verifyRollbackReceipt,
   verifyVerifiedHead,
   verifyWorldSnapshot,
@@ -1596,7 +1597,12 @@ test('verified and predicted heads reconcile local speculation without rewriting
     inputFrames: predictedFrames,
     executionKernel: kernel
   });
-  verifyPredictedHead(predicted.predictedHead, { verifiedHead });
+  verifyPredictedHead(predicted.predictedHead, {
+    verifiedHead,
+    inputFrames: predictedFrames,
+    replayReceipt: predicted.replay
+  });
+  verifyReplayReceipt(predicted.replay);
   assert.equal(predicted.predictedHead.headClass, 'PREDICTED_HEAD');
   assert.equal(predicted.predictedHead.authorityClass, 'LOCAL_SPECULATION_ONLY');
   assert.notEqual(predicted.predictedHead.predictionBranchRef, verifiedHead.branchRef);
@@ -1631,6 +1637,18 @@ test('verified and predicted heads reconcile local speculation without rewriting
   }
   assert.throws(() => verifyPredictedHead(authorityTamper), /cannot claim accepted authority/);
 
+  const rehashedPredictionEvidenceLie = canonicalClone(predicted.predictedHead);
+  rehashedPredictionEvidenceLie.inputSemanticSha256s[0] = H('c');
+  {
+    const { predictedHeadSha256: _ignored, ...body } = rehashedPredictionEvidenceLie;
+    rehashedPredictionEvidenceLie.predictedHeadSha256 = hashCanonical(body);
+  }
+  assert.throws(() => verifyPredictedHead(rehashedPredictionEvidenceLie, {
+    verifiedHead,
+    inputFrames: predictedFrames,
+    replayReceipt: predicted.replay
+  }), /replay evidence mismatch/);
+
   const authoritativeFrames = parentFrames(verifiedBranchRef).slice(0, 3);
   assert.notEqual(authoritativeFrames[0].inputFrameSha256, predictedFrames[0].inputFrameSha256);
   assert.equal(worldInputSemanticSha256(authoritativeFrames[0]), worldInputSemanticSha256(predictedFrames[0]));
@@ -1659,8 +1677,11 @@ test('verified and predicted heads reconcile local speculation without rewriting
   assert.equal(JSON.stringify(sourceChronicle), parentBeforeReconcile);
   verifyRollbackReceipt(matched.rollbackReceipt, {
     predictedHead: predicted.predictedHead,
-    verifiedHead
+    verifiedHead,
+    authoritativeInputFrames: authoritativeFrames,
+    authoritativeReplay: matched.authoritativeReplay
   });
+  verifyReplayReceipt(matched.authoritativeReplay);
 
   const divergentFrames = [
     frame(verifiedBranchRef, 1, {
@@ -1697,7 +1718,9 @@ test('verified and predicted heads reconcile local speculation without rewriting
   assert.equal(JSON.stringify(sourceChronicle), parentBeforeReconcile);
   verifyRollbackReceipt(divergent.rollbackReceipt, {
     predictedHead: predicted.predictedHead,
-    verifiedHead
+    verifiedHead,
+    authoritativeInputFrames: divergentFrames,
+    authoritativeReplay: divergent.authoritativeReplay
   });
 
   const rollbackModeTamper = canonicalClone(matched.rollbackReceipt);
@@ -1712,6 +1735,22 @@ test('verified and predicted heads reconcile local speculation without rewriting
       verifiedHead
     }),
     /mode\/mismatch classification inconsistent/
+  );
+
+  const rehashedRollbackEvidenceLie = canonicalClone(divergent.rollbackReceipt);
+  rehashedRollbackEvidenceLie.authoritativeInputSemanticSha256s[0] = H('d');
+  {
+    const { rollbackReceiptSha256: _ignored, ...body } = rehashedRollbackEvidenceLie;
+    rehashedRollbackEvidenceLie.rollbackReceiptSha256 = hashCanonical(body);
+  }
+  assert.throws(
+    () => verifyRollbackReceipt(rehashedRollbackEvidenceLie, {
+      predictedHead: predicted.predictedHead,
+      verifiedHead,
+      authoritativeInputFrames: divergentFrames,
+      authoritativeReplay: divergent.authoritativeReplay
+    }),
+    /semantic comparison mismatch|authoritative replay evidence mismatch/
   );
 
   const resync = formAuthoritativeResyncReceipt({
