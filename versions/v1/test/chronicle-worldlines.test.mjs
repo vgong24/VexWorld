@@ -1074,6 +1074,40 @@ test('intelligence decision records bounded causal evidence and rejects hidden r
   assert.equal(rejected.rejectionReasonOrNull, 'reason.not-afforded');
   assert.equal(verifyIntelligenceDecision(rejected), rejected);
 
+  assert.throws(() => formIntelligenceDecision({
+    decisionRef: 'decision.participant.vex.invalid-neither.0001',
+    participantRef: 'participant.vex',
+    workerRef: 'worker.vex.local.0001',
+    sourceObservationRef: 'observation.vex.fight.0001',
+    sourceObservationSha256: H('c'),
+    visibleContextRefs: [],
+    controllerRef: 'controller.vex.local-model.v1',
+    controllerDisposition: 'OLLAMA',
+    modelIdentityOrNull: null,
+    proposedIntent: { intentType: 'GUARD', targetRef: null },
+    acceptedIntentOrNull: null,
+    rejectionReasonOrNull: null,
+    fallbackReasonOrNull: null,
+    conciseReasonOrNull: null
+  }), /exactly one accepted intent or rejection reason/);
+
+  assert.throws(() => formIntelligenceDecision({
+    decisionRef: 'decision.participant.vex.invalid-fallback.0001',
+    participantRef: 'participant.vex',
+    workerRef: 'worker.vex.local.0001',
+    sourceObservationRef: 'observation.vex.fight.0001',
+    sourceObservationSha256: H('c'),
+    visibleContextRefs: [],
+    controllerRef: 'controller.vex.remote.deterministic-fallback',
+    controllerDisposition: 'DETERMINISTIC_FALLBACK',
+    modelIdentityOrNull: null,
+    proposedIntent: { intentType: 'GUARD', targetRef: null },
+    acceptedIntentOrNull: { intentRef: 'intent.vex.guard.invalid', intentType: 'GUARD', targetRef: null },
+    rejectionReasonOrNull: null,
+    fallbackReasonOrNull: null,
+    conciseReasonOrNull: null
+  }), /fallback disposition\/reason mismatch/);
+
   const tampered = canonicalClone(decision);
   tampered.fallbackReasonOrNull = 'MODEL_TIMEOUT';
   assert.throws(() => verifyIntelligenceDecision(tampered), /decision digest mismatch/);
@@ -1157,12 +1191,16 @@ test('accepted-intent events bind decision and observation refs while fresh alte
     payload: {
       intentRef: decision.acceptedIntentOrNull.intentRef,
       decisionRef: decision.decisionRef,
-      sourceObservationRef: decision.sourceObservationRef
+      decisionSha256: decision.decisionSha256,
+      sourceObservationRef: decision.sourceObservationRef,
+      sourceObservationSha256: decision.sourceObservationSha256
     }
   });
   parent = accepted.chronicle;
   verifyChronicle(parent);
   assert.deepEqual(accepted.event.causationRefs, [observed.event.eventRef, decision.decisionRef]);
+  assert.equal(accepted.event.payload.decisionSha256, decision.decisionSha256);
+  assert.equal(accepted.event.payload.sourceObservationSha256, decision.sourceObservationSha256);
 
   const snapshotState = initialFightState();
   snapshotState.tick = 2;
@@ -1209,7 +1247,9 @@ test('accepted-intent events bind decision and observation refs while fresh alte
     payload: {
       intentRef: alternateDecision.acceptedIntentOrNull.intentRef,
       decisionRef: alternateDecision.decisionRef,
-      sourceObservationRef: alternateDecision.sourceObservationRef
+      decisionSha256: alternateDecision.decisionSha256,
+      sourceObservationRef: alternateDecision.sourceObservationRef,
+      sourceObservationSha256: alternateDecision.sourceObservationSha256
     }
   });
 
