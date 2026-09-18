@@ -455,11 +455,21 @@ function validateQualifiedMotionSample(sample, owner) {
   }
   if (
     sample.captureSource.participantRef !== owner.participantRef ||
-    sample.captureSource.coordinateSpaceRef !== owner.coordinateSpaceRef ||
-    sample.captureSource.privacyClass !== owner.privacyClass ||
+    sample.captureSource.coordinateSpaceRef !== owner.coordinateSpaceRef
+  ) {
+    throw new TypeError('qualified motion sample capture source does not match owner coordinates');
+  }
+  if (
+    owner.privacyClass !== undefined &&
+    sample.captureSource.privacyClass !== owner.privacyClass
+  ) {
+    throw new TypeError('qualified motion sample capture source privacy does not match live tail');
+  }
+  if (
+    owner.retentionClass !== undefined &&
     sample.captureSource.retentionClass !== owner.retentionClass
   ) {
-    throw new TypeError('qualified motion sample capture source does not match owner');
+    throw new TypeError('qualified motion sample capture source retention does not match live tail');
   }
   assertNonNegativeInteger(sample.sourceTimeMicroseconds, 'qualified motion sample sourceTimeMicroseconds');
   assertTransportQuality(sample.transportQuality, 'qualified motion sample transportQuality');
