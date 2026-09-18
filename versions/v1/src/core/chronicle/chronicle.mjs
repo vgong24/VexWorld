@@ -50,13 +50,20 @@ function validateNullableSafeRef(value, label) {
   return value;
 }
 
+function boundedDecisionReason(value, label, max = 180) {
+  if (typeof value !== 'string' || !value.trim() || value.length > max) {
+    throw new TypeError(`${label} must be bounded non-empty text`);
+  }
+  return value;
+}
+
 function validateDecisionProposedIntent(value) {
   assertPlainObject(value, 'proposedIntent');
   rejectHiddenReasoning(value, 'proposedIntent');
   assertExactKeys(value, ['intentType', 'targetRef', 'reason'], 'proposedIntent');
   assertSafeRef(value.intentType, 'proposedIntent.intentType');
   validateNullableSafeRef(value.targetRef, 'proposedIntent.targetRef');
-  boundedText(value.reason, 'proposedIntent.reason', 180);
+  boundedDecisionReason(value.reason, 'proposedIntent.reason', 180);
   return value;
 }
 
