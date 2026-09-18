@@ -128,6 +128,18 @@ function fixture() {
     payload: { actionRef: 'action.world-memory.private.0001' }
   });
   chronicle = privateEvent.chronicle;
+
+  const otherPrivateEvent = appendChronicleEvent(chronicle, {
+    tick: 3,
+    ordinal: 2,
+    actorRef: 'participant.mira',
+    eventClass: 'ACTION_STARTED',
+    privacyClass: 'PARTICIPANT_PRIVATE',
+    causationRefs: [intent.event.eventRef],
+    correlationRefOrNull: 'correlation.world-memory.private.mira.0001',
+    payload: { actionRef: 'action.world-memory.private.mira.0001' }
+  });
+  chronicle = otherPrivateEvent.chronicle;
   verifyChronicle(chronicle);
 
   const snapshot = sealWorldSnapshot({
@@ -204,7 +216,8 @@ function fixture() {
     observed: observed.event,
     intent: intent.event,
     promoted: promoted.event,
-    privateEvent: privateEvent.event
+    privateEvent: privateEvent.event,
+    otherPrivateEvent: otherPrivateEvent.event
   };
 }
 
@@ -265,6 +278,23 @@ test('World Memory projection is bounded, read-only and source-grounded', () => 
     includedMotionWindows: [f.motionWindow],
     privacyClass: 'PARTY_SHARED'
   }), /cannot widen source privacy/);
+
+  assert.throws(() => formWorldMemoryProjection({
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    viewerParticipantRef: 'participant.victor',
+    fromTick: 1,
+    toTick: 3,
+    includedEventRefs: [
+      f.observed.eventRef,
+      f.intent.eventRef,
+      f.promoted.eventRef,
+      f.otherPrivateEvent.eventRef
+    ],
+    includedDecisionRefs: [f.decisionRef],
+    includedMotionWindows: [f.motionWindow],
+    privacyClass: 'PARTICIPANT_PRIVATE'
+  }), /another participant private Chronicle event/);
 
   assert.throws(() => formWorldMemoryProjection({
     chronicle: f.chronicle,
@@ -372,6 +402,9 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
     chronicle: f.chronicle,
     snapshot: f.snapshot,
     motionWindows: [f.motionWindow],
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow],
     requesterParticipantRef: 'participant.victor',
     subjectParticipantRefs: ['participant.victor', 'participant.mira'],
     requestedCapabilityRefs: ['capability.world-memory.view'],
@@ -404,6 +437,10 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
     chronicle: f.chronicle,
     snapshot: f.snapshot,
     motionWindows: [f.motionWindow],
+    projection: f.projection,
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow],
     policyDecisionRef: 'policy-decision.world-memory.view.0001',
     decisionClass: 'ALLOW',
     grantedCapabilityRefs: ['capability.world-memory.view'],
@@ -412,6 +449,14 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
     consentRefOrNull: 'consent.world-memory.view.0001'
   });
   verifyExternalPolicyDecision(viewAllow);
+
+  const liveEvidenceLie = canonicalClone(viewAllow);
+  liveEvidenceLie.evidenceClass = 'LIVE_VEXLIFE_POLICY_DECISION';
+  rehash(liveEvidenceLie, 'policyDecisionSha256');
+  assert.throws(
+    () => verifyExternalPolicyDecision(liveEvidenceLie),
+    /only synthetic external-policy fixture evidence/
+  );
 
   const viewAuthorization = evaluateWorldMemoryAuthorization({
     request: viewRequest,
@@ -470,6 +515,9 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
     chronicle: f.chronicle,
     snapshot: f.snapshot,
     motionWindows: [f.motionWindow],
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow],
     requesterParticipantRef: 'participant.victor',
     subjectParticipantRefs: ['participant.victor', 'participant.mira'],
     requestedCapabilityRefs: [
@@ -485,6 +533,10 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
 
   const narrowed = formSyntheticExternalPolicyDecision({
     request: wideRequest,
+    projection: f.projection,
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow],
     projection: f.projection,
     chronicle: f.chronicle,
     snapshot: f.snapshot,
@@ -509,6 +561,10 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
 
   const revoked = formSyntheticExternalPolicyDecision({
     request: viewRequest,
+    projection: f.projection,
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow],
     projection: f.projection,
     chronicle: f.chronicle,
     snapshot: f.snapshot,
