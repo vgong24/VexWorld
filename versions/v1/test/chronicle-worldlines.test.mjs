@@ -18,12 +18,16 @@ import {
   verifyWorldSnapshot
 } from '../src/core/chronicle/chronicle.mjs';
 import {
+  MOTION_CAPTURE_MODE,
   appendMotionSample,
+  appendQualifiedMotionSample,
   createMotionTail,
   expireMotionTail,
+  formSyntheticMotionCaptureSource,
   promoteMotionWindow,
   verifyMotionTail,
-  verifyMotionWindow
+  verifyMotionWindow,
+  verifySyntheticMotionCaptureSource
 } from '../src/core/chronicle/motion-tail.mjs';
 import { canonicalClone, hashCanonical } from '../src/core/chronicle/canonical.mjs';
 
@@ -929,6 +933,192 @@ test('motion hot tail quantizes, bounds, expires and promotes only consented mat
   assert.equal(window.sampleCount, 3);
   const { motionWindowSha256, ...windowBody } = canonicalClone(window);
   assert.equal(motionWindowSha256, hashCanonical(windowBody));
+});
+
+test('synthetic motion capture qualification binds clock/calibration/transport and promotes only exact consented material windows', () => {
+  const sourceInput = {
+    captureSourceRef: 'capture.synthetic.victor.headset.0001',
+    participantRef: 'participant.victor',
+    sourceClassRef: 'motion-source-class.synthetic-headset.v1',
+    coordinateSpaceRef: 'space.first-grove.arena',
+    deviceClockDomainRef: 'clock.synthetic.headset.0001',
+    clockAlignmentRef: 'clock-alignment.synthetic.headset-to-world.0001',
+    clockAlignmentDomainRef: 'clock.synthetic.headset.0001',
+    calibrationRef: 'calibration.synthetic.headset.arena.0001',
+    calibrationCoordinateSpaceRef: 'space.first-grove.arena',
+    transportProfileRef: 'transport.synthetic.xr-fixture.v1',
+    privacyClass: 'PARTICIPANT_PRIVATE',
+    retentionClass: 'EPHEMERAL_HOT_TAIL'
+  };
+  const source = formSyntheticMotionCaptureSource(sourceInput);
+  assert.equal(source.captureMode, MOTION_CAPTURE_MODE);
+  assert.equal(verifySyntheticMotionCaptureSource(source), source);
+
+  assert.throws(() => formSyntheticMotionCaptureSource({
+    ...sourceInput,
+    clockAlignmentRef: null
+  }), /clockAlignmentRef/);
+
+  assert.throws(() => formSyntheticMotionCaptureSource({
+    ...sourceInput,
+    clockAlignmentDomainRef: 'clock.synthetic.other'
+  }), /clock-alignment domain mismatch/);
+
+  assert.throws(() => formSyntheticMotionCaptureSource({
+    ...sourceInput,
+    calibrationCoordinateSpaceRef: 'space.first-grove.wrong'
+  }), /calibration coordinate-space mismatch/);
+
+  let tail = createMotionTail({
+    tailRef: 'motion-tail.victor.qualified-headset.0001',
+    participantRef: 'participant.victor',
+    coordinateSpaceRef: 'space.first-grove.arena',
+    maxSamples: 3,
+    maxAgeTicks: 2,
+    privacyClass: 'PARTICIPANT_PRIVATE',
+    retentionClass: 'EPHEMERAL_HOT_TAIL'
+  });
+
+  const pose = (x) => ({
+    positionMeters: { x, y: 1.75, z: -x / 2 },
+    orientationQuaternion: { x: 0, y: 0, z: 0, w: 1 },
+    linearVelocityMetersPerSecondOrNull: { x: 0.25, y: 0, z: 0 },
+    angularVelocityRadiansPerSecondOrNull: null
+  });
+
+  tail = appendQualifiedMotionSample(tail, source, {
+    sequence: 1,
+    tick: 10,
+    sourceTimeMicroseconds: 1_000,
+    transportQuality: 'DIRECT_OBSERVED',
+    poseOrNull: pose(0.1),
+    materialityRefs: []
+  }).tail;
+  tail = appendQualifiedMotionSample(tail, source, {
+    sequence: 2,
+    tick: 11,
+    sourceTimeMicroseconds: 2_000,
+    transportQuality: 'INTERPOLATED_ESTIMATE',
+    poseOrNull: pose(0.2),
+    materialityRefs: ['materiality.fight.hit-resolution']
+  }).tail;
+  tail = appendQualifiedMotionSample(tail, source, {
+    sequence: 3,
+    tick: 12,
+    sourceTimeMicroseconds: 3_000,
+    transportQuality: 'GAP_MARKER',
+    poseOrNull: null,
+    materialityRefs: ['materiality.environment.wall-fracture']
+  }).tail;
+
+  verifyMotionTail(tail);
+  assert.equal(tail.samples[0].transportQuality, 'DIRECT_OBSERVED');
+  assert.equal(tail.samples[1].transportQuality, 'INTERPOLATED_ESTIMATE');
+  assert.equal(tail.samples[2].transportQuality, 'GAP_MARKER');
+  assert.equal(tail.samples[2].poseOrNull, null);
+  assert.equal(tail.samples[0].captureSource.captureMode, 'SYNTHETIC_FIXTURE_ONLY');
+
+  assert.throws(() => appendQualifiedMotionSample(tail, source, {
+    sequence: 4,
+    tick: 13,
+    sourceTimeMicroseconds: 2_500,
+    transportQuality: 'DIRECT_OBSERVED',
+    poseOrNull: pose(0.4),
+    materialityRefs: []
+  }), /source time must increase strictly/);
+
+  const alternateSource = formSyntheticMotionCaptureSource({
+    ...sourceInput,
+    captureSourceRef: 'capture.synthetic.victor.headset.other'
+  });
+  assert.throws(() => appendQualifiedMotionSample(tail, alternateSource, {
+    sequence: 4,
+    tick: 13,
+    sourceTimeMicroseconds: 4_000,
+    transportQuality: 'DIRECT_OBSERVED',
+    poseOrNull: pose(0.4),
+    materialityRefs: []
+  }), /cannot switch qualified capture source/);
+
+  tail = appendQualifiedMotionSample(tail, source, {
+    sequence: 4,
+    tick: 13,
+    sourceTimeMicroseconds: 4_000,
+    transportQuality: 'DIRECT_OBSERVED',
+    poseOrNull: pose(0.4),
+    materialityRefs: ['materiality.motion.promoted-window']
+  }).tail;
+  verifyMotionTail(tail);
+  assert.deepEqual(tail.samples.map((sample) => sample.tick), [11, 12, 13]);
+
+  const tamperedTail = canonicalClone(tail);
+  tamperedTail.samples[0].captureSource.calibrationCoordinateSpaceRef = 'space.first-grove.wrong';
+  {
+    const { captureSourceSha256, ...captureBody } = tamperedTail.samples[0].captureSource;
+    tamperedTail.samples[0].captureSource.captureSourceSha256 = hashCanonical(captureBody);
+  }
+  {
+    const { sampleSha256, ...sampleBody } = tamperedTail.samples[0];
+    tamperedTail.samples[0].sampleSha256 = hashCanonical(sampleBody);
+  }
+  assert.throws(() => verifyMotionTail(tamperedTail), /calibration coordinate-space mismatch/);
+
+  const eventRefs = [
+    'event.first-grove.hit-resolved.0001',
+    'event.first-grove.environment-fractured.0001',
+    'event.first-grove.motion-window-promoted.0001'
+  ];
+
+  const privateWindow = promoteMotionWindow(tail, {
+    windowRef: 'motion-window.victor.qualified.private.0001',
+    fromTick: 11,
+    toTick: 13,
+    reasonRef: 'reason.material-fight-and-fracture-window',
+    consentRefOrNull: null,
+    privacyClass: 'PARTICIPANT_PRIVATE',
+    retentionClass: 'EVENT_EVIDENCE',
+    eventRefs
+  });
+  verifyMotionWindow(privateWindow);
+  assert.equal(privateWindow.sampleCount, 3);
+  assert.deepEqual(privateWindow.eventRefs, eventRefs);
+
+  assert.throws(() => promoteMotionWindow(tail, {
+    windowRef: 'motion-window.victor.qualified.shared.no-consent',
+    fromTick: 11,
+    toTick: 13,
+    reasonRef: 'reason.material-fight-and-fracture-window',
+    consentRefOrNull: null,
+    privacyClass: 'PARTY_SHARED',
+    retentionClass: 'SESSION_REPLAY',
+    eventRefs
+  }), /consent/);
+
+  const sharedWindow = promoteMotionWindow(tail, {
+    windowRef: 'motion-window.victor.qualified.shared.0001',
+    fromTick: 11,
+    toTick: 13,
+    reasonRef: 'reason.material-fight-and-fracture-window',
+    consentRefOrNull: 'consent.victor.synthetic-party-replay.0001',
+    privacyClass: 'PARTY_SHARED',
+    retentionClass: 'SESSION_REPLAY',
+    eventRefs
+  });
+  verifyMotionWindow(sharedWindow);
+
+  const consentStripped = canonicalClone(sharedWindow);
+  consentStripped.consentRefOrNull = null;
+  {
+    const { motionWindowSha256, ...windowBody } = consentStripped;
+    consentStripped.motionWindowSha256 = hashCanonical(windowBody);
+  }
+  assert.throws(() => verifyMotionWindow(consentStripped), /consent/);
+
+  const promotedHash = sharedWindow.motionWindowSha256;
+  const expired = expireMotionTail(tail, 100);
+  assert.equal(expired.samples.length, 0);
+  assert.equal(verifyMotionWindow(sharedWindow), sharedWindow);
+  assert.equal(sharedWindow.motionWindowSha256, promotedHash);
 });
 
 test('motion verifiers reject rehashed durable live tails, invalid quantized samples and consent-stripped shared windows', () => {
