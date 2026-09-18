@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "vexworld.source-map-fragment/v1",
+  "fragmentRef": "source-map-fragment.vexworld.v1.stage-07d-rollback-resync",
+  "reason": "Register VW-FWD-07D local verified/predicted-head rollback and authoritative-resync protocol work while reusing already-mapped Chronicle, SessionStore and HeadlessRealmHost owners without duplicating source-map ownership.",
+  "entries": [
+    {
+      "path": "config/source-map.fragments/stage-07d-rollback-resync.json",
+      "category": "navigation-and-coverage",
+      "owner": "Vex Chronicle",
+      "sourceClass": "CANONICAL_SOURCE"
+    }
+  ]
+}

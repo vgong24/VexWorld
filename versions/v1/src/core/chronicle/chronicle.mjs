@@ -24,7 +24,12 @@ export const SCHEMA = Object.freeze({
   snapshot: 'vexworld.world-snapshot/v1',
   branch: 'vexworld.worldline-branch/v1',
   decision: 'vexworld.intelligence-decision/v1',
-  replay: 'vexworld.worldline-replay-receipt/v1'
+  replay: 'vexworld.worldline-replay-receipt/v1',
+  verifiedHead: 'vexworld.verified-head/v1',
+  predictedHead: 'vexworld.predicted-head/v1',
+  predictionComparison: 'vexworld.prediction-comparison/v1',
+  rollback: 'vexworld.rollback-receipt/v1',
+  resync: 'vexworld.authoritative-resync-receipt/v1'
 });
 
 export const FIGHT_EVENT_CLASSES = Object.freeze([
@@ -737,6 +742,47 @@ export function formIntelligenceDecision(input) {
   return frozenCanonical({ ...body, decisionSha256: hashCanonical(body) });
 }
 
+export function verifyReplayReceipt(receipt) {
+  assertPlainObject(receipt, 'replay receipt');
+  assertExactKeys(receipt, [
+    'schemaVersion', 'sourceSnapshotRef', 'sourceSnapshotSha256', 'targetBranchRef',
+    'determinismEpochRef', 'determinismEpochSha256', 'executedKernelRef',
+    'executedKernelSha256', 'startTick', 'finalTick', 'frameCount', 'frameHashes',
+    'finalState', 'finalStateSha256', 'inputMode', 'replayReceiptSha256'
+  ], 'replay receipt');
+  if (receipt.schemaVersion !== SCHEMA.replay) throw new TypeError('replay receipt schema mismatch');
+  assertSafeRef(receipt.sourceSnapshotRef, 'replay receipt.sourceSnapshotRef');
+  assertSha256(receipt.sourceSnapshotSha256, 'replay receipt.sourceSnapshotSha256');
+  assertSafeRef(receipt.targetBranchRef, 'replay receipt.targetBranchRef');
+  assertSafeRef(receipt.determinismEpochRef, 'replay receipt.determinismEpochRef');
+  assertSha256(receipt.determinismEpochSha256, 'replay receipt.determinismEpochSha256');
+  assertSafeRef(receipt.executedKernelRef, 'replay receipt.executedKernelRef');
+  assertSha256(receipt.executedKernelSha256, 'replay receipt.executedKernelSha256');
+  assertNonNegativeInteger(receipt.startTick, 'replay receipt.startTick');
+  assertNonNegativeInteger(receipt.finalTick, 'replay receipt.finalTick');
+  assertNonNegativeInteger(receipt.frameCount, 'replay receipt.frameCount');
+  shaArray(receipt.frameHashes, 'replay receipt.frameHashes');
+  if (receipt.frameHashes.length !== receipt.frameCount) {
+    throw new TypeError('replay receipt frame count mismatch');
+  }
+  if (receipt.finalTick !== receipt.startTick + receipt.frameCount) {
+    throw new TypeError('replay receipt final tick mismatch');
+  }
+  assertPlainObject(receipt.finalState, 'replay receipt.finalState');
+  rejectHiddenReasoning(receipt.finalState, 'replay receipt.finalState');
+  assertSha256(receipt.finalStateSha256, 'replay receipt.finalStateSha256');
+  if (hashCanonical(receipt.finalState) !== receipt.finalStateSha256) {
+    throw new TypeError('replay receipt final state digest mismatch');
+  }
+  if (receipt.inputMode !== 'RECORDED_INPUT_FRAMES_ONLY') {
+    throw new TypeError('replay receipt input mode mismatch');
+  }
+  assertSha256(receipt.replayReceiptSha256, 'replay receipt.replayReceiptSha256');
+  const { replayReceiptSha256, ...body } = receipt;
+  if (hashCanonical(body) !== replayReceiptSha256) throw new TypeError('replay receipt digest mismatch');
+  return receipt;
+}
+
 export function replayWorldline({
   snapshot,
   sourceChronicle,
@@ -791,4 +837,590 @@ export function replayWorldline({
     inputMode: 'RECORDED_INPUT_FRAMES_ONLY'
   };
   return frozenCanonical({ ...body, replayReceiptSha256: hashCanonical(body) });
+}
+
+
+function shaArray(value, label) {
+  if (!Array.isArray(value)) throw new TypeError(`${label} must be an array`);
+  value.forEach((entry, index) => assertSha256(entry, `${label}[${index}]`));
+  return value;
+}
+
+export function worldInputSemanticSha256(frame) {
+  validateWorldInputFrame(frame);
+  return hashCanonical({
+    tick: frame.tick,
+    humanActionIntents: frame.humanActionIntents,
+    companionIntents: frame.companionIntents,
+    scheduledWorldEvents: frame.scheduledWorldEvents,
+    motionWindowRefs: frame.motionWindowRefs,
+    rngStateByStream: frame.rngStateByStream
+  });
+}
+
+export function formVerifiedHead(input) {
+  assertExactKeys(input, ['sessionRef', 'stateVersion', 'chronicle', 'snapshot'], 'verified head input');
+  assertSafeRef(input.sessionRef, 'verified head.sessionRef');
+  assertNonNegativeInteger(input.stateVersion, 'verified head.stateVersion');
+  verifyChronicle(input.chronicle);
+  verifyWorldSnapshot(input.snapshot, {
+    epoch: input.chronicle.epoch,
+    chronicle: input.chronicle
+  });
+
+  const body = {
+    schemaVersion: SCHEMA.verifiedHead,
+    headClass: 'VERIFIED_HEAD',
+    headRef: `${input.sessionRef}.verified-head.${pad(input.stateVersion, 10)}.${pad(input.snapshot.tick, 12)}.${input.snapshot.canonicalStateSha256.slice(0, 12)}`,
+    sessionRef: input.sessionRef,
+    stateVersion: input.stateVersion,
+    timelineRef: input.chronicle.timelineRef,
+    branchRef: input.chronicle.branchRef,
+    tick: input.snapshot.tick,
+    eventHeadSha256: input.chronicle.headSha256,
+    canonicalStateSha256: input.snapshot.canonicalStateSha256,
+    determinismEpochRef: input.chronicle.epoch.epochRef,
+    determinismEpochSha256: input.chronicle.epoch.epochSha256,
+    worldPackageFingerprint: input.chronicle.epoch.worldPackageFingerprint,
+    sourceSnapshotRef: input.snapshot.snapshotRef,
+    sourceSnapshotSha256: input.snapshot.snapshotSha256
+  };
+  return frozenCanonical({ ...body, verifiedHeadSha256: hashCanonical(body) });
+}
+
+export function verifyVerifiedHead(head, { chronicle = null, snapshot = null } = {}) {
+  assertPlainObject(head, 'verified head');
+  assertExactKeys(head, [
+    'schemaVersion', 'headClass', 'headRef', 'sessionRef', 'stateVersion',
+    'timelineRef', 'branchRef', 'tick', 'eventHeadSha256', 'canonicalStateSha256',
+    'determinismEpochRef', 'determinismEpochSha256', 'worldPackageFingerprint',
+    'sourceSnapshotRef', 'sourceSnapshotSha256', 'verifiedHeadSha256'
+  ], 'verified head');
+  if (head.schemaVersion !== SCHEMA.verifiedHead) throw new TypeError('verified head schema mismatch');
+  if (head.headClass !== 'VERIFIED_HEAD') throw new TypeError('verified head class mismatch');
+  assertSafeRef(head.headRef, 'verified head.headRef');
+  assertSafeRef(head.sessionRef, 'verified head.sessionRef');
+  assertNonNegativeInteger(head.stateVersion, 'verified head.stateVersion');
+  assertSafeRef(head.timelineRef, 'verified head.timelineRef');
+  assertSafeRef(head.branchRef, 'verified head.branchRef');
+  assertNonNegativeInteger(head.tick, 'verified head.tick');
+  assertSha256(head.eventHeadSha256, 'verified head.eventHeadSha256');
+  assertSha256(head.canonicalStateSha256, 'verified head.canonicalStateSha256');
+  assertSafeRef(head.determinismEpochRef, 'verified head.determinismEpochRef');
+  assertSha256(head.determinismEpochSha256, 'verified head.determinismEpochSha256');
+  assertSha256(head.worldPackageFingerprint, 'verified head.worldPackageFingerprint');
+  assertSafeRef(head.sourceSnapshotRef, 'verified head.sourceSnapshotRef');
+  assertSha256(head.sourceSnapshotSha256, 'verified head.sourceSnapshotSha256');
+  assertSha256(head.verifiedHeadSha256, 'verified head.verifiedHeadSha256');
+
+  const expectedHeadRef = `${head.sessionRef}.verified-head.${pad(head.stateVersion, 10)}.${pad(head.tick, 12)}.${head.canonicalStateSha256.slice(0, 12)}`;
+  if (head.headRef !== expectedHeadRef) throw new TypeError('verified head ref mismatch');
+  const { verifiedHeadSha256, ...body } = head;
+  if (hashCanonical(body) !== verifiedHeadSha256) throw new TypeError('verified head digest mismatch');
+
+  if (chronicle !== null || snapshot !== null) {
+    if (chronicle === null || snapshot === null) {
+      throw new TypeError('verified head contextual verification requires Chronicle and snapshot together');
+    }
+    verifyChronicle(chronicle);
+    verifyWorldSnapshot(snapshot, { epoch: chronicle.epoch, chronicle });
+    if (
+      head.timelineRef !== chronicle.timelineRef ||
+      head.branchRef !== chronicle.branchRef ||
+      head.tick !== chronicle.lastTick ||
+      head.eventHeadSha256 !== chronicle.headSha256 ||
+      head.canonicalStateSha256 !== snapshot.canonicalStateSha256 ||
+      head.determinismEpochRef !== chronicle.epoch.epochRef ||
+      head.determinismEpochSha256 !== chronicle.epoch.epochSha256 ||
+      head.worldPackageFingerprint !== chronicle.epoch.worldPackageFingerprint ||
+      head.sourceSnapshotRef !== snapshot.snapshotRef ||
+      head.sourceSnapshotSha256 !== snapshot.snapshotSha256
+    ) {
+      throw new TypeError('verified head source coordinate mismatch');
+    }
+  }
+  return head;
+}
+
+export function formPredictedHead(input) {
+  assertExactKeys(input, [
+    'verifiedHead', 'snapshot', 'sourceChronicle', 'epoch',
+    'predictionBranchRef', 'inputFrames', 'executionKernel'
+  ], 'predicted head input');
+  verifyVerifiedHead(input.verifiedHead, {
+    chronicle: input.sourceChronicle,
+    snapshot: input.snapshot
+  });
+  validateDeterminismEpoch(input.epoch);
+  if (
+    input.verifiedHead.determinismEpochRef !== input.epoch.epochRef ||
+    input.verifiedHead.determinismEpochSha256 !== input.epoch.epochSha256
+  ) {
+    throw new TypeError('predicted head epoch does not match verified parent');
+  }
+  assertSafeRef(input.predictionBranchRef, 'predicted head.predictionBranchRef');
+  if (input.predictionBranchRef === input.verifiedHead.branchRef) {
+    throw new TypeError('predicted head must use a speculative branch distinct from verified history');
+  }
+  if (!Array.isArray(input.inputFrames) || input.inputFrames.length === 0) {
+    throw new TypeError('predicted head requires at least one speculative input frame');
+  }
+
+  const replay = replayWorldline({
+    snapshot: input.snapshot,
+    sourceChronicle: input.sourceChronicle,
+    epoch: input.epoch,
+    targetBranchRef: input.predictionBranchRef,
+    inputFrames: input.inputFrames,
+    executionKernel: input.executionKernel
+  });
+  const semanticHashes = input.inputFrames.map(worldInputSemanticSha256);
+  const predictionCoordinateSha256 = hashCanonical({
+    parentVerifiedHeadSha256: input.verifiedHead.verifiedHeadSha256,
+    predictionBranchRef: input.predictionBranchRef,
+    semanticHashes
+  });
+  const body = {
+    schemaVersion: SCHEMA.predictedHead,
+    headClass: 'PREDICTED_HEAD',
+    predictionRef: `${input.verifiedHead.sessionRef}.prediction.${predictionCoordinateSha256.slice(0, 24)}`,
+    sessionRef: input.verifiedHead.sessionRef,
+    parentVerifiedHeadRef: input.verifiedHead.headRef,
+    parentVerifiedHeadSha256: input.verifiedHead.verifiedHeadSha256,
+    parentStateVersion: input.verifiedHead.stateVersion,
+    parentTick: input.verifiedHead.tick,
+    predictionBranchRef: input.predictionBranchRef,
+    determinismEpochRef: input.epoch.epochRef,
+    determinismEpochSha256: input.epoch.epochSha256,
+    frameCount: input.inputFrames.length,
+    inputFrameSha256s: [...replay.frameHashes],
+    inputSemanticSha256s: semanticHashes,
+    finalTick: replay.finalTick,
+    predictedStateSha256: replay.finalStateSha256,
+    replayReceiptSha256: replay.replayReceiptSha256,
+    authorityClass: 'LOCAL_SPECULATION_ONLY'
+  };
+  return Object.freeze({
+    predictedHead: frozenCanonical({ ...body, predictedHeadSha256: hashCanonical(body) }),
+    replay
+  });
+}
+
+export function verifyPredictedHead(head, {
+  verifiedHead = null,
+  inputFrames = null,
+  replayReceipt = null
+} = {}) {
+  assertPlainObject(head, 'predicted head');
+  assertExactKeys(head, [
+    'schemaVersion', 'headClass', 'predictionRef', 'sessionRef',
+    'parentVerifiedHeadRef', 'parentVerifiedHeadSha256', 'parentStateVersion',
+    'parentTick', 'predictionBranchRef', 'determinismEpochRef',
+    'determinismEpochSha256', 'frameCount', 'inputFrameSha256s',
+    'inputSemanticSha256s', 'finalTick', 'predictedStateSha256',
+    'replayReceiptSha256', 'authorityClass', 'predictedHeadSha256'
+  ], 'predicted head');
+  if (head.schemaVersion !== SCHEMA.predictedHead) throw new TypeError('predicted head schema mismatch');
+  if (head.headClass !== 'PREDICTED_HEAD') throw new TypeError('predicted head class mismatch');
+  if (head.authorityClass !== 'LOCAL_SPECULATION_ONLY') throw new TypeError('predicted head cannot claim accepted authority');
+  assertSafeRef(head.predictionRef, 'predicted head.predictionRef');
+  assertSafeRef(head.sessionRef, 'predicted head.sessionRef');
+  assertSafeRef(head.parentVerifiedHeadRef, 'predicted head.parentVerifiedHeadRef');
+  assertSha256(head.parentVerifiedHeadSha256, 'predicted head.parentVerifiedHeadSha256');
+  assertNonNegativeInteger(head.parentStateVersion, 'predicted head.parentStateVersion');
+  assertNonNegativeInteger(head.parentTick, 'predicted head.parentTick');
+  assertSafeRef(head.predictionBranchRef, 'predicted head.predictionBranchRef');
+  assertSafeRef(head.determinismEpochRef, 'predicted head.determinismEpochRef');
+  assertSha256(head.determinismEpochSha256, 'predicted head.determinismEpochSha256');
+  assertNonNegativeInteger(head.frameCount, 'predicted head.frameCount');
+  shaArray(head.inputFrameSha256s, 'predicted head.inputFrameSha256s');
+  shaArray(head.inputSemanticSha256s, 'predicted head.inputSemanticSha256s');
+  if (
+    head.frameCount === 0 ||
+    head.inputFrameSha256s.length !== head.frameCount ||
+    head.inputSemanticSha256s.length !== head.frameCount
+  ) {
+    throw new TypeError('predicted head frame evidence count mismatch');
+  }
+  assertNonNegativeInteger(head.finalTick, 'predicted head.finalTick');
+  if (head.finalTick !== head.parentTick + head.frameCount) {
+    throw new TypeError('predicted head final tick mismatch');
+  }
+  assertSha256(head.predictedStateSha256, 'predicted head.predictedStateSha256');
+  assertSha256(head.replayReceiptSha256, 'predicted head.replayReceiptSha256');
+  assertSha256(head.predictedHeadSha256, 'predicted head.predictedHeadSha256');
+  const { predictedHeadSha256, ...body } = head;
+  if (hashCanonical(body) !== predictedHeadSha256) throw new TypeError('predicted head digest mismatch');
+
+  if (verifiedHead !== null) {
+    verifyVerifiedHead(verifiedHead);
+    if (
+      head.sessionRef !== verifiedHead.sessionRef ||
+      head.parentVerifiedHeadRef !== verifiedHead.headRef ||
+      head.parentVerifiedHeadSha256 !== verifiedHead.verifiedHeadSha256 ||
+      head.parentStateVersion !== verifiedHead.stateVersion ||
+      head.parentTick !== verifiedHead.tick ||
+      head.determinismEpochRef !== verifiedHead.determinismEpochRef ||
+      head.determinismEpochSha256 !== verifiedHead.determinismEpochSha256 ||
+      head.predictionBranchRef === verifiedHead.branchRef
+    ) {
+      throw new TypeError('predicted head parent coordinate mismatch');
+    }
+  }
+
+  if (inputFrames !== null || replayReceipt !== null) {
+    if (!Array.isArray(inputFrames) || replayReceipt === null) {
+      throw new TypeError('predicted head contextual verification requires inputFrames and replayReceipt together');
+    }
+    verifyReplayReceipt(replayReceipt);
+    if (inputFrames.length !== head.frameCount) {
+      throw new TypeError('predicted head contextual frame count mismatch');
+    }
+    const frameHashes = [];
+    const semanticHashes = [];
+    let expectedTick = head.parentTick + 1;
+    for (const frame of inputFrames) {
+      validateWorldInputFrame(frame);
+      if (frame.branchRef !== head.predictionBranchRef || frame.tick !== expectedTick) {
+        throw new TypeError('predicted head contextual frame coordinate mismatch');
+      }
+      frameHashes.push(frame.inputFrameSha256);
+      semanticHashes.push(worldInputSemanticSha256(frame));
+      expectedTick += 1;
+    }
+    if (
+      canonicalJson(frameHashes) !== canonicalJson(head.inputFrameSha256s) ||
+      canonicalJson(semanticHashes) !== canonicalJson(head.inputSemanticSha256s) ||
+      replayReceipt.targetBranchRef !== head.predictionBranchRef ||
+      replayReceipt.startTick !== head.parentTick ||
+      replayReceipt.finalTick !== head.finalTick ||
+      replayReceipt.frameCount !== head.frameCount ||
+      canonicalJson(replayReceipt.frameHashes) !== canonicalJson(head.inputFrameSha256s) ||
+      replayReceipt.finalStateSha256 !== head.predictedStateSha256 ||
+      replayReceipt.replayReceiptSha256 !== head.replayReceiptSha256 ||
+      replayReceipt.determinismEpochRef !== head.determinismEpochRef ||
+      replayReceipt.determinismEpochSha256 !== head.determinismEpochSha256
+    ) {
+      throw new TypeError('predicted head replay evidence mismatch');
+    }
+  }
+  return head;
+}
+
+export function comparePredictionWithAuthoritativeInputs(input) {
+  assertExactKeys(input, ['predictedHead', 'authoritativeInputFrames'], 'prediction comparison input');
+  verifyPredictedHead(input.predictedHead);
+  if (!Array.isArray(input.authoritativeInputFrames)) {
+    throw new TypeError('authoritativeInputFrames must be an array');
+  }
+  const authoritativeSemanticSha256s = input.authoritativeInputFrames.map(worldInputSemanticSha256);
+  const expected = input.predictedHead.inputSemanticSha256s;
+  const maxLength = Math.max(expected.length, authoritativeSemanticSha256s.length);
+  let firstMismatchIndexOrNull = null;
+  for (let index = 0; index < maxLength; index += 1) {
+    if (expected[index] !== authoritativeSemanticSha256s[index]) {
+      firstMismatchIndexOrNull = index;
+      break;
+    }
+  }
+  const body = {
+    schemaVersion: SCHEMA.predictionComparison,
+    predictionRef: input.predictedHead.predictionRef,
+    predictedHeadSha256: input.predictedHead.predictedHeadSha256,
+    classification: firstMismatchIndexOrNull === null
+      ? 'MATCHED_AUTHORITATIVE_INPUTS'
+      : 'DIVERGENT_AUTHORITATIVE_INPUTS',
+    firstMismatchIndexOrNull,
+    predictedSemanticSha256s: [...expected],
+    authoritativeSemanticSha256s
+  };
+  return frozenCanonical({ ...body, comparisonSha256: hashCanonical(body) });
+}
+
+export function reconcilePredictedHead(input) {
+  assertExactKeys(input, [
+    'predictedHead', 'verifiedHead', 'snapshot', 'sourceChronicle', 'epoch',
+    'authoritativeBranchRef', 'authoritativeInputFrames', 'executionKernel'
+  ], 'prediction reconciliation input');
+  verifyVerifiedHead(input.verifiedHead, {
+    chronicle: input.sourceChronicle,
+    snapshot: input.snapshot
+  });
+  verifyPredictedHead(input.predictedHead, { verifiedHead: input.verifiedHead });
+  assertSafeRef(input.authoritativeBranchRef, 'authoritativeBranchRef');
+  if (input.authoritativeBranchRef !== input.verifiedHead.branchRef) {
+    throw new TypeError('authoritative reconciliation must continue the verified branch');
+  }
+
+  const comparison = comparePredictionWithAuthoritativeInputs({
+    predictedHead: input.predictedHead,
+    authoritativeInputFrames: input.authoritativeInputFrames
+  });
+  const replay = replayWorldline({
+    snapshot: input.snapshot,
+    sourceChronicle: input.sourceChronicle,
+    epoch: input.epoch,
+    targetBranchRef: input.authoritativeBranchRef,
+    inputFrames: input.authoritativeInputFrames,
+    executionKernel: input.executionKernel
+  });
+
+  if (
+    comparison.classification === 'MATCHED_AUTHORITATIVE_INPUTS' &&
+    replay.finalStateSha256 !== input.predictedHead.predictedStateSha256
+  ) {
+    throw new TypeError('matched authoritative inputs did not reproduce predicted state');
+  }
+
+  const mode = comparison.classification === 'MATCHED_AUTHORITATIVE_INPUTS'
+    ? 'MATCHED_PREDICTION'
+    : 'DIVERGENT_ROLLBACK';
+  const body = {
+    schemaVersion: SCHEMA.rollback,
+    rollbackRef: `${input.verifiedHead.sessionRef}.rollback.${hashCanonical({
+      prediction: input.predictedHead.predictedHeadSha256,
+      authoritative: comparison.authoritativeSemanticSha256s
+    }).slice(0, 24)}`,
+    mode,
+    parentVerifiedHeadRef: input.verifiedHead.headRef,
+    parentVerifiedHeadSha256: input.verifiedHead.verifiedHeadSha256,
+    discardedPredictionRef: input.predictedHead.predictionRef,
+    discardedPredictedHeadSha256: input.predictedHead.predictedHeadSha256,
+    authoritativeBranchRef: input.authoritativeBranchRef,
+    firstMismatchIndexOrNull: comparison.firstMismatchIndexOrNull,
+    authoritativeInputFrameSha256s: [...replay.frameHashes],
+    authoritativeInputSemanticSha256s: [...comparison.authoritativeSemanticSha256s],
+    startTick: replay.startTick,
+    finalTick: replay.finalTick,
+    reconciledStateSha256: replay.finalStateSha256,
+    authoritativeReplayReceiptSha256: replay.replayReceiptSha256,
+    verifiedParentEventHeadSha256: input.verifiedHead.eventHeadSha256,
+    verifiedParentPreserved: true
+  };
+  return Object.freeze({
+    rollbackReceipt: frozenCanonical({ ...body, rollbackReceiptSha256: hashCanonical(body) }),
+    authoritativeReplay: replay,
+    comparison
+  });
+}
+
+export function verifyRollbackReceipt(receipt, {
+  predictedHead = null,
+  verifiedHead = null,
+  authoritativeInputFrames = null,
+  authoritativeReplay = null
+} = {}) {
+  assertPlainObject(receipt, 'rollback receipt');
+  assertExactKeys(receipt, [
+    'schemaVersion', 'rollbackRef', 'mode', 'parentVerifiedHeadRef',
+    'parentVerifiedHeadSha256', 'discardedPredictionRef',
+    'discardedPredictedHeadSha256', 'authoritativeBranchRef',
+    'firstMismatchIndexOrNull', 'authoritativeInputFrameSha256s',
+    'authoritativeInputSemanticSha256s', 'startTick', 'finalTick',
+    'reconciledStateSha256', 'authoritativeReplayReceiptSha256',
+    'verifiedParentEventHeadSha256', 'verifiedParentPreserved',
+    'rollbackReceiptSha256'
+  ], 'rollback receipt');
+  if (receipt.schemaVersion !== SCHEMA.rollback) throw new TypeError('rollback receipt schema mismatch');
+  if (!['MATCHED_PREDICTION', 'DIVERGENT_ROLLBACK'].includes(receipt.mode)) {
+    throw new TypeError('rollback receipt mode invalid');
+  }
+  assertSafeRef(receipt.rollbackRef, 'rollback receipt.rollbackRef');
+  assertSafeRef(receipt.parentVerifiedHeadRef, 'rollback receipt.parentVerifiedHeadRef');
+  assertSha256(receipt.parentVerifiedHeadSha256, 'rollback receipt.parentVerifiedHeadSha256');
+  assertSafeRef(receipt.discardedPredictionRef, 'rollback receipt.discardedPredictionRef');
+  assertSha256(receipt.discardedPredictedHeadSha256, 'rollback receipt.discardedPredictedHeadSha256');
+  assertSafeRef(receipt.authoritativeBranchRef, 'rollback receipt.authoritativeBranchRef');
+  if (receipt.firstMismatchIndexOrNull !== null) {
+    assertNonNegativeInteger(receipt.firstMismatchIndexOrNull, 'rollback receipt.firstMismatchIndexOrNull');
+  }
+  if (
+    (receipt.mode === 'MATCHED_PREDICTION') !==
+    (receipt.firstMismatchIndexOrNull === null)
+  ) {
+    throw new TypeError('rollback receipt mode/mismatch classification inconsistent');
+  }
+  shaArray(receipt.authoritativeInputFrameSha256s, 'rollback receipt.authoritativeInputFrameSha256s');
+  shaArray(receipt.authoritativeInputSemanticSha256s, 'rollback receipt.authoritativeInputSemanticSha256s');
+  if (receipt.authoritativeInputFrameSha256s.length !== receipt.authoritativeInputSemanticSha256s.length) {
+    throw new TypeError('rollback receipt authoritative input evidence count mismatch');
+  }
+  assertNonNegativeInteger(receipt.startTick, 'rollback receipt.startTick');
+  assertNonNegativeInteger(receipt.finalTick, 'rollback receipt.finalTick');
+  if (receipt.finalTick !== receipt.startTick + receipt.authoritativeInputFrameSha256s.length) {
+    throw new TypeError('rollback receipt final tick mismatch');
+  }
+  assertSha256(receipt.reconciledStateSha256, 'rollback receipt.reconciledStateSha256');
+  assertSha256(receipt.authoritativeReplayReceiptSha256, 'rollback receipt.authoritativeReplayReceiptSha256');
+  assertSha256(receipt.verifiedParentEventHeadSha256, 'rollback receipt.verifiedParentEventHeadSha256');
+  if (receipt.verifiedParentPreserved !== true) throw new TypeError('rollback receipt must preserve verified parent');
+  assertSha256(receipt.rollbackReceiptSha256, 'rollback receipt.rollbackReceiptSha256');
+  const { rollbackReceiptSha256, ...body } = receipt;
+  if (hashCanonical(body) !== rollbackReceiptSha256) throw new TypeError('rollback receipt digest mismatch');
+
+  if (predictedHead !== null) {
+    verifyPredictedHead(predictedHead);
+    if (
+      receipt.discardedPredictionRef !== predictedHead.predictionRef ||
+      receipt.discardedPredictedHeadSha256 !== predictedHead.predictedHeadSha256
+    ) throw new TypeError('rollback receipt prediction mismatch');
+
+    const expectedSemantic = predictedHead.inputSemanticSha256s;
+    const actualSemantic = receipt.authoritativeInputSemanticSha256s;
+    const maxLength = Math.max(expectedSemantic.length, actualSemantic.length);
+    let expectedMismatchIndexOrNull = null;
+    for (let index = 0; index < maxLength; index += 1) {
+      if (expectedSemantic[index] !== actualSemantic[index]) {
+        expectedMismatchIndexOrNull = index;
+        break;
+      }
+    }
+    const expectedMode = expectedMismatchIndexOrNull === null
+      ? 'MATCHED_PREDICTION'
+      : 'DIVERGENT_ROLLBACK';
+    if (
+      receipt.mode !== expectedMode ||
+      receipt.firstMismatchIndexOrNull !== expectedMismatchIndexOrNull
+    ) {
+      throw new TypeError('rollback receipt semantic comparison mismatch');
+    }
+  }
+  if (verifiedHead !== null) {
+    verifyVerifiedHead(verifiedHead);
+    if (
+      receipt.parentVerifiedHeadRef !== verifiedHead.headRef ||
+      receipt.parentVerifiedHeadSha256 !== verifiedHead.verifiedHeadSha256 ||
+      receipt.authoritativeBranchRef !== verifiedHead.branchRef ||
+      receipt.verifiedParentEventHeadSha256 !== verifiedHead.eventHeadSha256
+    ) throw new TypeError('rollback receipt verified parent mismatch');
+  }
+
+  if (authoritativeInputFrames !== null || authoritativeReplay !== null) {
+    if (!Array.isArray(authoritativeInputFrames) || authoritativeReplay === null) {
+      throw new TypeError('rollback contextual verification requires authoritativeInputFrames and authoritativeReplay together');
+    }
+    verifyReplayReceipt(authoritativeReplay);
+    const frameHashes = authoritativeInputFrames.map((frame) => {
+      validateWorldInputFrame(frame);
+      return frame.inputFrameSha256;
+    });
+    const semanticHashes = authoritativeInputFrames.map(worldInputSemanticSha256);
+    if (
+      canonicalJson(frameHashes) !== canonicalJson(receipt.authoritativeInputFrameSha256s) ||
+      canonicalJson(semanticHashes) !== canonicalJson(receipt.authoritativeInputSemanticSha256s) ||
+      authoritativeReplay.targetBranchRef !== receipt.authoritativeBranchRef ||
+      authoritativeReplay.startTick !== receipt.startTick ||
+      authoritativeReplay.finalTick !== receipt.finalTick ||
+      canonicalJson(authoritativeReplay.frameHashes) !== canonicalJson(receipt.authoritativeInputFrameSha256s) ||
+      authoritativeReplay.finalStateSha256 !== receipt.reconciledStateSha256 ||
+      authoritativeReplay.replayReceiptSha256 !== receipt.authoritativeReplayReceiptSha256
+    ) {
+      throw new TypeError('rollback receipt authoritative replay evidence mismatch');
+    }
+  }
+  return receipt;
+}
+
+export function formAuthoritativeResyncReceipt(input) {
+  assertExactKeys(input, [
+    'verifiedHead', 'rollbackReceipt', 'hostId', 'hostLeaseGeneration',
+    'expectedStateVersion', 'acceptedStateVersion', 'acceptedCheckpointSha256'
+  ], 'authoritative resync input');
+  verifyVerifiedHead(input.verifiedHead);
+  verifyRollbackReceipt(input.rollbackReceipt, { verifiedHead: input.verifiedHead });
+  assertSafeRef(input.hostId, 'authoritative resync.hostId');
+  assertNonNegativeInteger(input.hostLeaseGeneration, 'authoritative resync.hostLeaseGeneration');
+  if (input.hostLeaseGeneration < 1) {
+    throw new TypeError('authoritative resync requires a positive host lease generation');
+  }
+  assertNonNegativeInteger(input.expectedStateVersion, 'authoritative resync.expectedStateVersion');
+  assertNonNegativeInteger(input.acceptedStateVersion, 'authoritative resync.acceptedStateVersion');
+  if (input.expectedStateVersion !== input.verifiedHead.stateVersion) {
+    throw new TypeError('authoritative resync expected stateVersion does not match verified head');
+  }
+  if (input.acceptedStateVersion !== input.expectedStateVersion + 1) {
+    throw new TypeError('authoritative resync accepted stateVersion must advance exactly once');
+  }
+  assertSha256(input.acceptedCheckpointSha256, 'authoritative resync.acceptedCheckpointSha256');
+  if (input.acceptedCheckpointSha256 !== input.rollbackReceipt.reconciledStateSha256) {
+    throw new TypeError('authoritative resync checkpoint hash does not match reconciled state');
+  }
+
+  const body = {
+    schemaVersion: SCHEMA.resync,
+    resyncRef: `${input.verifiedHead.sessionRef}.resync.${pad(input.acceptedStateVersion, 10)}.${input.rollbackReceipt.reconciledStateSha256.slice(0, 12)}`,
+    resyncMode: 'LOCAL_SYNTHETIC_AUTHORITATIVE_RESYNC',
+    sessionRef: input.verifiedHead.sessionRef,
+    sourceVerifiedHeadRef: input.verifiedHead.headRef,
+    sourceVerifiedHeadSha256: input.verifiedHead.verifiedHeadSha256,
+    rollbackRef: input.rollbackReceipt.rollbackRef,
+    rollbackReceiptSha256: input.rollbackReceipt.rollbackReceiptSha256,
+    hostId: input.hostId,
+    hostLeaseGeneration: input.hostLeaseGeneration,
+    expectedStateVersion: input.expectedStateVersion,
+    acceptedStateVersion: input.acceptedStateVersion,
+    acceptedCheckpointSha256: input.acceptedCheckpointSha256,
+    reconciledStateSha256: input.rollbackReceipt.reconciledStateSha256,
+    evidenceScope: 'LOCAL_RESYNC_RECEIPT_REQUIRES_ACCEPTED_SESSIONSTORE_WRITE'
+  };
+  return frozenCanonical({ ...body, resyncReceiptSha256: hashCanonical(body) });
+}
+
+export function verifyAuthoritativeResyncReceipt(receipt, { verifiedHead = null, rollbackReceipt = null } = {}) {
+  assertPlainObject(receipt, 'authoritative resync receipt');
+  assertExactKeys(receipt, [
+    'schemaVersion', 'resyncRef', 'resyncMode', 'sessionRef',
+    'sourceVerifiedHeadRef', 'sourceVerifiedHeadSha256', 'rollbackRef',
+    'rollbackReceiptSha256', 'hostId', 'hostLeaseGeneration',
+    'expectedStateVersion', 'acceptedStateVersion', 'acceptedCheckpointSha256',
+    'reconciledStateSha256', 'evidenceScope', 'resyncReceiptSha256'
+  ], 'authoritative resync receipt');
+  if (receipt.schemaVersion !== SCHEMA.resync) throw new TypeError('authoritative resync receipt schema mismatch');
+  if (receipt.resyncMode !== 'LOCAL_SYNTHETIC_AUTHORITATIVE_RESYNC') throw new TypeError('authoritative resync mode mismatch');
+  if (receipt.evidenceScope !== 'LOCAL_RESYNC_RECEIPT_REQUIRES_ACCEPTED_SESSIONSTORE_WRITE') {
+    throw new TypeError('authoritative resync evidence scope mismatch');
+  }
+  assertSafeRef(receipt.resyncRef, 'authoritative resync.resyncRef');
+  assertSafeRef(receipt.sessionRef, 'authoritative resync.sessionRef');
+  assertSafeRef(receipt.sourceVerifiedHeadRef, 'authoritative resync.sourceVerifiedHeadRef');
+  assertSha256(receipt.sourceVerifiedHeadSha256, 'authoritative resync.sourceVerifiedHeadSha256');
+  assertSafeRef(receipt.rollbackRef, 'authoritative resync.rollbackRef');
+  assertSha256(receipt.rollbackReceiptSha256, 'authoritative resync.rollbackReceiptSha256');
+  assertSafeRef(receipt.hostId, 'authoritative resync.hostId');
+  assertNonNegativeInteger(receipt.hostLeaseGeneration, 'authoritative resync.hostLeaseGeneration');
+  if (receipt.hostLeaseGeneration < 1) {
+    throw new TypeError('authoritative resync requires a positive host lease generation');
+  }
+  assertNonNegativeInteger(receipt.expectedStateVersion, 'authoritative resync.expectedStateVersion');
+  assertNonNegativeInteger(receipt.acceptedStateVersion, 'authoritative resync.acceptedStateVersion');
+  if (receipt.acceptedStateVersion !== receipt.expectedStateVersion + 1) {
+    throw new TypeError('authoritative resync stateVersion advance mismatch');
+  }
+  assertSha256(receipt.acceptedCheckpointSha256, 'authoritative resync.acceptedCheckpointSha256');
+  assertSha256(receipt.reconciledStateSha256, 'authoritative resync.reconciledStateSha256');
+  if (receipt.acceptedCheckpointSha256 !== receipt.reconciledStateSha256) {
+    throw new TypeError('authoritative resync checkpoint/reconciled-state mismatch');
+  }
+  assertSha256(receipt.resyncReceiptSha256, 'authoritative resync.resyncReceiptSha256');
+  const { resyncReceiptSha256, ...body } = receipt;
+  if (hashCanonical(body) !== resyncReceiptSha256) throw new TypeError('authoritative resync receipt digest mismatch');
+
+  if (verifiedHead !== null) {
+    verifyVerifiedHead(verifiedHead);
+    if (
+      receipt.sessionRef !== verifiedHead.sessionRef ||
+      receipt.sourceVerifiedHeadRef !== verifiedHead.headRef ||
+      receipt.sourceVerifiedHeadSha256 !== verifiedHead.verifiedHeadSha256 ||
+      receipt.expectedStateVersion !== verifiedHead.stateVersion
+    ) throw new TypeError('authoritative resync verified-head mismatch');
+  }
+  if (rollbackReceipt !== null) {
+    verifyRollbackReceipt(rollbackReceipt);
+    if (
+      receipt.rollbackRef !== rollbackReceipt.rollbackRef ||
+      receipt.rollbackReceiptSha256 !== rollbackReceipt.rollbackReceiptSha256 ||
+      receipt.reconciledStateSha256 !== rollbackReceipt.reconciledStateSha256
+    ) throw new TypeError('authoritative resync rollback mismatch');
+  }
+  return receipt;
 }

@@ -9,13 +9,24 @@ import {
   createChronicle,
   forkWorldline,
   formDeterminismEpoch,
+  comparePredictionWithAuthoritativeInputs,
+  formAuthoritativeResyncReceipt,
   formIntelligenceDecision,
+  formPredictedHead,
+  formVerifiedHead,
   formWorldInputFrame,
+  reconcilePredictedHead,
   replayWorldline,
   sealWorldSnapshot,
+  verifyAuthoritativeResyncReceipt,
   verifyChronicle,
   verifyIntelligenceDecision,
-  verifyWorldSnapshot
+  verifyPredictedHead,
+  verifyReplayReceipt,
+  verifyRollbackReceipt,
+  verifyVerifiedHead,
+  verifyWorldSnapshot,
+  worldInputSemanticSha256
 } from '../src/core/chronicle/chronicle.mjs';
 import {
   MOTION_CAPTURE_MODE,
@@ -1538,4 +1549,255 @@ test('accepted-intent events bind decision and observation refs while fresh alte
   assert.equal(JSON.stringify(parent), parentBeforeFork, 'fresh inference must not rewrite verified parent history');
   assert.equal(alternateEvent.chronicle.branchRef, fork.branch.branchRef);
   assert.notEqual(alternateDecision.decisionRef, decision.decisionRef);
+});
+
+
+test('verified and predicted heads reconcile local speculation without rewriting verified history', () => {
+  const kernel = executionKernel();
+  const determinismEpoch = epoch(kernel);
+  const verifiedBranchRef = 'worldline.first-grove.verified.rollback-proof';
+  const predictedBranchRef = 'worldline.first-grove.prediction.rollback-proof';
+  const sourceChronicle = createChronicle({
+    timelineRef: 'timeline.first-grove.rollback-proof.0001',
+    branchRef: verifiedBranchRef,
+    epoch: determinismEpoch
+  });
+  const snapshot = sealWorldSnapshot({
+    chronicle: sourceChronicle,
+    tick: 0,
+    canonicalState: initialFightState()
+  });
+  const verifiedHead = formVerifiedHead({
+    sessionRef: 'session.first-grove.rollback-proof',
+    stateVersion: 4,
+    chronicle: sourceChronicle,
+    snapshot
+  });
+  assert.equal(verifiedHead.headClass, 'VERIFIED_HEAD');
+  assert.equal(verifyVerifiedHead(verifiedHead, { chronicle: sourceChronicle, snapshot }), verifiedHead);
+
+  const falseVerifiedHead = canonicalClone(verifiedHead);
+  falseVerifiedHead.eventHeadSha256 = H('b');
+  {
+    const { verifiedHeadSha256: _ignored, ...body } = falseVerifiedHead;
+    falseVerifiedHead.verifiedHeadSha256 = hashCanonical(body);
+  }
+  assert.throws(
+    () => verifyVerifiedHead(falseVerifiedHead, { chronicle: sourceChronicle, snapshot }),
+    /source coordinate mismatch/
+  );
+
+  const predictedFrames = parentFrames(predictedBranchRef).slice(0, 3);
+  const predicted = formPredictedHead({
+    verifiedHead,
+    snapshot,
+    sourceChronicle,
+    epoch: determinismEpoch,
+    predictionBranchRef: predictedBranchRef,
+    inputFrames: predictedFrames,
+    executionKernel: kernel
+  });
+  verifyPredictedHead(predicted.predictedHead, {
+    verifiedHead,
+    inputFrames: predictedFrames,
+    replayReceipt: predicted.replay
+  });
+  verifyReplayReceipt(predicted.replay);
+  assert.equal(predicted.predictedHead.headClass, 'PREDICTED_HEAD');
+  assert.equal(predicted.predictedHead.authorityClass, 'LOCAL_SPECULATION_ONLY');
+  assert.notEqual(predicted.predictedHead.predictionBranchRef, verifiedHead.branchRef);
+
+  const predictedAgain = formPredictedHead({
+    verifiedHead,
+    snapshot,
+    sourceChronicle,
+    epoch: determinismEpoch,
+    predictionBranchRef: predictedBranchRef,
+    inputFrames: predictedFrames,
+    executionKernel: kernel
+  });
+  assert.equal(predictedAgain.predictedHead.predictedStateSha256, predicted.predictedHead.predictedStateSha256);
+  assert.equal(predictedAgain.predictedHead.predictedHeadSha256, predicted.predictedHead.predictedHeadSha256);
+
+  assert.throws(() => formPredictedHead({
+    verifiedHead,
+    snapshot,
+    sourceChronicle,
+    epoch: determinismEpoch,
+    predictionBranchRef: verifiedBranchRef,
+    inputFrames: parentFrames(verifiedBranchRef).slice(0, 1),
+    executionKernel: kernel
+  }), /speculative branch distinct from verified history/);
+
+  const authorityTamper = canonicalClone(predicted.predictedHead);
+  authorityTamper.authorityClass = 'ACCEPTED_CHECKPOINT';
+  {
+    const { predictedHeadSha256: _ignored, ...body } = authorityTamper;
+    authorityTamper.predictedHeadSha256 = hashCanonical(body);
+  }
+  assert.throws(() => verifyPredictedHead(authorityTamper), /cannot claim accepted authority/);
+
+  const rehashedPredictionEvidenceLie = canonicalClone(predicted.predictedHead);
+  rehashedPredictionEvidenceLie.inputSemanticSha256s[0] = H('c');
+  {
+    const { predictedHeadSha256: _ignored, ...body } = rehashedPredictionEvidenceLie;
+    rehashedPredictionEvidenceLie.predictedHeadSha256 = hashCanonical(body);
+  }
+  assert.throws(() => verifyPredictedHead(rehashedPredictionEvidenceLie, {
+    verifiedHead,
+    inputFrames: predictedFrames,
+    replayReceipt: predicted.replay
+  }), /replay evidence mismatch/);
+
+  const authoritativeFrames = parentFrames(verifiedBranchRef).slice(0, 3);
+  assert.notEqual(authoritativeFrames[0].inputFrameSha256, predictedFrames[0].inputFrameSha256);
+  assert.equal(worldInputSemanticSha256(authoritativeFrames[0]), worldInputSemanticSha256(predictedFrames[0]));
+
+  const matchedComparison = comparePredictionWithAuthoritativeInputs({
+    predictedHead: predicted.predictedHead,
+    authoritativeInputFrames: authoritativeFrames
+  });
+  assert.equal(matchedComparison.classification, 'MATCHED_AUTHORITATIVE_INPUTS');
+  assert.equal(matchedComparison.firstMismatchIndexOrNull, null);
+
+  const parentBeforeReconcile = JSON.stringify(sourceChronicle);
+  const matched = reconcilePredictedHead({
+    predictedHead: predicted.predictedHead,
+    verifiedHead,
+    snapshot,
+    sourceChronicle,
+    epoch: determinismEpoch,
+    authoritativeBranchRef: verifiedBranchRef,
+    authoritativeInputFrames: authoritativeFrames,
+    executionKernel: kernel
+  });
+  assert.equal(matched.rollbackReceipt.mode, 'MATCHED_PREDICTION');
+  assert.equal(matched.authoritativeReplay.finalStateSha256, predicted.predictedHead.predictedStateSha256);
+  assert.equal(matched.rollbackReceipt.verifiedParentPreserved, true);
+  assert.equal(JSON.stringify(sourceChronicle), parentBeforeReconcile);
+  verifyRollbackReceipt(matched.rollbackReceipt, {
+    predictedHead: predicted.predictedHead,
+    verifiedHead,
+    authoritativeInputFrames: authoritativeFrames,
+    authoritativeReplay: matched.authoritativeReplay
+  });
+  verifyReplayReceipt(matched.authoritativeReplay);
+
+  const divergentFrames = [
+    frame(verifiedBranchRef, 1, {
+      humanActionIntents: [{
+        actionRef: 'action.notice.other.0001',
+        kind: 'NOTICE',
+        observationRef: 'observation.victor.other.0001',
+        observerRef: 'participant.victor',
+        targetRef: 'entity.other'
+      }]
+    }),
+    ...parentFrames(verifiedBranchRef).slice(1, 3)
+  ];
+  const divergentComparison = comparePredictionWithAuthoritativeInputs({
+    predictedHead: predicted.predictedHead,
+    authoritativeInputFrames: divergentFrames
+  });
+  assert.equal(divergentComparison.classification, 'DIVERGENT_AUTHORITATIVE_INPUTS');
+  assert.equal(divergentComparison.firstMismatchIndexOrNull, 0);
+
+  const divergent = reconcilePredictedHead({
+    predictedHead: predicted.predictedHead,
+    verifiedHead,
+    snapshot,
+    sourceChronicle,
+    epoch: determinismEpoch,
+    authoritativeBranchRef: verifiedBranchRef,
+    authoritativeInputFrames: divergentFrames,
+    executionKernel: kernel
+  });
+  assert.equal(divergent.rollbackReceipt.mode, 'DIVERGENT_ROLLBACK');
+  assert.equal(divergent.rollbackReceipt.firstMismatchIndexOrNull, 0);
+  assert.notEqual(divergent.authoritativeReplay.finalStateSha256, predicted.predictedHead.predictedStateSha256);
+  assert.equal(JSON.stringify(sourceChronicle), parentBeforeReconcile);
+  verifyRollbackReceipt(divergent.rollbackReceipt, {
+    predictedHead: predicted.predictedHead,
+    verifiedHead,
+    authoritativeInputFrames: divergentFrames,
+    authoritativeReplay: divergent.authoritativeReplay
+  });
+
+  const rollbackModeTamper = canonicalClone(matched.rollbackReceipt);
+  rollbackModeTamper.mode = 'DIVERGENT_ROLLBACK';
+  {
+    const { rollbackReceiptSha256: _ignored, ...body } = rollbackModeTamper;
+    rollbackModeTamper.rollbackReceiptSha256 = hashCanonical(body);
+  }
+  assert.throws(
+    () => verifyRollbackReceipt(rollbackModeTamper, {
+      predictedHead: predicted.predictedHead,
+      verifiedHead
+    }),
+    /mode\/mismatch classification inconsistent/
+  );
+
+  const rehashedRollbackEvidenceLie = canonicalClone(divergent.rollbackReceipt);
+  rehashedRollbackEvidenceLie.authoritativeInputSemanticSha256s[0] = H('d');
+  {
+    const { rollbackReceiptSha256: _ignored, ...body } = rehashedRollbackEvidenceLie;
+    rehashedRollbackEvidenceLie.rollbackReceiptSha256 = hashCanonical(body);
+  }
+  assert.throws(
+    () => verifyRollbackReceipt(rehashedRollbackEvidenceLie, {
+      predictedHead: predicted.predictedHead,
+      verifiedHead,
+      authoritativeInputFrames: divergentFrames,
+      authoritativeReplay: divergent.authoritativeReplay
+    }),
+    /semantic comparison mismatch|authoritative replay evidence mismatch/
+  );
+
+  const resync = formAuthoritativeResyncReceipt({
+    verifiedHead,
+    rollbackReceipt: divergent.rollbackReceipt,
+    hostId: 'host.headless.rollback-proof',
+    hostLeaseGeneration: 3,
+    expectedStateVersion: verifiedHead.stateVersion,
+    acceptedStateVersion: verifiedHead.stateVersion + 1,
+    acceptedCheckpointSha256: divergent.rollbackReceipt.reconciledStateSha256
+  });
+  assert.equal(
+    resync.evidenceScope,
+    'LOCAL_RESYNC_RECEIPT_REQUIRES_ACCEPTED_SESSIONSTORE_WRITE'
+  );
+  assert.equal(verifyAuthoritativeResyncReceipt(resync, {
+    verifiedHead,
+    rollbackReceipt: divergent.rollbackReceipt
+  }), resync);
+
+  assert.throws(() => formAuthoritativeResyncReceipt({
+    verifiedHead,
+    rollbackReceipt: divergent.rollbackReceipt,
+    hostId: 'host.headless.rollback-proof',
+    hostLeaseGeneration: 0,
+    expectedStateVersion: verifiedHead.stateVersion,
+    acceptedStateVersion: verifiedHead.stateVersion + 1,
+    acceptedCheckpointSha256: divergent.rollbackReceipt.reconciledStateSha256
+  }), /positive host lease generation/);
+
+  assert.throws(() => formAuthoritativeResyncReceipt({
+    verifiedHead,
+    rollbackReceipt: divergent.rollbackReceipt,
+    hostId: 'host.headless.rollback-proof',
+    hostLeaseGeneration: 3,
+    expectedStateVersion: verifiedHead.stateVersion - 1,
+    acceptedStateVersion: verifiedHead.stateVersion,
+    acceptedCheckpointSha256: divergent.rollbackReceipt.reconciledStateSha256
+  }), /expected stateVersion does not match verified head/);
+
+  assert.throws(() => formAuthoritativeResyncReceipt({
+    verifiedHead,
+    rollbackReceipt: divergent.rollbackReceipt,
+    hostId: 'host.headless.rollback-proof',
+    hostLeaseGeneration: 3,
+    expectedStateVersion: verifiedHead.stateVersion,
+    acceptedStateVersion: verifiedHead.stateVersion + 1,
+    acceptedCheckpointSha256: H('c')
+  }), /checkpoint hash does not match reconciled state/);
 });

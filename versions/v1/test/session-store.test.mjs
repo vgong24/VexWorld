@@ -4,6 +4,19 @@ import { mkdtemp, readdir, rename as fsRename, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { SessionStore } from '../src/server/session-store.mjs';
+import {
+  bindExecutionKernel,
+  createChronicle,
+  formAuthoritativeResyncReceipt,
+  formDeterminismEpoch,
+  formPredictedHead,
+  formVerifiedHead,
+  formWorldInputFrame,
+  reconcilePredictedHead,
+  sealWorldSnapshot,
+  verifyAuthoritativeResyncReceipt
+} from '../src/core/chronicle/chronicle.mjs';
+import { hashCanonical } from '../src/core/chronicle/canonical.mjs';
 
 function filesystemError(code, message = code) {
   const error = new Error(message);
@@ -185,6 +198,204 @@ test('non-transient replace errors fail immediately without Windows retry', asyn
       (error) => error?.code === 'EACCES'
     );
     assert.equal(renameCalls, 1);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+
+function rollbackKernelFixture() {
+  function reducer(state, inputFrame) {
+    state.tick = inputFrame.tick;
+    for (let index = 0; index < inputFrame.humanActionIntents.length; index += 1) {
+      state.value += inputFrame.humanActionIntents[index].delta;
+    }
+    return state;
+  }
+  return bindExecutionKernel({
+    kernelRef: 'kernel.vexworld.rollback-store-proof.v1',
+    reducerSource: Function.prototype.toString.call(reducer),
+    bindings: {}
+  });
+}
+
+function rollbackEpochFixture(kernel) {
+  return formDeterminismEpoch({
+    epochRef: 'epoch.vexworld.rollback-store-proof.v1',
+    worldPackageFingerprint: 'a'.repeat(64),
+    kernelRef: kernel.kernelRef,
+    kernelSha256: kernel.kernelSha256,
+    stateSchemaVersion: 'fixture.rollback-store-state/v1',
+    fixedStepMs: 1000 / 60,
+    numericProfileRef: 'numeric.rollback-store.integer.v1',
+    rootSeed: 7,
+    rngStreamRefs: ['rng.rollback']
+  });
+}
+
+function rollbackFrameFixture(branchRef, tick, delta) {
+  return formWorldInputFrame({
+    branchRef,
+    tick,
+    humanActionIntents: [{
+      actionRef: `action.rollback.delta.${tick}.${delta < 0 ? 'minus' : 'plus'}`,
+      kind: 'DELTA',
+      delta
+    }],
+    companionIntents: [],
+    scheduledWorldEvents: [],
+    motionWindowRefs: [],
+    rngStateByStream: { 'rng.rollback': tick + 100 }
+  });
+}
+
+test('local prediction never becomes authoritative until the current lease holder wins exact-version checkpoint write', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'vexworld-rollback-resync-'));
+  try {
+    const store = new SessionStore(directory);
+    const sessionRef = 'session.rollback-resync';
+    const seedHost = 'host.seed';
+    const authoritativeHost = 'host.authoritative';
+    const foreignHost = 'host.foreign';
+
+    const kernel = rollbackKernelFixture();
+    const determinismEpoch = rollbackEpochFixture(kernel);
+    const verifiedBranchRef = 'worldline.rollback-resync.verified';
+    const predictionBranchRef = 'worldline.rollback-resync.prediction';
+    const sourceChronicle = createChronicle({
+      timelineRef: 'timeline.rollback-resync.0001',
+      branchRef: verifiedBranchRef,
+      epoch: determinismEpoch
+    });
+    const initialState = {
+      schemaVersion: 'fixture.rollback-store-state/v1',
+      tick: 0,
+      value: 0
+    };
+    const snapshot = sealWorldSnapshot({
+      chronicle: sourceChronicle,
+      tick: 0,
+      canonicalState: initialState
+    });
+
+    const seedLease = await store.claimLease(sessionRef, seedHost, { now: 1000, ttlMs: 5000 });
+    assert.equal(seedLease.accepted, true);
+    const seeded = await store.writeCheckpoint(
+      sessionRef,
+      seedHost,
+      0,
+      initialState,
+      { now: 1001 }
+    );
+    assert.equal(seeded.accepted, true);
+    assert.equal(seeded.stateVersion, 1);
+    assert.equal((await store.releaseLease(sessionRef, seedHost, { now: 1002 })).accepted, true);
+
+    const verifiedHead = formVerifiedHead({
+      sessionRef,
+      stateVersion: seeded.stateVersion,
+      chronicle: sourceChronicle,
+      snapshot
+    });
+
+    const prediction = formPredictedHead({
+      verifiedHead,
+      snapshot,
+      sourceChronicle,
+      epoch: determinismEpoch,
+      predictionBranchRef,
+      inputFrames: [rollbackFrameFixture(predictionBranchRef, 1, 1)],
+      executionKernel: kernel
+    });
+    assert.equal(prediction.predictedHead.authorityClass, 'LOCAL_SPECULATION_ONLY');
+
+    const afterPrediction = await store.read(sessionRef);
+    assert.equal(afterPrediction.stateVersion, 1, 'local prediction must not advance accepted stateVersion');
+    assert.deepEqual(afterPrediction.checkpoint, initialState, 'local prediction must not mutate accepted checkpoint');
+
+    const authoritativeFrames = [rollbackFrameFixture(verifiedBranchRef, 1, 2)];
+    const reconciliation = reconcilePredictedHead({
+      predictedHead: prediction.predictedHead,
+      verifiedHead,
+      snapshot,
+      sourceChronicle,
+      epoch: determinismEpoch,
+      authoritativeBranchRef: verifiedBranchRef,
+      authoritativeInputFrames: authoritativeFrames,
+      executionKernel: kernel
+    });
+    assert.equal(reconciliation.rollbackReceipt.mode, 'DIVERGENT_ROLLBACK');
+    assert.equal(reconciliation.authoritativeReplay.finalState.value, 2);
+
+    const lease = await store.claimLease(sessionRef, authoritativeHost, { now: 2000, ttlMs: 5000 });
+    assert.equal(lease.accepted, true);
+    assert.ok(lease.lease.generation >= 1);
+
+    const foreignClaim = await store.claimLease(sessionRef, foreignHost, { now: 2001, ttlMs: 5000 });
+    assert.equal(foreignClaim.accepted, false);
+    assert.equal(foreignClaim.reason, 'LEASE_HELD');
+
+    const foreignWrite = await store.writeCheckpoint(
+      sessionRef,
+      foreignHost,
+      verifiedHead.stateVersion,
+      reconciliation.authoritativeReplay.finalState,
+      { now: 2002 }
+    );
+    assert.equal(foreignWrite.accepted, false);
+    assert.equal(foreignWrite.reason, 'VALID_HOST_LEASE_REQUIRED');
+
+    const staleWrite = await store.writeCheckpoint(
+      sessionRef,
+      authoritativeHost,
+      verifiedHead.stateVersion - 1,
+      reconciliation.authoritativeReplay.finalState,
+      { now: 2003 }
+    );
+    assert.equal(staleWrite.accepted, false);
+    assert.equal(staleWrite.reason, 'VERSION_CONFLICT');
+
+    const acceptedWrite = await store.writeCheckpoint(
+      sessionRef,
+      authoritativeHost,
+      verifiedHead.stateVersion,
+      reconciliation.authoritativeReplay.finalState,
+      { now: 2004 }
+    );
+    assert.equal(acceptedWrite.accepted, true);
+    assert.equal(acceptedWrite.stateVersion, verifiedHead.stateVersion + 1);
+
+    const checkpointSha256 = hashCanonical(reconciliation.authoritativeReplay.finalState);
+    assert.equal(checkpointSha256, reconciliation.rollbackReceipt.reconciledStateSha256);
+
+    const resyncReceipt = formAuthoritativeResyncReceipt({
+      verifiedHead,
+      rollbackReceipt: reconciliation.rollbackReceipt,
+      hostId: authoritativeHost,
+      hostLeaseGeneration: lease.lease.generation,
+      expectedStateVersion: verifiedHead.stateVersion,
+      acceptedStateVersion: acceptedWrite.stateVersion,
+      acceptedCheckpointSha256: checkpointSha256
+    });
+    verifyAuthoritativeResyncReceipt(resyncReceipt, {
+      verifiedHead,
+      rollbackReceipt: reconciliation.rollbackReceipt
+    });
+
+    const authoritativeRecord = await store.read(sessionRef);
+    assert.equal(authoritativeRecord.stateVersion, resyncReceipt.acceptedStateVersion);
+    assert.deepEqual(authoritativeRecord.checkpoint, reconciliation.authoritativeReplay.finalState);
+
+    assert.equal((await store.releaseLease(sessionRef, authoritativeHost, { now: 2005 })).accepted, true);
+    const afterReleaseWrite = await store.writeCheckpoint(
+      sessionRef,
+      authoritativeHost,
+      acceptedWrite.stateVersion,
+      { ...reconciliation.authoritativeReplay.finalState, value: 99 },
+      { now: 2006 }
+    );
+    assert.equal(afterReleaseWrite.accepted, false);
+    assert.equal(afterReleaseWrite.reason, 'VALID_HOST_LEASE_REQUIRED');
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
