@@ -1254,6 +1254,27 @@ SYNTHETIC_PRESENTATION_FIXTURE != LIVE_VEX_STUDIO_CAPTURE
 Media-capture manifests remain deterministic descriptors. They produce no bytes and
 perform no filesystem, network, publication, or history mutation.
 
+Provenance-sensitive downstream consumption is context-mandatory:
+
+```text
+cinematic sequence verification
+  requires exact shots[]
+
+render request formation/readback
+  requires exact sequence + shots[]
+
+capture manifest formation/readback
+  requires exact sequence + shots[] + frameEvidence[]
+  and verifies every frame against its exact shot
+
+media export formation/readback
+  requires exact manifest + sequence + shots[] + frameEvidence[]
+  before deriving which source projections require authorization
+```
+
+Copied projection/branch/frame coordinates are therefore not accepted as self-authenticating
+evidence merely because an outer digest was consistently recomputed.
+
 External export requests must consume contextually verified Stage-07E authorization that
 includes:
 
