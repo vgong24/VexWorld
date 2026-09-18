@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "vexworld.source-map-fragment/v1",
+  "fragmentRef": "source-map-fragment.vexworld.v1.stage-07e-world-memory-projection",
+  "reason": "Register VW-FWD-07E World Memory read-only projection, private rehearsal request, bounded saved-moment and external consent-envelope source plus focused proof without creating Home/VexLife ownership.",
+  "entries": [
+    {
+      "path": "config/source-map.fragments/stage-07e-world-memory-projection.json",
+      "category": "navigation-and-coverage",
+      "owner": "Vex Chronicle",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "src/core/chronicle/world-memory.mjs",
+      "category": "world-memory-projection",
+      "owner": "Vex Chronicle",
+      "sourceClass": "CANONICAL_SOURCE"
+    },
+    {
+      "path": "test/world-memory.test.mjs",
+      "category": "test-evidence",
+      "owner": "Assurance",
+      "sourceClass": "EVIDENCE_SOURCE"
+    }
+  ]
+}
