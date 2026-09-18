@@ -285,7 +285,9 @@ test('replay, private fork request and saved moment remain distinct effect-free 
 
   const forkRequest = formPrivateRehearsalForkRequest({
     projection: f.projection,
+    chronicle: f.chronicle,
     snapshot: f.snapshot,
+    motionWindows: [f.motionWindow],
     requestedBranchRef: 'worldline.first-grove.private-rehearsal.world-memory.0001',
     formedByParticipantRef: 'participant.victor',
     purposeRef: 'purpose.world-memory.rehearsal',
@@ -293,7 +295,9 @@ test('replay, private fork request and saved moment remain distinct effect-free 
   });
   verifyPrivateRehearsalForkRequest(forkRequest, {
     projection: f.projection,
-    snapshot: f.snapshot
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow]
   });
   assert.equal(forkRequest.requestOnly, true);
   assert.equal(forkRequest.forkEffectPerformed, false);
@@ -304,6 +308,16 @@ test('replay, private fork request and saved moment remain distinct effect-free 
   forkLie.requestedBranchClass = 'SHARED_ALTERNATE_HISTORY';
   rehash(forkLie, 'forkRequestSha256');
   assert.throws(() => verifyPrivateRehearsalForkRequest(forkLie), /PRIVATE_REHEARSAL/);
+
+  const forgedForkOwner = canonicalClone(forkRequest);
+  forgedForkOwner.formedByParticipantRef = 'participant.mallory';
+  rehash(forgedForkOwner, 'forkRequestSha256');
+  assert.throws(() => verifyPrivateRehearsalForkRequest(forgedForkOwner, {
+    projection: f.projection,
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow]
+  }), /source context mismatch/);
 
   const saved = formSavedMomentDescriptor({
     projection: f.projection,
@@ -355,6 +369,9 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
 
   const viewRequest = formWorldMemoryPermissionRequest({
     projection: f.projection,
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow],
     requesterParticipantRef: 'participant.victor',
     subjectParticipantRefs: ['participant.victor', 'participant.mira'],
     requestedCapabilityRefs: ['capability.world-memory.view'],
@@ -364,8 +381,29 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
     externalPolicyOwnerRef: 'policy.vexlife.relationships-consent'
   });
 
+  const forgedRequest = canonicalClone(viewRequest);
+  forgedRequest.requesterParticipantRef = 'participant.mallory';
+  rehash(forgedRequest, 'permissionRequestSha256');
+  assert.throws(() => formSyntheticExternalPolicyDecision({
+    request: forgedRequest,
+    projection: f.projection,
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow],
+    policyDecisionRef: 'policy-decision.world-memory.forged-request.0001',
+    decisionClass: 'ALLOW',
+    grantedCapabilityRefs: ['capability.world-memory.view'],
+    audienceRefs: ['participant.mira'],
+    currentnessRef: 'currentness.vexlife.relationships.forged.0001',
+    consentRefOrNull: 'consent.world-memory.view.forged.0001'
+  }), /permission request source projection mismatch/);
+
   const viewAllow = formSyntheticExternalPolicyDecision({
     request: viewRequest,
+    projection: f.projection,
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow],
     policyDecisionRef: 'policy-decision.world-memory.view.0001',
     decisionClass: 'ALLOW',
     grantedCapabilityRefs: ['capability.world-memory.view'],
@@ -377,11 +415,19 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
 
   const viewAuthorization = evaluateWorldMemoryAuthorization({
     request: viewRequest,
-    decision: viewAllow
+    decision: viewAllow,
+    projection: f.projection,
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow]
   });
   verifyWorldMemoryAuthorization(viewAuthorization, {
     request: viewRequest,
-    decision: viewAllow
+    decision: viewAllow,
+    projection: f.projection,
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow]
   });
   assert.deepEqual(viewAuthorization.effectiveCapabilityRefs, ['capability.world-memory.view']);
   assert.equal(viewAuthorization.effectiveCapabilityRefs.includes('capability.world-memory.fork-private'), false);
@@ -398,7 +444,11 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
   rehash(capabilityEscalation, 'policyDecisionSha256');
   assert.throws(() => evaluateWorldMemoryAuthorization({
     request: viewRequest,
-    decision: capabilityEscalation
+    decision: capabilityEscalation,
+    projection: f.projection,
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow]
   }), /unrequested capability|ALLOW must grant the exact requested/);
 
   const friendShapedButNotDecision = {
@@ -408,11 +458,18 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
   };
   assert.throws(() => evaluateWorldMemoryAuthorization({
     request: viewRequest,
-    decision: friendShapedButNotDecision
+    decision: friendShapedButNotDecision,
+    projection: f.projection,
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow]
   }), /fields do not match contract|schema mismatch/);
 
   const wideRequest = formWorldMemoryPermissionRequest({
     projection: f.projection,
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow],
     requesterParticipantRef: 'participant.victor',
     subjectParticipantRefs: ['participant.victor', 'participant.mira'],
     requestedCapabilityRefs: [
@@ -428,6 +485,10 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
 
   const narrowed = formSyntheticExternalPolicyDecision({
     request: wideRequest,
+    projection: f.projection,
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow],
     policyDecisionRef: 'policy-decision.world-memory.narrow.0001',
     decisionClass: 'NARROW',
     grantedCapabilityRefs: ['capability.world-memory.fork-private'],
@@ -437,13 +498,21 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
   });
   const narrowedAuth = evaluateWorldMemoryAuthorization({
     request: wideRequest,
-    decision: narrowed
+    decision: narrowed,
+    projection: f.projection,
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow]
   });
   assert.deepEqual(narrowedAuth.effectiveCapabilityRefs, ['capability.world-memory.fork-private']);
   assert.equal(narrowedAuth.effectiveCapabilityRefs.includes('capability.world-memory.redistribute'), false);
 
   const revoked = formSyntheticExternalPolicyDecision({
     request: viewRequest,
+    projection: f.projection,
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow],
     policyDecisionRef: 'policy-decision.world-memory.revoke.0001',
     decisionClass: 'REVOKE',
     grantedCapabilityRefs: [],
@@ -453,7 +522,11 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
   });
   const revokedAuth = evaluateWorldMemoryAuthorization({
     request: viewRequest,
-    decision: revoked
+    decision: revoked,
+    projection: f.projection,
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow]
   });
   assert.equal(revokedAuth.authorizationClass, 'REVOKED');
   assert.deepEqual(revokedAuth.effectiveCapabilityRefs, []);
@@ -469,7 +542,11 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
   rehash(authLie, 'authorizationSha256');
   assert.throws(() => verifyWorldMemoryAuthorization(authLie, {
     request: viewRequest,
-    decision: viewAllow
+    decision: viewAllow,
+    projection: f.projection,
+    chronicle: f.chronicle,
+    snapshot: f.snapshot,
+    motionWindows: [f.motionWindow]
   }), /context mismatch/);
 
   assert.deepEqual(WORLD_MEMORY_CAPABILITIES, [
