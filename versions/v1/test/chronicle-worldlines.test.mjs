@@ -14,6 +14,7 @@ import {
   replayWorldline,
   sealWorldSnapshot,
   verifyChronicle,
+  verifyIntelligenceDecision,
   verifyWorldSnapshot
 } from '../src/core/chronicle/chronicle.mjs';
 import {
@@ -1023,39 +1024,278 @@ test('motion promotion digest is stable and expiry does not rewrite a promoted w
 });
 
 test('intelligence decision records bounded causal evidence and rejects hidden reasoning', () => {
-  const decision = formIntelligenceDecision({
+  const acceptedDecisionInput = {
+    decisionRef: 'decision.participant.vex.0001',
     participantRef: 'participant.vex',
     workerRef: 'worker.vex.local.0001',
     sourceObservationRef: 'observation.vex.fight.0001',
     sourceObservationSha256: H('c'),
     visibleContextRefs: ['context.first-grove.fight-affordances'],
     controllerRef: 'controller.vex.local-model.v1',
+    controllerDisposition: 'OLLAMA',
     modelIdentityOrNull: {
       modelRef: 'model.devex.g0',
       modelDigest: H('d')
     },
-    proposedIntent: { intentType: 'GUARD', targetRef: null },
-    acceptedIntentOrNull: { intentType: 'GUARD', targetRef: null },
+    proposedIntent: { intentType: 'GUARD', targetRef: null, reason: 'INCOMING_RUSH' },
+    acceptedIntentOrNull: {
+      intentRef: 'intent.vex.guard.0001',
+      intentType: 'GUARD',
+      targetRef: null
+    },
     rejectionReasonOrNull: null,
+    fallbackReasonOrNull: null,
     conciseReasonOrNull: 'The incoming rush is close; I guard.'
-  });
+  };
+  const decision = formIntelligenceDecision(acceptedDecisionInput);
   assert.equal(decision.acceptedIntentOrNull.intentType, 'GUARD');
-  assert.ok(decision.decisionSha256);
+  assert.equal(decision.controllerDisposition, 'OLLAMA');
+  assert.equal(verifyIntelligenceDecision(decision), decision);
+
+  const rejected = formIntelligenceDecision({
+    decisionRef: 'decision.participant.vex.rejected.0001',
+    participantRef: 'participant.vex',
+    workerRef: 'worker.vex.local.0001',
+    sourceObservationRef: 'observation.vex.fight.0001',
+    sourceObservationSha256: H('c'),
+    visibleContextRefs: ['context.first-grove.fight-affordances'],
+    controllerRef: 'controller.vex.local-model.v1',
+    controllerDisposition: 'OLLAMA',
+    modelIdentityOrNull: {
+      modelRef: 'model.devex.g0',
+      modelDigest: H('d')
+    },
+    proposedIntent: { intentType: 'ATTACK_NEAREST', targetRef: 'entity.hidden', reason: 'MODEL_SELECTED_HIDDEN_TARGET' },
+    acceptedIntentOrNull: null,
+    rejectionReasonOrNull: 'reason.not-afforded',
+    fallbackReasonOrNull: null,
+    conciseReasonOrNull: null
+  });
+  assert.equal(rejected.acceptedIntentOrNull, null);
+  assert.equal(rejected.rejectionReasonOrNull, 'reason.not-afforded');
+  assert.equal(verifyIntelligenceDecision(rejected), rejected);
 
   assert.throws(() => formIntelligenceDecision({
+    decisionRef: 'decision.participant.vex.invalid-neither.0001',
     participantRef: 'participant.vex',
     workerRef: 'worker.vex.local.0001',
     sourceObservationRef: 'observation.vex.fight.0001',
     sourceObservationSha256: H('c'),
     visibleContextRefs: [],
     controllerRef: 'controller.vex.local-model.v1',
+    controllerDisposition: 'OLLAMA',
+    modelIdentityOrNull: null,
+    proposedIntent: { intentType: 'GUARD', targetRef: null, reason: 'INCOMING_RUSH' },
+    acceptedIntentOrNull: null,
+    rejectionReasonOrNull: null,
+    fallbackReasonOrNull: null,
+    conciseReasonOrNull: null
+  }), /exactly one accepted intent or rejection reason/);
+
+  assert.throws(() => formIntelligenceDecision({
+    decisionRef: 'decision.participant.vex.invalid-fallback.0001',
+    participantRef: 'participant.vex',
+    workerRef: 'worker.vex.local.0001',
+    sourceObservationRef: 'observation.vex.fight.0001',
+    sourceObservationSha256: H('c'),
+    visibleContextRefs: [],
+    controllerRef: 'controller.vex.remote.deterministic-fallback',
+    controllerDisposition: 'DETERMINISTIC_FALLBACK',
+    modelIdentityOrNull: null,
+    proposedIntent: { intentType: 'GUARD', targetRef: null, reason: 'INCOMING_RUSH' },
+    acceptedIntentOrNull: { intentRef: 'intent.vex.guard.invalid', intentType: 'GUARD', targetRef: null },
+    rejectionReasonOrNull: null,
+    fallbackReasonOrNull: null,
+    conciseReasonOrNull: null
+  }), /fallback disposition\/reason mismatch/);
+
+  const tampered = canonicalClone(decision);
+  tampered.conciseReasonOrNull = 'A different bounded outward reason.';
+  assert.throws(() => verifyIntelligenceDecision(tampered), /decision digest mismatch/);
+
+  const prohibitedProposalExtras = [
+    ['hiddenPrompt', 'system prompt must not persist'],
+    ['credentials', 'secret-token'],
+    ['privateHomeContext', { roomRef: 'home.private.room' }],
+    ['rawModelOutput', { text: 'unbounded raw model payload' }]
+  ];
+
+  for (const [field, value] of prohibitedProposalExtras) {
+    assert.throws(() => formIntelligenceDecision({
+      ...acceptedDecisionInput,
+      proposedIntent: { ...acceptedDecisionInput.proposedIntent, [field]: value }
+    }), /proposedIntent fields do not match contract/);
+
+    const rehashed = canonicalClone(decision);
+    rehashed.proposedIntent[field] = value;
+    const body = canonicalClone(rehashed);
+    delete body.decisionSha256;
+    rehashed.decisionSha256 = hashCanonical(body);
+    assert.throws(() => verifyIntelligenceDecision(rehashed), /proposedIntent fields do not match contract/);
+  }
+
+  assert.throws(() => formIntelligenceDecision({
+    ...acceptedDecisionInput,
+    acceptedIntentOrNull: {
+      ...acceptedDecisionInput.acceptedIntentOrNull,
+      privateHomeContext: 'not-admitted'
+    }
+  }), /acceptedIntentOrNull fields do not match contract/);
+
+  const acceptedExtraRehashed = canonicalClone(decision);
+  acceptedExtraRehashed.acceptedIntentOrNull.rawModelOutput = 'not-admitted';
+  const acceptedExtraBody = canonicalClone(acceptedExtraRehashed);
+  delete acceptedExtraBody.decisionSha256;
+  acceptedExtraRehashed.decisionSha256 = hashCanonical(acceptedExtraBody);
+  assert.throws(
+    () => verifyIntelligenceDecision(acceptedExtraRehashed),
+    /acceptedIntentOrNull fields do not match contract/
+  );
+
+  assert.throws(() => formIntelligenceDecision({
+    decisionRef: 'decision.participant.vex.rejected.0001',
+    participantRef: 'participant.vex',
+    workerRef: 'worker.vex.local.0001',
+    sourceObservationRef: 'observation.vex.fight.0001',
+    sourceObservationSha256: H('c'),
+    visibleContextRefs: [],
+    controllerRef: 'controller.vex.local-model.v1',
+    controllerDisposition: 'OLLAMA',
     modelIdentityOrNull: null,
     proposedIntent: {
       intentType: 'GUARD',
+      targetRef: null,
+      reason: 'INCOMING_RUSH',
       privateReasoning: 'unbounded hidden trace must not enter Chronicle'
     },
     acceptedIntentOrNull: null,
     rejectionReasonOrNull: 'reason.not-afforded',
+    fallbackReasonOrNull: null,
     conciseReasonOrNull: null
   }), /hidden-reasoning/);
+});
+
+test('accepted-intent events bind decision and observation refs while fresh alternate decisions stay on a fork', () => {
+  const determinismEpoch = epoch();
+  let parent = createChronicle({
+    timelineRef: 'timeline.first-grove.intelligence-provenance.0001',
+    branchRef: 'worldline.first-grove.verified',
+    epoch: determinismEpoch
+  });
+  const decision = formIntelligenceDecision({
+    decisionRef: 'decision.participant.vex.0002',
+    participantRef: 'participant.vex',
+    workerRef: 'worker.vex.local.0002',
+    sourceObservationRef: 'observation.vex.fight.0002',
+    sourceObservationSha256: H('e'),
+    visibleContextRefs: ['world.first-grove', 'participant.victor'],
+    controllerRef: 'controller.vex.remote.ollama',
+    controllerDisposition: 'OLLAMA',
+    modelIdentityOrNull: {
+      modelRef: 'model.ollama.sha256.' + H('f'),
+      modelDigest: H('f')
+    },
+    proposedIntent: { intentType: 'HOLD_POSITION', targetRef: null, reason: 'WAIT' },
+    acceptedIntentOrNull: {
+      intentRef: 'intent.vex.hold.0002',
+      intentType: 'HOLD_POSITION',
+      targetRef: null
+    },
+    rejectionReasonOrNull: null,
+    fallbackReasonOrNull: null,
+    conciseReasonOrNull: 'WAIT'
+  });
+
+  const observed = appendChronicleEvent(parent, {
+    tick: 1,
+    ordinal: 0,
+    actorRef: 'system.vexworld.observation',
+    eventClass: 'OBSERVATION_DELIVERED',
+    privacyClass: 'PARTY_SHARED',
+    causationRefs: [],
+    correlationRefOrNull: 'correlation.intelligence.0002',
+    payload: {
+      observationRef: decision.sourceObservationRef,
+      observationSha256: decision.sourceObservationSha256,
+      deliveredToRef: decision.participantRef
+    }
+  });
+  parent = observed.chronicle;
+
+  const accepted = appendChronicleEvent(parent, {
+    tick: 2,
+    ordinal: 0,
+    actorRef: decision.participantRef,
+    eventClass: 'INTENT_ACCEPTED',
+    privacyClass: 'PARTY_SHARED',
+    causationRefs: [observed.event.eventRef, decision.decisionRef],
+    correlationRefOrNull: 'correlation.intelligence.0002',
+    payload: {
+      intentRef: decision.acceptedIntentOrNull.intentRef,
+      decisionRef: decision.decisionRef,
+      decisionSha256: decision.decisionSha256,
+      sourceObservationRef: decision.sourceObservationRef,
+      sourceObservationSha256: decision.sourceObservationSha256
+    }
+  });
+  parent = accepted.chronicle;
+  verifyChronicle(parent);
+  assert.deepEqual(accepted.event.causationRefs, [observed.event.eventRef, decision.decisionRef]);
+  assert.equal(accepted.event.payload.decisionSha256, decision.decisionSha256);
+  assert.equal(accepted.event.payload.sourceObservationSha256, decision.sourceObservationSha256);
+
+  const snapshotState = initialFightState();
+  snapshotState.tick = 2;
+  const snapshot = sealWorldSnapshot({ chronicle: parent, tick: 2, canonicalState: snapshotState });
+  const parentBeforeFork = JSON.stringify(parent);
+  const fork = forkWorldline({
+    parentChronicle: parent,
+    snapshot,
+    branchRef: 'worldline.first-grove.private-rehearsal.intelligence.0001',
+    branchClass: 'PRIVATE_REHEARSAL',
+    formedByRef: 'participant.victor',
+    purposeRef: 'purpose.reconsider-companion-intent',
+    assumptionRefs: ['assumption.fresh-controller-invocation']
+  });
+
+  const alternateDecision = formIntelligenceDecision({
+    decisionRef: 'decision.participant.vex.alternate.0002',
+    participantRef: decision.participantRef,
+    workerRef: decision.workerRef,
+    sourceObservationRef: decision.sourceObservationRef,
+    sourceObservationSha256: decision.sourceObservationSha256,
+    visibleContextRefs: decision.visibleContextRefs,
+    controllerRef: decision.controllerRef,
+    controllerDisposition: decision.controllerDisposition,
+    modelIdentityOrNull: decision.modelIdentityOrNull,
+    proposedIntent: { intentType: 'FOLLOW_HUMAN', targetRef: null, reason: 'PARTY_COHESION' },
+    acceptedIntentOrNull: {
+      intentRef: 'intent.vex.follow.alternate.0002',
+      intentType: 'FOLLOW_HUMAN',
+      targetRef: null
+    },
+    rejectionReasonOrNull: null,
+    fallbackReasonOrNull: null,
+    conciseReasonOrNull: 'PARTY_COHESION'
+  });
+  const alternateEvent = appendChronicleEvent(fork.chronicle, {
+    tick: 3,
+    ordinal: 0,
+    actorRef: alternateDecision.participantRef,
+    eventClass: 'INTENT_ACCEPTED',
+    privacyClass: 'PARTICIPANT_PRIVATE',
+    causationRefs: [alternateDecision.decisionRef],
+    correlationRefOrNull: 'correlation.intelligence.alternate.0002',
+    payload: {
+      intentRef: alternateDecision.acceptedIntentOrNull.intentRef,
+      decisionRef: alternateDecision.decisionRef,
+      decisionSha256: alternateDecision.decisionSha256,
+      sourceObservationRef: alternateDecision.sourceObservationRef,
+      sourceObservationSha256: alternateDecision.sourceObservationSha256
+    }
+  });
+
+  assert.equal(JSON.stringify(parent), parentBeforeFork, 'fresh inference must not rewrite verified parent history');
+  assert.equal(alternateEvent.chronicle.branchRef, fork.branch.branchRef);
+  assert.notEqual(alternateDecision.decisionRef, decision.decisionRef);
 });

@@ -2,6 +2,8 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { ALLOWED_COMPANION_INTENTS } from '../core/constants.mjs';
+import { hashCanonical } from '../core/chronicle/canonical.mjs';
+import { formIntelligenceDecision } from '../core/chronicle/chronicle.mjs';
 import {
   deterministicCommunicationProposal,
   formCompanionUtterance,
@@ -199,6 +201,104 @@ function assertObservationAuthority(observation) {
   }
 }
 
+function canonicalModelDigest(value) {
+  if (typeof value !== 'string') {
+    throw controllerError('MODEL_DIGEST_INVALID', 'Model digest must be a SHA-256 string');
+  }
+  const normalized = value.trim().toLowerCase();
+  if (/^[a-f0-9]{64}$/.test(normalized)) return normalized;
+  if (/^sha256:[a-f0-9]{64}$/.test(normalized)) return normalized.slice('sha256:'.length);
+  throw controllerError('MODEL_DIGEST_INVALID', 'Model digest must be bare SHA-256 hex or sha256:<hex>');
+}
+
+function visibleContextRefsForObservation(observation) {
+  const refs = [
+    observation.worldRef,
+    observation.observerParticipantRef,
+    observation.human?.participantRef,
+    observation.restoration?.entityRef,
+    ...(Array.isArray(observation.nearbyEnemies)
+      ? observation.nearbyEnemies.map((enemy) => enemy?.entityRef)
+      : [])
+  ].filter((value) => typeof value === 'string' && value);
+  return [...new Set(refs)].sort();
+}
+
+function controllerRefForDecision(options, controllerDisposition) {
+  if (controllerDisposition === 'DETERMINISTIC_FALLBACK') {
+    return 'controller.vexworld.remote.deterministic-fallback';
+  }
+  return options.mode === 'ollama'
+    ? 'controller.vexworld.remote.ollama'
+    : 'controller.vexworld.remote.deterministic';
+}
+
+function conciseDecisionReasonOrNull(value) {
+  if (
+    typeof value !== 'string' ||
+    !value.trim() ||
+    value.length > 240 ||
+    /[\u0000-\u001f\u007f]/u.test(value)
+  ) {
+    return null;
+  }
+  return value;
+}
+
+export function formWorkerIntelligenceDecision({
+  options,
+  observation,
+  proposedIntent,
+  acceptedIntent,
+  modelIdentity,
+  controllerDisposition,
+  fallbackReason
+}) {
+  assertObservationAuthority(observation);
+  if (!acceptedIntent?.intentRef || !Number.isInteger(acceptedIntent.sequence)) {
+    throw controllerError('ACCEPTED_INTENT_REQUIRED', 'Decision provenance requires one accepted intent with stable ref/sequence');
+  }
+  const modelDigest = modelIdentity ? canonicalModelDigest(modelIdentity.digest) : null;
+  const workerDigest = hashCanonical(String(options.workerId));
+  const decisionCoordinateSha256 = hashCanonical({
+    sessionRef: String(options.session),
+    participantRef: options.companion,
+    intentRef: acceptedIntent.intentRef,
+    intentSequence: acceptedIntent.sequence
+  });
+  const normalizedProposal = {
+    intentType: proposedIntent.intentType,
+    targetRef: proposedIntent.targetRef || null,
+    reason: proposedIntent.reason || 'CONTROLLER_SELECTED'
+  };
+  const accepted = {
+    intentRef: acceptedIntent.intentRef,
+    intentType: acceptedIntent.intentType,
+    targetRef: acceptedIntent.targetRef || null
+  };
+  return formIntelligenceDecision({
+    decisionRef: `decision.vexworld.sha256.${decisionCoordinateSha256}`,
+    participantRef: options.companion,
+    workerRef: `worker.vexworld.sha256.${workerDigest}`,
+    sourceObservationRef: observation.observationRef,
+    sourceObservationSha256: hashCanonical(observation),
+    visibleContextRefs: visibleContextRefsForObservation(observation),
+    controllerRef: controllerRefForDecision(options, controllerDisposition),
+    controllerDisposition,
+    modelIdentityOrNull: modelDigest
+      ? {
+          modelRef: `model.ollama.sha256.${modelDigest}`,
+          modelDigest
+        }
+      : null,
+    proposedIntent: normalizedProposal,
+    acceptedIntentOrNull: accepted,
+    rejectionReasonOrNull: null,
+    fallbackReasonOrNull: fallbackReason || null,
+    conciseReasonOrNull: conciseDecisionReasonOrNull(normalizedProposal.reason)
+  });
+}
+
 export function validateModelProposal(proposal, observation) {
   assertObservationAuthority(observation);
   if (!proposal || typeof proposal !== 'object' || Array.isArray(proposal)) {
@@ -351,7 +451,7 @@ export async function runWorkerCycle(options, state = {
     `/api/v1/sessions/${encodeURIComponent(options.session)}/companions/${encodeURIComponent(options.companion)}/observation`
   );
   if (!observation || Number(observation.sequence) <= state.lastObservationSequence) {
-    return { ...state, modelIdentity, processed: false, intent: null, utterance: null };
+    return { ...state, modelIdentity, processed: false, intent: null, decision: null, utterance: null };
   }
 
   const lastObservationSequence = Number(observation.sequence);
@@ -402,6 +502,16 @@ export async function runWorkerCycle(options, state = {
       fallbackReason
     }
   };
+  const decision = formWorkerIntelligenceDecision({
+    options,
+    observation,
+    proposedIntent: proposed,
+    acceptedIntent: intent,
+    modelIdentity,
+    controllerDisposition,
+    fallbackReason
+  });
+
   await agentApi(options, `/api/v1/sessions/${encodeURIComponent(options.session)}/companions/${encodeURIComponent(options.companion)}/intent`, {
     method: 'PUT', body: JSON.stringify(intent)
   });
@@ -454,6 +564,7 @@ export async function runWorkerCycle(options, state = {
     modelIdentity,
     processed: true,
     intent,
+    decision,
     utterance,
     utteranceError
   };

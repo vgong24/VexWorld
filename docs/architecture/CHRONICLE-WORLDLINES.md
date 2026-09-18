@@ -302,28 +302,173 @@ Historical replay consumes the recorded accepted intent stream. It does not ask 
 A bounded intelligence decision may record:
 
 ```text
+decisionRef
 participantRef
 workerRef
 source observation ref/hash
 visible context refs
 controller ref
+controllerDisposition
+fallbackReasonOrNull
 model ref/digest when used
-proposed intent
-accepted intent or rejection
-bounded concise reason
+final bounded proposed intent
+accepted intent or explicit rejection
+bounded concise outward-facing reason
+decision hash
 ```
 
-It must not contain hidden chain-of-thought, private reasoning traces or unbounded model context.
+### Stage 07B observation identity
+
+For the first worker integration, `sourceObservationSha256` is the canonical SHA-256 of the **exact observation object received by that worker cycle**.
+
+That object currently includes fields such as the observation ref/sequence, `formedAt`, simulation time, world/reality coordinates, observer-relative bodies/resources, nearby enemies, restoration point, quest projection, affordances and unknown refs.
+
+Therefore:
 
 ```text
-MODEL PROPOSAL
-→ validation
-→ accepted or rejected intent
-→ Chronicle boundary event
-→ deterministic world transition
+SOURCE_OBSERVATION_SHA256
+=
+EXACT_RECEIVED_OBSERVATION_PAYLOAD_IDENTITY
+
+SOURCE_OBSERVATION_SHA256
+!=
+SEMANTIC_EQUIVALENCE_CLASS
 ```
 
-A new inference made from an old observation belongs to a new Worldline. It cannot replace the original historical choice.
+Changing any canonical field changes the decision content hash even when `observationRef` is unchanged.
+
+Worker-generated `decisionRef` coordinates are separately namespaced by a canonical hash of:
+
+```text
+sessionRef
+participantRef
+accepted intent ref
+accepted intent sequence
+```
+
+so two sessions do not collide merely because the same companion reaches the same local intent sequence.
+
+```text
+DECISION_REF = STABLE CAUSAL COORDINATE
+DECISION_SHA256 = EXACT DECISION CONTENT IDENTITY
+```
+
+The worker does not claim a digest for hidden model context, private Home context, server bytes it did not receive, or subjective awareness.
+
+### Proposal, fallback and accepted intent
+
+The existing worker authority boundary remains intact:
+
+```text
+MODEL / DETERMINISTIC CONTROLLER
+→ bounded proposal validation
+→ deterministic fallback when required
+→ locally formed decision evidence
+→ existing accepted-intent relay
+→ later Chronicle/event integration
+```
+
+For a successful Ollama decision, the bounded validated model proposal becomes the decision's `proposedIntent`.
+
+When the model/controller path fails validation, times out or is unavailable, Stage 07B records:
+
+```text
+controllerDisposition=DETERMINISTIC_FALLBACK
+fallbackReasonOrNull=<bounded error code>
+proposedIntent=<final bounded deterministic fallback proposal>
+acceptedIntentOrNull=<intent actually relayed>
+```
+
+The raw invalid/unbounded model output is **not** admitted into Chronicle decision evidence. This preserves the hidden-reasoning/private-context boundary and avoids treating rejected untrusted output as durable world truth.
+
+A resolved Chronicle decision has exactly one outcome:
+
+```text
+ACCEPTED
+  acceptedIntentOrNull=<accepted intent>
+  rejectionReasonOrNull=null
+
+or
+
+REJECTED
+  acceptedIntentOrNull=null
+  rejectionReasonOrNull=<bounded reason ref>
+```
+
+Both accepted+rejected and neither accepted nor rejected fail the decision contract.
+
+Likewise:
+
+```text
+controllerDisposition=DETERMINISTIC_FALLBACK
+↔
+fallbackReasonOrNull is present
+```
+
+so fallback provenance cannot silently disappear or be attached to an ordinary-success disposition.
+
+Proposal and acceptance therefore remain distinct facts.
+
+### Result-local integration boundary
+
+Stage 07B forms decision evidence in the remote worker and returns it alongside the existing accepted intent.
+
+It does **not** add a SessionStore decision collection, Chronicle persistence endpoint, server route, browser projection or live-world reconnection.
+
+Decision formation is pure and is completed before the existing intent PUT. The decision is returned only when that relay succeeds.
+
+```text
+LOCAL DECISION FORMATION
+!=
+DURABLE CHRONICLE PERSISTENCE
+```
+
+Historical replay continues to consume recorded accepted input frames and makes no model/controller call.
+
+A fresh inference made from an old observation belongs to a new Worldline. It cannot replace the original historical choice.
+
+Where Chronicle events later bind the decision, the causal payload should retain both coordinates and exact content identities:
+
+```text
+OBSERVATION_DELIVERED {
+  observationRef
+  observationSha256
+}
+
+→ decision {
+     decisionRef
+     decisionSha256
+     sourceObservationRef
+     sourceObservationSha256
+   }
+
+→ INTENT_ACCEPTED {
+     intentRef
+     decisionRef
+     decisionSha256
+     sourceObservationRef
+     sourceObservationSha256
+   }
+```
+
+This keeps a later event from ambiguously referring only to a reusable coordinate if decision bytes differ.
+
+It still does not claim:
+
+```text
+OBSERVATION_DELIVERED
+=
+SUBJECTIVE_AWARENESS
+```
+
+The decision contract must not contain hidden chain-of-thought, private reasoning traces, hidden prompts, credentials, private Home context or unbounded model context.
+
+```text
+MODEL_PROPOSAL != ACCEPTED_WORLD_INTENT
+RECORDED_INTENT != CHAIN_OF_THOUGHT
+REPLAY != MODEL_REINFERENCE
+MODEL_TRAINING != WORLD_EVENT_PROVENANCE
+```
 
 ## Worldline fork
 

@@ -45,6 +45,38 @@ const BRANCH_CLASS = new Set([
 const FIGHT = new Set(FIGHT_EVENT_CLASSES);
 const pad = (n, width) => String(n).padStart(width, '0');
 
+function validateNullableSafeRef(value, label) {
+  if (value !== null) assertSafeRef(value, label);
+  return value;
+}
+
+function boundedDecisionReason(value, label, max = 180) {
+  if (typeof value !== 'string' || !value.trim() || value.length > max) {
+    throw new TypeError(`${label} must be bounded non-empty text`);
+  }
+  return value;
+}
+
+function validateDecisionProposedIntent(value) {
+  assertPlainObject(value, 'proposedIntent');
+  rejectHiddenReasoning(value, 'proposedIntent');
+  assertExactKeys(value, ['intentType', 'targetRef', 'reason'], 'proposedIntent');
+  assertSafeRef(value.intentType, 'proposedIntent.intentType');
+  validateNullableSafeRef(value.targetRef, 'proposedIntent.targetRef');
+  boundedDecisionReason(value.reason, 'proposedIntent.reason', 180);
+  return value;
+}
+
+function validateDecisionAcceptedIntent(value) {
+  assertPlainObject(value, 'acceptedIntentOrNull');
+  rejectHiddenReasoning(value, 'acceptedIntentOrNull');
+  assertExactKeys(value, ['intentRef', 'intentType', 'targetRef'], 'acceptedIntentOrNull');
+  assertSafeRef(value.intentRef, 'acceptedIntentOrNull.intentRef');
+  assertSafeRef(value.intentType, 'acceptedIntentOrNull.intentType');
+  validateNullableSafeRef(value.targetRef, 'acceptedIntentOrNull.targetRef');
+  return value;
+}
+
 function boundedText(value, label, max = 160) {
   if (typeof value !== 'string' || !value.trim() || value.length > max || /[\u0000-\u001f\u007f]/u.test(value)) {
     throw new TypeError(`${label} must be bounded printable text`);
@@ -628,29 +660,80 @@ export function forkWorldline({ parentChronicle, snapshot, branchRef, branchClas
   });
 }
 
+function validateIntelligenceDecisionBody(body, label = 'decision') {
+  assertExactKeys(body, [
+    'schemaVersion', 'decisionRef', 'participantRef', 'workerRef',
+    'sourceObservationRef', 'sourceObservationSha256', 'visibleContextRefs',
+    'controllerRef', 'controllerDisposition', 'modelIdentityOrNull',
+    'proposedIntent', 'acceptedIntentOrNull', 'rejectionReasonOrNull',
+    'fallbackReasonOrNull', 'conciseReasonOrNull'
+  ], label);
+  if (body.schemaVersion !== SCHEMA.decision) throw new TypeError('decision schema mismatch');
+  rejectHiddenReasoning(body, label);
+  for (const [key, value] of [
+    ['decisionRef', body.decisionRef],
+    ['participantRef', body.participantRef],
+    ['workerRef', body.workerRef],
+    ['sourceObservationRef', body.sourceObservationRef],
+    ['controllerRef', body.controllerRef],
+    ['controllerDisposition', body.controllerDisposition]
+  ]) assertSafeRef(value, key);
+  assertSha256(body.sourceObservationSha256, 'sourceObservationSha256');
+  assertUniqueSafeRefs(body.visibleContextRefs, 'visibleContextRefs');
+  if (body.modelIdentityOrNull !== null) {
+    assertExactKeys(body.modelIdentityOrNull, ['modelRef', 'modelDigest'], 'modelIdentityOrNull');
+    assertSafeRef(body.modelIdentityOrNull.modelRef, 'modelRef');
+    assertSha256(body.modelIdentityOrNull.modelDigest, 'modelDigest');
+  }
+  validateDecisionProposedIntent(body.proposedIntent);
+  if (body.acceptedIntentOrNull !== null) validateDecisionAcceptedIntent(body.acceptedIntentOrNull);
+  if (body.rejectionReasonOrNull !== null) assertSafeRef(body.rejectionReasonOrNull, 'rejectionReasonOrNull');
+  if (body.fallbackReasonOrNull !== null) assertSafeRef(body.fallbackReasonOrNull, 'fallbackReasonOrNull');
+
+  const accepted = body.acceptedIntentOrNull !== null;
+  const rejected = body.rejectionReasonOrNull !== null;
+  if (accepted === rejected) {
+    throw new TypeError('decision must resolve to exactly one accepted intent or rejection reason');
+  }
+
+  const fallback = body.controllerDisposition === 'DETERMINISTIC_FALLBACK';
+  if (fallback !== (body.fallbackReasonOrNull !== null)) {
+    throw new TypeError('decision fallback disposition/reason mismatch');
+  }
+
+  if (body.conciseReasonOrNull !== null) boundedText(body.conciseReasonOrNull, 'conciseReasonOrNull', 240);
+  return body;
+}
+
+export function verifyIntelligenceDecision(decision) {
+  assertPlainObject(decision, 'decision');
+  assertExactKeys(decision, [
+    'schemaVersion', 'decisionRef', 'participantRef', 'workerRef',
+    'sourceObservationRef', 'sourceObservationSha256', 'visibleContextRefs',
+    'controllerRef', 'controllerDisposition', 'modelIdentityOrNull',
+    'proposedIntent', 'acceptedIntentOrNull', 'rejectionReasonOrNull',
+    'fallbackReasonOrNull', 'conciseReasonOrNull', 'decisionSha256'
+  ], 'decision');
+  assertSha256(decision.decisionSha256, 'decision.decisionSha256');
+  const body = canonicalClone(decision);
+  delete body.decisionSha256;
+  validateIntelligenceDecisionBody(body);
+  if (hashCanonical(body) !== decision.decisionSha256) {
+    throw new TypeError('decision digest mismatch');
+  }
+  return decision;
+}
+
 export function formIntelligenceDecision(input) {
   assertExactKeys(input, [
-    'participantRef', 'workerRef', 'sourceObservationRef', 'sourceObservationSha256',
-    'visibleContextRefs', 'controllerRef', 'modelIdentityOrNull', 'proposedIntent',
-    'acceptedIntentOrNull', 'rejectionReasonOrNull', 'conciseReasonOrNull'
+    'decisionRef', 'participantRef', 'workerRef',
+    'sourceObservationRef', 'sourceObservationSha256', 'visibleContextRefs',
+    'controllerRef', 'controllerDisposition', 'modelIdentityOrNull',
+    'proposedIntent', 'acceptedIntentOrNull', 'rejectionReasonOrNull',
+    'fallbackReasonOrNull', 'conciseReasonOrNull'
   ], 'decision input');
-  rejectHiddenReasoning(input, 'decision');
-  for (const [key, value] of [
-    ['participantRef', input.participantRef], ['workerRef', input.workerRef],
-    ['sourceObservationRef', input.sourceObservationRef], ['controllerRef', input.controllerRef]
-  ]) assertSafeRef(value, key);
-  assertSha256(input.sourceObservationSha256, 'sourceObservationSha256');
-  assertUniqueSafeRefs(input.visibleContextRefs, 'visibleContextRefs');
-  if (input.modelIdentityOrNull !== null) {
-    assertExactKeys(input.modelIdentityOrNull, ['modelRef', 'modelDigest'], 'modelIdentityOrNull');
-    assertSafeRef(input.modelIdentityOrNull.modelRef, 'modelRef');
-    assertSha256(input.modelIdentityOrNull.modelDigest, 'modelDigest');
-  }
-  assertPlainObject(input.proposedIntent, 'proposedIntent');
-  if (input.acceptedIntentOrNull !== null) assertPlainObject(input.acceptedIntentOrNull, 'acceptedIntentOrNull');
-  if (input.rejectionReasonOrNull !== null) assertSafeRef(input.rejectionReasonOrNull, 'rejectionReasonOrNull');
-  if (input.conciseReasonOrNull !== null) boundedText(input.conciseReasonOrNull, 'conciseReasonOrNull', 240);
   const body = { schemaVersion: SCHEMA.decision, ...canonicalClone(input) };
+  validateIntelligenceDecisionBody(body, 'decision input');
   return frozenCanonical({ ...body, decisionSha256: hashCanonical(body) });
 }
 
