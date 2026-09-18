@@ -1147,6 +1147,12 @@ export function verifyRollbackReceipt(receipt, { predictedHead = null, verifiedH
   if (receipt.firstMismatchIndexOrNull !== null) {
     assertNonNegativeInteger(receipt.firstMismatchIndexOrNull, 'rollback receipt.firstMismatchIndexOrNull');
   }
+  if (
+    (receipt.mode === 'MATCHED_PREDICTION') !==
+    (receipt.firstMismatchIndexOrNull === null)
+  ) {
+    throw new TypeError('rollback receipt mode/mismatch classification inconsistent');
+  }
   shaArray(receipt.authoritativeInputFrameSha256s, 'rollback receipt.authoritativeInputFrameSha256s');
   shaArray(receipt.authoritativeInputSemanticSha256s, 'rollback receipt.authoritativeInputSemanticSha256s');
   if (receipt.authoritativeInputFrameSha256s.length !== receipt.authoritativeInputSemanticSha256s.length) {
@@ -1171,6 +1177,26 @@ export function verifyRollbackReceipt(receipt, { predictedHead = null, verifiedH
       receipt.discardedPredictionRef !== predictedHead.predictionRef ||
       receipt.discardedPredictedHeadSha256 !== predictedHead.predictedHeadSha256
     ) throw new TypeError('rollback receipt prediction mismatch');
+
+    const expectedSemantic = predictedHead.inputSemanticSha256s;
+    const actualSemantic = receipt.authoritativeInputSemanticSha256s;
+    const maxLength = Math.max(expectedSemantic.length, actualSemantic.length);
+    let expectedMismatchIndexOrNull = null;
+    for (let index = 0; index < maxLength; index += 1) {
+      if (expectedSemantic[index] !== actualSemantic[index]) {
+        expectedMismatchIndexOrNull = index;
+        break;
+      }
+    }
+    const expectedMode = expectedMismatchIndexOrNull === null
+      ? 'MATCHED_PREDICTION'
+      : 'DIVERGENT_ROLLBACK';
+    if (
+      receipt.mode !== expectedMode ||
+      receipt.firstMismatchIndexOrNull !== expectedMismatchIndexOrNull
+    ) {
+      throw new TypeError('rollback receipt semantic comparison mismatch');
+    }
   }
   if (verifiedHead !== null) {
     verifyVerifiedHead(verifiedHead);
@@ -1193,6 +1219,9 @@ export function formAuthoritativeResyncReceipt(input) {
   verifyRollbackReceipt(input.rollbackReceipt, { verifiedHead: input.verifiedHead });
   assertSafeRef(input.hostId, 'authoritative resync.hostId');
   assertNonNegativeInteger(input.hostLeaseGeneration, 'authoritative resync.hostLeaseGeneration');
+  if (input.hostLeaseGeneration < 1) {
+    throw new TypeError('authoritative resync requires a positive host lease generation');
+  }
   assertNonNegativeInteger(input.expectedStateVersion, 'authoritative resync.expectedStateVersion');
   assertNonNegativeInteger(input.acceptedStateVersion, 'authoritative resync.acceptedStateVersion');
   if (input.expectedStateVersion !== input.verifiedHead.stateVersion) {
@@ -1246,6 +1275,9 @@ export function verifyAuthoritativeResyncReceipt(receipt, { verifiedHead = null,
   assertSha256(receipt.rollbackReceiptSha256, 'authoritative resync.rollbackReceiptSha256');
   assertSafeRef(receipt.hostId, 'authoritative resync.hostId');
   assertNonNegativeInteger(receipt.hostLeaseGeneration, 'authoritative resync.hostLeaseGeneration');
+  if (receipt.hostLeaseGeneration < 1) {
+    throw new TypeError('authoritative resync requires a positive host lease generation');
+  }
   assertNonNegativeInteger(receipt.expectedStateVersion, 'authoritative resync.expectedStateVersion');
   assertNonNegativeInteger(receipt.acceptedStateVersion, 'authoritative resync.acceptedStateVersion');
   if (receipt.acceptedStateVersion !== receipt.expectedStateVersion + 1) {
