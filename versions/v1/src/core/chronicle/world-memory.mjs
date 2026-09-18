@@ -387,11 +387,14 @@ export function verifyWorldMemoryProjection(projection, {
 
 export function formPrivateRehearsalForkRequest(input) {
   assertExactKeys(input, [
-    'projection', 'snapshot', 'requestedBranchRef',
+    'projection', 'chronicle', 'snapshot', 'motionWindows', 'requestedBranchRef',
     'formedByParticipantRef', 'purposeRef', 'assumptionRefs'
   ], 'private rehearsal fork request input');
-  verifyWorldMemoryProjection(input.projection);
-  verifyWorldSnapshot(input.snapshot);
+  verifyWorldMemoryProjection(input.projection, {
+    chronicle: input.chronicle,
+    snapshot: input.snapshot,
+    motionWindows: input.motionWindows
+  });
   assertSafeRef(input.requestedBranchRef, 'fork request.requestedBranchRef');
   assertSafeRef(input.formedByParticipantRef, 'fork request.formedByParticipantRef');
   assertSafeRef(input.purposeRef, 'fork request.purposeRef');
@@ -444,7 +447,9 @@ export function formPrivateRehearsalForkRequest(input) {
 
 export function verifyPrivateRehearsalForkRequest(request, {
   projection = null,
-  snapshot = null
+  chronicle = null,
+  snapshot = null,
+  motionWindows = null
 } = {}) {
   assertPlainObject(request, 'private rehearsal fork request');
   assertExactKeys(request, [
@@ -494,12 +499,13 @@ export function verifyPrivateRehearsalForkRequest(request, {
   const { forkRequestSha256, ...body } = request;
   if (hashCanonical(body) !== forkRequestSha256) throw new TypeError('fork request digest mismatch');
 
-  if (projection !== null || snapshot !== null) {
-    if (projection === null || snapshot === null) {
-      throw new TypeError('fork request contextual verification requires projection and snapshot together');
+  const contextual =
+    projection !== null || chronicle !== null || snapshot !== null || motionWindows !== null;
+  if (contextual) {
+    if (projection === null || chronicle === null || snapshot === null || motionWindows === null) {
+      throw new TypeError('fork request contextual verification requires projection, Chronicle, snapshot and motionWindows together');
     }
-    verifyWorldMemoryProjection(projection);
-    verifyWorldSnapshot(snapshot);
+    verifyWorldMemoryProjection(projection, { chronicle, snapshot, motionWindows });
     if (
       request.sourceProjectionRef !== projection.projectionRef ||
       request.sourceProjectionSha256 !== projection.projectionSha256 ||
@@ -695,11 +701,16 @@ export function verifySavedMomentDescriptor(moment, {
 
 export function formWorldMemoryPermissionRequest(input) {
   assertExactKeys(input, [
-    'projection', 'requesterParticipantRef', 'subjectParticipantRefs',
+    'projection', 'chronicle', 'snapshot', 'motionWindows',
+    'requesterParticipantRef', 'subjectParticipantRefs',
     'requestedCapabilityRefs', 'purposeRef', 'requestedAudienceRefs',
     'requestedRetentionClass', 'externalPolicyOwnerRef'
   ], 'World Memory permission request input');
-  verifyWorldMemoryProjection(input.projection);
+  verifyWorldMemoryProjection(input.projection, {
+    chronicle: input.chronicle,
+    snapshot: input.snapshot,
+    motionWindows: input.motionWindows
+  });
   assertSafeRef(input.requesterParticipantRef, 'permission request.requesterParticipantRef');
   if (input.requesterParticipantRef !== input.projection.viewerParticipantRef) {
     throw new TypeError('permission requester must be the World Memory projection viewer');
@@ -749,7 +760,12 @@ export function formWorldMemoryPermissionRequest(input) {
   return frozenCanonical({ ...body, permissionRequestSha256: hashCanonical(body) });
 }
 
-export function verifyWorldMemoryPermissionRequest(request, { projection = null } = {}) {
+export function verifyWorldMemoryPermissionRequest(request, {
+  projection = null,
+  chronicle = null,
+  snapshot = null,
+  motionWindows = null
+} = {}) {
   assertPlainObject(request, 'World Memory permission request');
   assertExactKeys(request, [
     'schemaVersion', 'permissionRequestRef', 'requesterParticipantRef',
@@ -795,8 +811,13 @@ export function verifyWorldMemoryPermissionRequest(request, { projection = null 
   const { permissionRequestSha256, ...body } = request;
   if (hashCanonical(body) !== permissionRequestSha256) throw new TypeError('permission request digest mismatch');
 
-  if (projection !== null) {
-    verifyWorldMemoryProjection(projection);
+  const contextual =
+    projection !== null || chronicle !== null || snapshot !== null || motionWindows !== null;
+  if (contextual) {
+    if (projection === null || chronicle === null || snapshot === null || motionWindows === null) {
+      throw new TypeError('permission request contextual verification requires projection, Chronicle, snapshot and motionWindows together');
+    }
+    verifyWorldMemoryProjection(projection, { chronicle, snapshot, motionWindows });
     if (
       request.requesterParticipantRef !== projection.viewerParticipantRef ||
       request.sourceProjectionRef !== projection.projectionRef ||
@@ -808,8 +829,13 @@ export function verifyWorldMemoryPermissionRequest(request, { projection = null 
   return request;
 }
 
-function validateDecisionAgainstRequest(decision, request) {
-  verifyWorldMemoryPermissionRequest(request);
+function validateDecisionAgainstRequest(decision, request, {
+  projection,
+  chronicle,
+  snapshot,
+  motionWindows
+}) {
+  verifyWorldMemoryPermissionRequest(request, { projection, chronicle, snapshot, motionWindows });
   verifyExternalPolicyDecision(decision);
   if (
     decision.permissionRequestRef !== request.permissionRequestRef ||
@@ -868,11 +894,17 @@ function validateDecisionAgainstRequest(decision, request) {
 
 export function formSyntheticExternalPolicyDecision(input) {
   assertExactKeys(input, [
-    'request', 'policyDecisionRef', 'decisionClass',
+    'request', 'projection', 'chronicle', 'snapshot', 'motionWindows',
+    'policyDecisionRef', 'decisionClass',
     'grantedCapabilityRefs', 'audienceRefs',
     'currentnessRef', 'consentRefOrNull'
   ], 'synthetic external policy decision input');
-  verifyWorldMemoryPermissionRequest(input.request);
+  verifyWorldMemoryPermissionRequest(input.request, {
+    projection: input.projection,
+    chronicle: input.chronicle,
+    snapshot: input.snapshot,
+    motionWindows: input.motionWindows
+  });
   assertSafeRef(input.policyDecisionRef, 'policy decision.policyDecisionRef');
   if (!POLICY_DECISION_CLASS.has(input.decisionClass)) {
     throw new TypeError('policy decision class is unsupported');
@@ -900,7 +932,12 @@ export function formSyntheticExternalPolicyDecision(input) {
     networkDeliveryPerformed: false
   };
   const formed = frozenCanonical({ ...body, policyDecisionSha256: hashCanonical(body) });
-  validateDecisionAgainstRequest(formed, input.request);
+  validateDecisionAgainstRequest(formed, input.request, {
+    projection: input.projection,
+    chronicle: input.chronicle,
+    snapshot: input.snapshot,
+    motionWindows: input.motionWindows
+  });
   return formed;
 }
 
@@ -946,8 +983,20 @@ export function verifyExternalPolicyDecision(decision) {
   return decision;
 }
 
-export function evaluateWorldMemoryAuthorization({ request, decision }) {
-  validateDecisionAgainstRequest(decision, request);
+export function evaluateWorldMemoryAuthorization({
+  request,
+  decision,
+  projection,
+  chronicle,
+  snapshot,
+  motionWindows
+}) {
+  validateDecisionAgainstRequest(decision, request, {
+    projection,
+    chronicle,
+    snapshot,
+    motionWindows
+  });
 
   let authorizationClass;
   if (decision.decisionClass === 'ALLOW' || decision.decisionClass === 'NARROW') {
@@ -1000,7 +1049,11 @@ export function evaluateWorldMemoryAuthorization({ request, decision }) {
 
 export function verifyWorldMemoryAuthorization(authorization, {
   request = null,
-  decision = null
+  decision = null,
+  projection = null,
+  chronicle = null,
+  snapshot = null,
+  motionWindows = null
 } = {}) {
   assertPlainObject(authorization, 'World Memory authorization');
   assertExactKeys(authorization, [
@@ -1057,11 +1110,24 @@ export function verifyWorldMemoryAuthorization(authorization, {
   const { authorizationSha256, ...body } = authorization;
   if (hashCanonical(body) !== authorizationSha256) throw new TypeError('World Memory authorization digest mismatch');
 
-  if (request !== null || decision !== null) {
-    if (request === null || decision === null) {
-      throw new TypeError('authorization contextual verification requires request and decision together');
+  const contextual =
+    request !== null || decision !== null || projection !== null ||
+    chronicle !== null || snapshot !== null || motionWindows !== null;
+  if (contextual) {
+    if (
+      request === null || decision === null || projection === null ||
+      chronicle === null || snapshot === null || motionWindows === null
+    ) {
+      throw new TypeError('authorization contextual verification requires request, decision, projection, Chronicle, snapshot and motionWindows together');
     }
-    const expected = evaluateWorldMemoryAuthorization({ request, decision });
+    const expected = evaluateWorldMemoryAuthorization({
+      request,
+      decision,
+      projection,
+      chronicle,
+      snapshot,
+      motionWindows
+    });
     if (expected.authorizationSha256 !== authorization.authorizationSha256) {
       throw new TypeError('World Memory authorization request/decision context mismatch');
     }
