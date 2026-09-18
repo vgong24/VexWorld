@@ -1109,7 +1109,7 @@ test('intelligence decision records bounded causal evidence and rejects hidden r
   }), /fallback disposition\/reason mismatch/);
 
   const tampered = canonicalClone(decision);
-  tampered.fallbackReasonOrNull = 'MODEL_TIMEOUT';
+  tampered.conciseReasonOrNull = 'A different bounded outward reason.';
   assert.throws(() => verifyIntelligenceDecision(tampered), /decision digest mismatch/);
 
   assert.throws(() => formIntelligenceDecision({
