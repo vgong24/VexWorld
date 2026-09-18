@@ -263,6 +263,50 @@ function rehash(value, digestField) {
   value[digestField] = hashCanonical(body);
 }
 
+function alternateRedistributeAuthorization(f) {
+  const request = formWorldMemoryPermissionRequest({
+    projection: f.alternateProjection,
+    chronicle: f.alternateChronicle,
+    snapshot: f.alternateSnapshot,
+    motionWindows: [],
+    requesterParticipantRef: 'participant.victor',
+    subjectParticipantRefs: ['participant.victor', 'participant.mira'],
+    requestedCapabilityRefs: ['capability.world-memory.redistribute'],
+    purposeRef: 'purpose.media.export.alternate',
+    requestedAudienceRefs: ['participant.mira'],
+    requestedRetentionClass: 'TRANSIENT_REPLAY',
+    externalPolicyOwnerRef: 'policy.vexlife.relationships-consent'
+  });
+  const decision = formSyntheticExternalPolicyDecision({
+    request,
+    projection: f.alternateProjection,
+    chronicle: f.alternateChronicle,
+    snapshot: f.alternateSnapshot,
+    motionWindows: [],
+    policyDecisionRef: 'policy-decision.media.redistribute.alternate.0001',
+    decisionClass: 'ALLOW',
+    grantedCapabilityRefs: ['capability.world-memory.redistribute'],
+    audienceRefs: ['participant.mira'],
+    currentnessRef: 'currentness.media.alternate.0001',
+    consentRefOrNull: 'consent.media.alternate.0001'
+  });
+  const authorization = evaluateWorldMemoryAuthorization({
+    request,
+    decision,
+    projection: f.alternateProjection,
+    chronicle: f.alternateChronicle,
+    snapshot: f.alternateSnapshot,
+    motionWindows: []
+  });
+  return {
+    authorization, request, decision,
+    projection: f.alternateProjection,
+    chronicle: f.alternateChronicle,
+    snapshot: f.alternateSnapshot,
+    motionWindows: []
+  };
+}
+
 function redistributeAuthorization(f, capability = 'capability.world-memory.redistribute') {
   const request = formWorldMemoryPermissionRequest({
     projection: f.projection,
@@ -401,6 +445,17 @@ test('cinematic sequence preserves branch identities and never merges Worldlines
   mergeLie.branchTransitions[0].canonicalBranchMergePerformed = true;
   rehash(mergeLie, 'sequenceSha256');
   assert.throws(() => verifyCinematicSequence(mergeLie), /must not merge Worldlines/);
+
+  const provenanceLie = canonicalClone(crossBranch);
+  provenanceLie.orderedSourceProjectionRefs[1] = 'world-memory.projection.forged';
+  provenanceLie.orderedSourceProjectionSha256s[1] = H('d');
+  provenanceLie.orderedSourceBranchRefs[1] = 'worldline.first-grove.forged-media';
+  provenanceLie.branchTransitions[0].toBranchRef = 'worldline.first-grove.forged-media';
+  rehash(provenanceLie, 'sequenceSha256');
+  assert.throws(
+    () => verifyCinematicSequence(provenanceLie, { shots: [second, alternate] }),
+    /shot\/provenance context mismatch/
+  );
 });
 
 test('re-render and synthetic frame evidence remain noncanonical and effect-free', () => {
@@ -412,10 +467,11 @@ test('re-render and synthetic frame evidence remain noncanonical and effect-free
   });
   const render = formCinematicRenderRequest({
     sequence,
+    shots: [formedShot],
     presentationAdapterRef: 'adapter.synthetic.vex-studio',
     outputProfileRef: 'output-profile.media.preview'
   });
-  assert.equal(verifyCinematicRenderRequest(render, { sequence }), render);
+  assert.equal(verifyCinematicRenderRequest(render, { sequence, shots: [formedShot] }), render);
   assert.equal(render.worldSimulationPerformed, false);
   assert.equal(render.modelReinference, false);
   assert.equal(render.runtimeMediaFileWritePerformed, false);
@@ -462,15 +518,39 @@ test('capture and export descriptors produce no media/network/publication effect
   });
   const manifest = formMediaCaptureManifest({
     sequence,
+    shots: [formedShot],
     frameEvidence: [frame],
     mediaProfileRef: 'media-profile.synthetic.preview',
     containerClass: 'VIDEO_STREAM_DESCRIPTOR'
   });
-  assert.equal(verifyMediaCaptureManifest(manifest, { sequence, frameEvidence: [frame] }), manifest);
+  assert.equal(verifyMediaCaptureManifest(manifest, {
+    sequence,
+    shots: [formedShot],
+    frameEvidence: [frame]
+  }), manifest);
   assert.equal(manifest.mediaBytesProduced, false);
   assert.equal(manifest.runtimeMediaFileWritePerformed, false);
   assert.equal(manifest.networkDeliveryPerformed, false);
   assert.equal(manifest.publicationPerformed, false);
+
+  const detachedFrame = canonicalClone(frame);
+  detachedFrame.shotSha256 = H('d');
+  detachedFrame.sourceProjectionRef = 'world-memory.projection.forged';
+  detachedFrame.sourceProjectionSha256 = H('e');
+  detachedFrame.frameRef = 'presentation.frame.' + hashCanonical({
+    shotSha256: detachedFrame.shotSha256,
+    sourceTick: detachedFrame.sourceTick,
+    presentationAdapterRef: detachedFrame.presentationAdapterRef,
+    frameContentSha256: detachedFrame.frameContentSha256
+  }).slice(0, 32);
+  rehash(detachedFrame, 'frameEvidenceSha256');
+  assert.throws(() => formMediaCaptureManifest({
+    sequence,
+    shots: [formedShot],
+    frameEvidence: [detachedFrame],
+    mediaProfileRef: 'media-profile.synthetic.preview',
+    containerClass: 'VIDEO_STREAM_DESCRIPTOR'
+  }), /shot\/source context mismatch/);
 
   const bytesLie = canonicalClone(manifest);
   bytesLie.mediaBytesProduced = true;
@@ -479,17 +559,29 @@ test('capture and export descriptors produce no media/network/publication effect
 
   const localOnly = formMediaExportRequest({
     manifest,
+    sequence,
+    shots: [formedShot],
+    frameEvidence: [frame],
     requesterParticipantRef: 'participant.victor',
     audienceRefs: [],
     exportPurposeRef: 'purpose.media.local-preview',
     authorizationContexts: []
   });
-  assert.equal(verifyMediaExportRequest(localOnly, { manifest, authorizationContexts: [] }), localOnly);
+  assert.equal(verifyMediaExportRequest(localOnly, {
+    manifest,
+    sequence,
+    shots: [formedShot],
+    frameEvidence: [frame],
+    authorizationContexts: []
+  }), localOnly);
   assert.equal(localOnly.exportEffectPerformed, false);
   assert.equal(localOnly.publicationPerformed, false);
 
   assert.throws(() => formMediaExportRequest({
     manifest,
+    sequence,
+    shots: [formedShot],
+    frameEvidence: [frame],
     requesterParticipantRef: 'participant.victor',
     audienceRefs: ['participant.mira'],
     exportPurposeRef: 'purpose.media.share',
@@ -499,6 +591,9 @@ test('capture and export descriptors produce no media/network/publication effect
   const redistribute = redistributeAuthorization(f);
   const external = formMediaExportRequest({
     manifest,
+    sequence,
+    shots: [formedShot],
+    frameEvidence: [frame],
     requesterParticipantRef: 'participant.victor',
     audienceRefs: ['participant.mira'],
     exportPurposeRef: 'purpose.media.share',
@@ -506,6 +601,9 @@ test('capture and export descriptors produce no media/network/publication effect
   });
   assert.equal(verifyMediaExportRequest(external, {
     manifest,
+    sequence,
+    shots: [formedShot],
+    frameEvidence: [frame],
     authorizationContexts: [redistribute]
   }), external);
   assert.equal(external.distributionClass, 'EXTERNAL_REQUEST');
@@ -515,6 +613,9 @@ test('capture and export descriptors produce no media/network/publication effect
   const viewOnly = redistributeAuthorization(f, 'capability.world-memory.view');
   assert.throws(() => formMediaExportRequest({
     manifest,
+    sequence,
+    shots: [formedShot],
+    frameEvidence: [frame],
     requesterParticipantRef: 'participant.victor',
     audienceRefs: ['participant.mira'],
     exportPurposeRef: 'purpose.media.share',
@@ -526,9 +627,28 @@ test('capture and export descriptors produce no media/network/publication effect
   rehash(escalated, 'authorizationSha256');
   assert.throws(() => formMediaExportRequest({
     manifest,
+    sequence,
+    shots: [formedShot],
+    frameEvidence: [frame],
     requesterParticipantRef: 'participant.victor',
     audienceRefs: ['participant.mira'],
     exportPurposeRef: 'purpose.media.share',
     authorizationContexts: [{ ...viewOnly, authorization: escalated }]
   }), /context mismatch/);
+
+  const wrongProjectionManifest = canonicalClone(manifest);
+  wrongProjectionManifest.sourceProjectionRefs = [f.alternateProjection.projectionRef];
+  wrongProjectionManifest.sourceProjectionSha256s = [f.alternateProjection.projectionSha256];
+  rehash(wrongProjectionManifest, 'manifestSha256');
+  const wrongProjectionAuthorization = alternateRedistributeAuthorization(f);
+  assert.throws(() => formMediaExportRequest({
+    manifest: wrongProjectionManifest,
+    sequence,
+    shots: [formedShot],
+    frameEvidence: [frame],
+    requesterParticipantRef: 'participant.victor',
+    audienceRefs: ['participant.mira'],
+    exportPurposeRef: 'purpose.media.share',
+    authorizationContexts: [wrongProjectionAuthorization]
+  }), /exact provenance context mismatch/);
 });
