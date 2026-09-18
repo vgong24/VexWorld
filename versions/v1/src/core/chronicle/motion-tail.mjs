@@ -344,17 +344,20 @@ function qualifiedSampleBody(tail, captureSource, input) {
     throw new TypeError('motion sample tick cannot move backward');
   }
 
-  let priorQualified = null;
+  let priorQualifiedForSource = null;
   for (const entry of tail.samples) {
-    if (entry.schemaVersion === QUALIFIED_MOTION_SAMPLE_SCHEMA) {
-      if (entry.captureSource.captureSourceRef !== captureSource.captureSourceRef) {
-        throw new TypeError('one motion tail cannot switch qualified capture source');
-      }
-      priorQualified = entry;
+    if (
+      entry.schemaVersion === QUALIFIED_MOTION_SAMPLE_SCHEMA &&
+      entry.captureSource.captureSourceRef === captureSource.captureSourceRef
+    ) {
+      priorQualifiedForSource = entry;
     }
   }
-  if (priorQualified && input.sourceTimeMicroseconds <= priorQualified.sourceTimeMicroseconds) {
-    throw new TypeError('qualified motion source time must increase strictly');
+  if (
+    priorQualifiedForSource &&
+    input.sourceTimeMicroseconds <= priorQualifiedForSource.sourceTimeMicroseconds
+  ) {
+    throw new TypeError('qualified motion source time must increase strictly within the retained tail');
   }
 
   return {
@@ -506,28 +509,19 @@ export function verifyMotionTail(tail) {
   if (!Array.isArray(tail.samples) || tail.samples.length > tail.maxSamples) throw new TypeError('motion tail sample count invalid');
   let priorSequence = -1;
   let priorTick = -1;
-  let qualifiedCaptureSourceRefOrNull = null;
-  let priorQualifiedSourceTimeOrNull = null;
+  const priorQualifiedSourceTimeByRef = new Map();
   for (const sample of tail.samples) {
     validateMotionSample(sample, tail);
     if (sample.sequence <= priorSequence || sample.tick < priorTick) {
       throw new TypeError('motion tail sample order invalid');
     }
     if (sample.schemaVersion === QUALIFIED_MOTION_SAMPLE_SCHEMA) {
-      if (
-        qualifiedCaptureSourceRefOrNull !== null &&
-        sample.captureSource.captureSourceRef !== qualifiedCaptureSourceRefOrNull
-      ) {
-        throw new TypeError('one motion tail cannot switch qualified capture source');
+      const sourceRef = sample.captureSource.captureSourceRef;
+      const priorSourceTime = priorQualifiedSourceTimeByRef.get(sourceRef);
+      if (priorSourceTime !== undefined && sample.sourceTimeMicroseconds <= priorSourceTime) {
+        throw new TypeError('qualified motion source time must increase strictly within the retained tail');
       }
-      if (
-        priorQualifiedSourceTimeOrNull !== null &&
-        sample.sourceTimeMicroseconds <= priorQualifiedSourceTimeOrNull
-      ) {
-        throw new TypeError('qualified motion source time must increase strictly');
-      }
-      qualifiedCaptureSourceRefOrNull = sample.captureSource.captureSourceRef;
-      priorQualifiedSourceTimeOrNull = sample.sourceTimeMicroseconds;
+      priorQualifiedSourceTimeByRef.set(sourceRef, sample.sourceTimeMicroseconds);
     }
     priorSequence = sample.sequence;
     priorTick = sample.tick;
