@@ -726,19 +726,236 @@ or a retained simulation cache.
 
 Canonical gameplay water should remain a deterministic coarse field (volume, flow, hazard, buoyancy, navigation). High-fidelity fluid simulation and visual water remain adapters.
 
-## Multiplayer future route
+## Stage 07D — verified/predicted heads and local authoritative resync
 
-A later stage may maintain:
+Stage 07D establishes the **local deterministic protocol semantics** required before
+any production multiplayer transport is considered.
 
 ```text
-VERIFIED HEAD
-  all required inputs accepted
+VERIFIED_HEAD
+  accepted canonical coordinate
 
-PREDICTED HEAD
-  simulated ahead under declared predictions
+PREDICTED_HEAD
+  local speculative continuation from one exact VERIFIED_HEAD
 ```
 
-Late divergent input triggers restore + replay within a bounded rollback window. Prediction history is not accepted Chronicle history until reconciled.
+Permanent:
+
+```text
+VERIFIED_HEAD != PREDICTED_HEAD
+ROLLBACK != DELETE_OR_REWRITE_VERIFIED_HISTORY
+RESYNC != DISTRIBUTED_CONSENSUS
+LOCAL_SYNTHETIC_ROLLBACK != PRODUCTION_NETWORKING
+```
+
+### Verified head
+
+A verified head binds the minimum accepted coordinate already owned by Chronicle /
+SessionStore:
+
+```text
+sessionRef
+stateVersion
+
+timelineRef
+branchRef
+tick
+eventHeadSha256
+
+canonicalStateSha256
+
+determinismEpochRef
+determinismEpochSha256
+worldPackageFingerprint
+
+sourceSnapshotRef
+sourceSnapshotSha256
+```
+
+`verifiedHeadSha256` authenticates that coordinate.
+
+The Chronicle verifier can reconnect the head to its exact source Chronicle +
+snapshot. SessionStore `stateVersion` is supplied from the accepted checkpoint
+record; Chronicle does not invent SessionStore authority.
+
+### Predicted head
+
+A predicted head:
+
+```text
+binds exactly one VERIFIED_HEAD
+uses a distinct speculative branchRef
+binds exact ordered predicted frame hashes
+binds branch-independent input-semantic hashes
+binds deterministic replay receipt / predicted final state hash
+
+authorityClass=LOCAL_SPECULATION_ONLY
+```
+
+Prediction is pure local computation.
+
+```text
+PREDICTED_HEAD != ACCEPTED_CHECKPOINT
+```
+
+Creating or verifying a predicted head does not write SessionStore and does not
+advance `stateVersion`.
+
+### Branch-bound frame identity vs input semantics
+
+A predicted frame and later authoritative frame intentionally have different
+`branchRef` values, therefore different `inputFrameSha256` values.
+
+07D separately computes:
+
+```text
+worldInputSemanticSha256(frame)
+```
+
+over:
+
+```text
+tick
+humanActionIntents
+companionIntents
+scheduledWorldEvents
+motionWindowRefs
+rngStateByStream
+```
+
+excluding only `branchRef`.
+
+This allows the protocol to ask:
+
+> Did authoritative input mean the same thing as the prediction?
+
+without pretending the speculative frame itself was already verified history.
+
+### Match / divergence / rollback
+
+```text
+same verified parent
++ same semantic ordered inputs
+→ MATCHED_AUTHORITATIVE_INPUTS
+
+same verified parent
++ different semantic input
+→ DIVERGENT_AUTHORITATIVE_INPUTS
+```
+
+Both cases replay from the **verified snapshot** on the verified branch.
+
+For a match, the authoritative replay must reproduce the predicted state hash.
+
+For divergence, the speculative result is discarded and authoritative frames are
+replayed deterministically.
+
+The rollback receipt binds:
+
+```text
+verified parent head
+discarded prediction
+authoritative input frame hashes
+authoritative semantic input hashes
+first mismatch index
+reconciled final state hash
+authoritative replay receipt
+verified parent event head
+verifiedParentPreserved=true
+```
+
+Rollback never edits or deletes the verified parent Chronicle.
+
+Receipt verification can reconnect the receipt to the exact predicted head,
+authoritative input frames and authoritative replay. A consistently rehashed receipt
+cannot relabel divergent input as a matched prediction.
+
+### Local authoritative resync
+
+A local resync receipt may be formed only after the existing authoritative persistence
+path has accepted the reconciled checkpoint.
+
+The existing SessionStore remains the authority owner:
+
+```text
+ONE_ACTIVE_AUTHORITATIVE_HOST_LEASE
++
+exact expected stateVersion
++
+accepted writeCheckpoint(...)
+=
+one accepted stateVersion advance
+```
+
+The 07D integration proof requires:
+
+```text
+prediction computation
+  does not mutate SessionStore
+
+foreign host write
+  -> VALID_HOST_LEASE_REQUIRED
+
+stale expected version
+  -> VERSION_CONFLICT
+
+current lease holder + exact version
+  -> accepted once
+  -> stateVersion increments exactly one
+
+released/lost lease write
+  -> VALID_HOST_LEASE_REQUIRED
+```
+
+Only after the successful accepted write does the proof form an
+`AUTHORITATIVE_RESYNC` receipt binding:
+
+```text
+source VERIFIED_HEAD
+rollback receipt
+host id
+host lease generation
+expected stateVersion
+accepted stateVersion
+accepted checkpoint hash
+reconciled state hash
+```
+
+The pure Chronicle resync receipt is **not independently a lease grant** and is not a
+distributed-consensus certificate. Its authority claim is justified by composing it
+with the accepted SessionStore write evidence.
+
+### Headless host continuity
+
+07D reuses the accepted HeadlessRealmHost boundary:
+
+```text
+accepted checkpoint required
+one host lease required
+World Package identity checked
+stateVersion drift fails closed
+lease loss fails closed
+fixed-step canonical simulation
+HUMAN_ABSENCE != FABRICATED_HUMAN_INPUT
+```
+
+No second authoritative host or rollback-specific world-state store is introduced.
+
+### No production transport
+
+07D does not add or authorize:
+
+```text
+WebSocket / UDP / TCP multiplayer transport
+public matchmaking
+distributed consensus
+production authentication
+internet service discovery
+remote device control
+```
+
+Existing prototype/local communication code remains existing infrastructure; this
+stage does not widen it into production networking.
 
 ## Privacy classes
 
