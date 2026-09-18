@@ -230,6 +230,16 @@ function resolveProjectionEvidence({
         throw new TypeError('projection motion window references an event not included in projection');
       }
     }
+    const promotionEventBound = window.eventRefs.some((eventRef) => {
+      const event = eventMap.get(eventRef);
+      return event?.eventClass === 'MOTION_WINDOW_PROMOTED' &&
+        event.payload?.windowRef === window.windowRef;
+    });
+    if (!promotionEventBound) {
+      throw new TypeError(
+        'projection motion window is not bound to an included MOTION_WINDOW_PROMOTED event for its exact windowRef'
+      );
+    }
     motionWindowRefs.push(window.windowRef);
     motionWindowSha256s.push(window.motionWindowSha256);
   }
