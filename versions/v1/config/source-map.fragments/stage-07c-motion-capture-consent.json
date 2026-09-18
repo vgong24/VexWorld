@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "vexworld.source-map-fragment/v1",
+  "fragmentRef": "source-map-fragment.vexworld.v1.stage-07c-motion-capture-consent",
+  "reason": "Register VW-FWD-07C synthetic motion-capture qualification and consent-bound material-window work while reusing already-mapped Chronicle motion and test owners.",
+  "entries": [
+    {
+      "path": "config/source-map.fragments/stage-07c-motion-capture-consent.json",
+      "category": "navigation-and-coverage",
+      "owner": "Vex Chronicle",
+      "sourceClass": "CANONICAL_SOURCE"
+    }
+  ]
+}
