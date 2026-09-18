@@ -8,9 +8,9 @@
   "currentVersionRef": "version.vexworld.v1",
   "currentVersionPath": "versions/v1",
   "forwardRouteDisposition": "ACTIVE_FORWARD_ROUTE",
-  "lastAcceptedMainRef": "github.commit.vexworld.72811599595359a567f0448cc370d650ac2e0f02",
-  "activeStageRef": "stage.vexworld.vw-fwd-07c",
-  "activeStageIssueRef": "github.issue.vexworld.87",
+  "lastAcceptedMainRef": "github.commit.vexworld.6edd1adbd0e0f8ce623739318c24242e7c9d45c6",
+  "activeStageRef": "stage.vexworld.vw-fwd-07d",
+  "activeStageIssueRef": "github.issue.vexworld.92",
   "stageOrder": [
     "stage.vexworld.vw-fwd-01a",
     "stage.vexworld.vw-fwd-01b",
@@ -28,7 +28,8 @@
     "stage.vexworld.vw-fwd-06a",
     "stage.vexworld.vw-fwd-07a",
     "stage.vexworld.vw-fwd-07b",
-    "stage.vexworld.vw-fwd-07c"
+    "stage.vexworld.vw-fwd-07c",
+    "stage.vexworld.vw-fwd-07d"
   ],
   "stages": [
     {
@@ -528,12 +529,12 @@
       "stageRef": "stage.vexworld.vw-fwd-07c",
       "issueRef": "github.issue.vexworld.87",
       "title": "Consent-bound motion capture qualification and promoted material windows",
-      "state": "ACTIVE_SINGLE_FORWARD_LANE",
+      "state": "ACCEPTED_COMPLETE",
       "predecessorStageRef": "stage.vexworld.vw-fwd-07b",
       "parentStageRefs": [
         "stage.vexworld.vw-fwd-07b"
       ],
-      "sourceChanging": true,
+      "sourceChanging": false,
       "meaningOwnerRef": "project.vextreme.vexworld",
       "implementationOwnerRef": "role.vexworld.chronicle-motion-consent-builder",
       "reviewOwnerRef": "role.vexworld.chronicle-motion-consent-reviewer",
@@ -571,6 +572,63 @@
         "PHYSICAL_ACTUATION",
         "PUBLIC_RELEASE",
         "MERGE_WITHOUT_INDEPENDENT_REVIEW"
+      ],
+      "acceptedCloseReceiptRef": "github.issue.vexworld.87.comment.5724226596",
+      "acceptedMainRef": "github.commit.vexworld.6edd1adbd0e0f8ce623739318c24242e7c9d45c6",
+      "reviewReceiptRefs": [
+        "github.pull.vexworld.90.comment.5724051132",
+        "github.issue.vexworld.91.comment.5724051496"
+      ]
+    },
+    {
+      "stageRef": "stage.vexworld.vw-fwd-07d",
+      "issueRef": "github.issue.vexworld.92",
+      "title": "Verified/predicted heads, deterministic rollback and authoritative resync",
+      "state": "ACTIVE_SINGLE_FORWARD_LANE",
+      "predecessorStageRef": "stage.vexworld.vw-fwd-07c",
+      "parentStageRefs": [
+        "stage.vexworld.vw-fwd-07c"
+      ],
+      "sourceChanging": true,
+      "meaningOwnerRef": "project.vextreme.vexworld",
+      "implementationOwnerRef": "role.vexworld.chronicle-rollback-resync-builder",
+      "reviewOwnerRef": "role.vexworld.chronicle-rollback-resync-reviewer",
+      "ownedPathPatterns": [
+        "config/project-state.json",
+        "docs/architecture/CHRONICLE-WORLDLINES.md",
+        "versions/v1/config/source-map.fragments/stage-07d-rollback-resync.json",
+        "versions/v1/src/core/chronicle/chronicle.mjs",
+        "versions/v1/src/server/session-store.mjs",
+        "versions/v1/src/server/headless-realm-host.mjs",
+        "versions/v1/test/chronicle-worldlines.test.mjs",
+        "versions/v1/test/session-store.test.mjs",
+        "versions/v1/test/headless-realm-host.test.mjs"
+      ],
+      "activationReceiptRef": "github.issue.vexworld.92.comment.5724238681",
+      "startingMainRef": "github.commit.vexworld.6edd1adbd0e0f8ce623739318c24242e7c9d45c6",
+      "predecessorCloseReceiptRef": "github.issue.vexworld.87.comment.5724226596",
+      "claimRef": "claim.vexworld.chronicle-worldlines.stage-07d.20260917",
+      "allowedEffects": [
+        "SOURCE_MUTATION_WITHIN_EXACT_MEMBRANE",
+        "LOCAL_SYNTHETIC_TEST_EXECUTION",
+        "DRAFT_PR_FORMATION"
+      ],
+      "forbiddenEffects": [
+        "PRODUCTION_NETWORKING",
+        "PUBLIC_MATCHMAKING",
+        "DISTRIBUTED_CONSENSUS",
+        "PRODUCTION_AUTHENTICATION",
+        "REAL_VR_SENSOR_CAPTURE",
+        "LIVE_SENSOR_DEVICE_ACCESS",
+        "BIOMETRIC_SURVEILLANCE",
+        "HOME_MEMORY_INGESTION",
+        "PERSISTENT_MEMORY_PROMOTION",
+        "MODEL_TRAINING",
+        "WEIGHT_MUTATION",
+        "MODEL_ACTIVATION_OR_REPLACEMENT",
+        "PHYSICAL_ACTUATION",
+        "PUBLIC_RELEASE",
+        "MERGE_WITHOUT_INDEPENDENT_REVIEW"
       ]
     }
   ],
@@ -585,7 +643,8 @@
     "github.issue.vexworld.72",
     "github.issue.vexworld.73",
     "github.issue.vexworld.81",
-    "github.issue.vexworld.87"
+    "github.issue.vexworld.87",
+    "github.issue.vexworld.92"
   ],
   "knownUnknownRefs": [
     "unknown.vexworld.software-license",
@@ -603,8 +662,8 @@
     "unknown.vexworld.motion-capture-real-device-clock-alignment",
     "unknown.vexworld.world-memory-shared-replay-consent-defaults"
   ],
-  "currentStrongestClaim": "VW_FWD_07A_ACCEPTED__VW_FWD_07B_ACCEPTED__VW_FWD_07C_ACTIVE_SYNTHETIC_MOTION_CONTRACT_SOURCE_MUTATION_ADMITTED__REAL_SENSOR_CAPTURE_HELD",
-  "observedAt": "2026-09-18T00:41:55Z",
+  "currentStrongestClaim": "VW_FWD_07A_ACCEPTED__VW_FWD_07B_ACCEPTED__VW_FWD_07C_ACCEPTED__VW_FWD_07D_ACTIVE_LOCAL_SYNTHETIC_ROLLBACK_RESYNC_SOURCE_MUTATION_ADMITTED__PRODUCTION_NETWORKING_HELD",
+  "observedAt": "2026-09-18T02:29:10Z",
   "effects": {
     "modelTraining": false,
     "productionNetwork": false,
