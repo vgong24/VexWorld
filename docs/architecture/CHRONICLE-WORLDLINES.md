@@ -1163,3 +1163,117 @@ Stage 07E consumes only already-promoted motion windows. A live
 
 No Stage-07E source path writes VexLife, Home, Memory, Vault, relationships, network
 delivery, models, sensors, physical systems, or public release state.
+
+
+## Stage 07F — cinematic capture and branch-aware media continuity
+
+Stage 07F defines the VexWorld-owned **presentation continuity contract** over accepted
+Chronicle / Worldline / World Memory evidence. It does not make presentation artifacts,
+camera choices, media files, or edits canonical world truth.
+
+Permanent:
+
+\`\`\`text
+VEX_STUDIO_CONSUMER != VEXWORLD_HISTORY_OWNER
+PRESENTATION_CACHE != CANONICAL_HISTORY
+RENDERED_FRAME != WORLD_STATE
+CAMERA_VISIBILITY != PARTICIPANT_EXISTENCE
+MEDIA_EDIT != CANONICAL_TIMELINE
+BRANCH_SPLICE != WORLDLINE_MERGE
+MEDIA_RECONSTRUCTION != REWRITE_HISTORY
+RE_RENDER != RE_SIMULATE
+RE_RENDER != MODEL_REINFERENCE
+CAPTURE_REQUEST != MEDIA_FILE_WRITTEN
+EXPORT_REQUEST != PUBLICATION
+\`\`\`
+
+The source flow is bounded to:
+
+\`\`\`text
+exact verified World Memory projection
++ exact Chronicle / snapshot / promoted-motion context
+-> deterministic presentation-only cinematic shot
+-> explicit branch-aware cinematic sequence
+-> request-only re-render descriptor
+-> synthetic presentation-frame evidence
+-> effect-free media-capture manifest
+-> optional effect-free export request
+\`\`\`
+
+A cinematic shot re-verifies the exact World Memory source context. Selected event refs
+remain an ordered subset of the projection; selected promoted-motion refs remain a subset
+of the projection; shot privacy cannot widen source privacy. Camera subjects must be
+grounded in admitted source evidence.
+
+Camera intent contains presentation coordinates only. It carries:
+
+\`\`\`text
+canonicalHistoryMutation=false
+worldStateMutation=false
+participantExistenceInference=false
+renderEffectPerformed=false
+modelReinference=false
+worldSimulationPerformed=false
+\`\`\`
+
+A sequence preserves each shot's exact Worldline identity. Adjacent edits are explicit:
+
+\`\`\`text
+SAME_BRANCH_CUT
+CROSS_BRANCH_EDIT
+\`\`\`
+
+A cross-branch edit is presentation ordering only. It never performs a canonical branch
+merge and never rewrites either source Worldline.
+
+Re-render requests are descriptors, not execution claims:
+
+\`\`\`text
+renderRequestOnly=true
+renderEffectPerformed=false
+worldSimulationPerformed=false
+modelReinference=false
+canonicalHistoryMutation=false
+runtimeMediaFileWritePerformed=false
+\`\`\`
+
+Executable Stage-07F frame proof accepts only:
+
+\`\`\`text
+evidenceClass=SYNTHETIC_VEX_STUDIO_PRESENTATION_FIXTURE
+\`\`\`
+
+That evidence may bind a frame-content digest to an exact shot/tick/adapter, but:
+
+\`\`\`text
+FRAME_DIGEST != CANONICAL_STATE_HASH
+PRESENTATION_FRAME != CHRONICLE_EVENT
+SYNTHETIC_PRESENTATION_FIXTURE != LIVE_VEX_STUDIO_CAPTURE
+\`\`\`
+
+Media-capture manifests remain deterministic descriptors. They produce no bytes and
+perform no filesystem, network, publication, or history mutation.
+
+External export requests must consume contextually verified Stage-07E authorization that
+includes:
+
+\`\`\`text
+capability.world-memory.redistribute
+\`\`\`
+
+The authorization must reconnect to the exact source projection and synthetic external
+policy evidence. A VIEW grant or a consistently rehashed capability escalation is not
+sufficient. Even an authorized export remains request-only:
+
+\`\`\`text
+exportEffectPerformed=false
+networkDeliveryPerformed=false
+publicationPerformed=false
+mediaBytesProduced=false
+canonicalHistoryMutation=false
+\`\`\`
+
+Stage 07F does not modify the browser renderer, Godot adapter, SessionStore, server,
+VexLife, Home/Memory, models, devices, camera/microphone capture, media binaries, or
+publication surfaces. A later Vex Studio consumer may implement those effects only under
+its own explicit source placement and authority.
