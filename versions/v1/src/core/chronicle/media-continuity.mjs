@@ -337,7 +337,7 @@ export function formCinematicSequence(input) {
   return frozenCanonical({ ...body, sequenceSha256: hashCanonical(body) });
 }
 
-export function verifyCinematicSequence(sequence, { shots = null } = {}) {
+export function verifyCinematicSequence(sequence, { shots } = {}) {
   assertPlainObject(sequence, 'cinematic sequence');
   assertExactKeys(sequence, [
     'schemaVersion', 'sequenceRef', 'sequencePurposeRef', 'sourceTimelineRef',
@@ -404,16 +404,17 @@ export function verifyCinematicSequence(sequence, { shots = null } = {}) {
   rejectHiddenReasoning(sequence, 'cinematic sequence');
   const { sequenceSha256, ...body } = sequence;
   if (hashCanonical(body) !== sequenceSha256) throw new TypeError('cinematic sequence digest mismatch');
-  if (shots !== null) {
-    const expected = formCinematicSequence({ shots, sequencePurposeRef: sequence.sequencePurposeRef });
-    if (!same(expected, sequence)) throw new TypeError('cinematic sequence shot context mismatch');
+  if (!Array.isArray(shots) || shots.length === 0) {
+    throw new TypeError('cinematic sequence verification requires exact shots context');
   }
+  const expected = formCinematicSequence({ shots, sequencePurposeRef: sequence.sequencePurposeRef });
+  if (!same(expected, sequence)) throw new TypeError('cinematic sequence shot/provenance context mismatch');
   return sequence;
 }
 
 export function formCinematicRenderRequest(input) {
-  assertExactKeys(input, ['sequence', 'presentationAdapterRef', 'outputProfileRef'], 'cinematic render request input');
-  verifyCinematicSequence(input.sequence);
+  assertExactKeys(input, ['sequence', 'shots', 'presentationAdapterRef', 'outputProfileRef'], 'cinematic render request input');
+  verifyCinematicSequence(input.sequence, { shots: input.shots });
   assertSafeRef(input.presentationAdapterRef, 'render request.presentationAdapterRef');
   assertSafeRef(input.outputProfileRef, 'render request.outputProfileRef');
   const body = {
@@ -437,7 +438,7 @@ export function formCinematicRenderRequest(input) {
   return frozenCanonical({ ...body, renderRequestSha256: hashCanonical(body) });
 }
 
-export function verifyCinematicRenderRequest(request, { sequence = null } = {}) {
+export function verifyCinematicRenderRequest(request, { sequence, shots } = {}) {
   assertPlainObject(request, 'cinematic render request');
   assertExactKeys(request, [
     'schemaVersion', 'renderRequestRef', 'sourceSequenceRef', 'sourceSequenceSha256',
@@ -466,11 +467,12 @@ export function verifyCinematicRenderRequest(request, { sequence = null } = {}) 
   rejectHiddenReasoning(request, 'cinematic render request');
   const { renderRequestSha256, ...body } = request;
   if (hashCanonical(body) !== renderRequestSha256) throw new TypeError('cinematic render request digest mismatch');
-  if (sequence !== null) {
-    verifyCinematicSequence(sequence);
-    if (request.sourceSequenceRef !== sequence.sequenceRef || request.sourceSequenceSha256 !== sequence.sequenceSha256) {
-      throw new TypeError('cinematic render request source sequence mismatch');
-    }
+  if (sequence === undefined || shots === undefined) {
+    throw new TypeError('cinematic render request verification requires exact sequence + shots context');
+  }
+  verifyCinematicSequence(sequence, { shots });
+  if (request.sourceSequenceRef !== sequence.sequenceRef || request.sourceSequenceSha256 !== sequence.sequenceSha256) {
+    throw new TypeError('cinematic render request source sequence mismatch');
   }
   return request;
 }
@@ -565,12 +567,17 @@ export function verifyPresentationFrameEvidence(frame, { shot = null } = {}) {
 }
 
 export function formMediaCaptureManifest(input) {
-  assertExactKeys(input, ['sequence', 'frameEvidence', 'mediaProfileRef', 'containerClass'], 'media capture manifest input');
-  verifyCinematicSequence(input.sequence);
+  assertExactKeys(input, ['sequence', 'shots', 'frameEvidence', 'mediaProfileRef', 'containerClass'], 'media capture manifest input');
+  verifyCinematicSequence(input.sequence, { shots: input.shots });
   if (!Array.isArray(input.frameEvidence) || input.frameEvidence.length === 0) {
     throw new TypeError('media capture manifest requires synthetic frame evidence');
   }
-  input.frameEvidence.forEach((frame) => verifyPresentationFrameEvidence(frame));
+  const shotByRef = new Map(input.shots.map((shot) => [shot.shotRef, shot]));
+  input.frameEvidence.forEach((frame) => {
+    const shot = shotByRef.get(frame.shotRef);
+    if (!shot) throw new TypeError('capture manifest frame shotRef is absent from exact shots context');
+    verifyPresentationFrameEvidence(frame, { shot });
+  });
   assertSafeRef(input.mediaProfileRef, 'capture manifest.mediaProfileRef');
   if (!CONTAINER.has(input.containerClass)) throw new TypeError('capture manifest containerClass is unsupported');
   const shotSet = new Set(input.sequence.orderedShotRefs);
@@ -606,7 +613,7 @@ export function formMediaCaptureManifest(input) {
   return frozenCanonical({ ...body, manifestSha256: hashCanonical(body) });
 }
 
-export function verifyMediaCaptureManifest(manifest, { sequence = null, frameEvidence = null } = {}) {
+export function verifyMediaCaptureManifest(manifest, { sequence, shots, frameEvidence } = {}) {
   assertPlainObject(manifest, 'media capture manifest');
   assertExactKeys(manifest, [
     'schemaVersion', 'manifestRef', 'sourceSequenceRef', 'sourceSequenceSha256',
@@ -652,18 +659,17 @@ export function verifyMediaCaptureManifest(manifest, { sequence = null, frameEvi
   rejectHiddenReasoning(manifest, 'media capture manifest');
   const { manifestSha256, ...body } = manifest;
   if (hashCanonical(body) !== manifestSha256) throw new TypeError('media capture manifest digest mismatch');
-  if (sequence !== null || frameEvidence !== null) {
-    if (sequence === null || frameEvidence === null) {
-      throw new TypeError('capture manifest contextual verification requires sequence and frameEvidence together');
-    }
-    const expected = formMediaCaptureManifest({
-      sequence,
-      frameEvidence,
-      mediaProfileRef: manifest.mediaProfileRef,
-      containerClass: manifest.containerClass
-    });
-    if (!same(expected, manifest)) throw new TypeError('media capture manifest source context mismatch');
+  if (sequence === undefined || shots === undefined || frameEvidence === undefined) {
+    throw new TypeError('capture manifest verification requires exact sequence + shots + frameEvidence context');
   }
+  const expected = formMediaCaptureManifest({
+    sequence,
+    shots,
+    frameEvidence,
+    mediaProfileRef: manifest.mediaProfileRef,
+    containerClass: manifest.containerClass
+  });
+  if (!same(expected, manifest)) throw new TypeError('media capture manifest exact provenance context mismatch');
   return manifest;
 }
 
@@ -720,9 +726,14 @@ function authorizationEvidence(manifest, requesterParticipantRef, audienceRefs, 
 
 export function formMediaExportRequest(input) {
   assertExactKeys(input, [
-    'manifest', 'requesterParticipantRef', 'audienceRefs', 'exportPurposeRef', 'authorizationContexts'
+    'manifest', 'sequence', 'shots', 'frameEvidence',
+    'requesterParticipantRef', 'audienceRefs', 'exportPurposeRef', 'authorizationContexts'
   ], 'media export request input');
-  verifyMediaCaptureManifest(input.manifest);
+  verifyMediaCaptureManifest(input.manifest, {
+    sequence: input.sequence,
+    shots: input.shots,
+    frameEvidence: input.frameEvidence
+  });
   assertSafeRef(input.requesterParticipantRef, 'media export requesterParticipantRef');
   assertUniqueSafeRefs(input.audienceRefs, 'media export audienceRefs');
   assertSafeRef(input.exportPurposeRef, 'media export exportPurposeRef');
@@ -765,7 +776,9 @@ export function formMediaExportRequest(input) {
   return frozenCanonical({ ...body, exportRequestSha256: hashCanonical(body) });
 }
 
-export function verifyMediaExportRequest(request, { manifest = null, authorizationContexts = null } = {}) {
+export function verifyMediaExportRequest(request, {
+  manifest, sequence, shots, frameEvidence, authorizationContexts
+} = {}) {
   assertPlainObject(request, 'media export request');
   assertExactKeys(request, [
     'schemaVersion', 'exportRequestRef', 'sourceManifestRef', 'sourceManifestSha256',
@@ -823,20 +836,22 @@ export function verifyMediaExportRequest(request, { manifest = null, authorizati
   const { exportRequestSha256, ...body } = request;
   if (hashCanonical(body) !== exportRequestSha256) throw new TypeError('media export request digest mismatch');
 
-  if (manifest !== null || authorizationContexts !== null) {
-    if (manifest === null || authorizationContexts === null) {
-      throw new TypeError('media export contextual verification requires manifest and authorizationContexts together');
-    }
-    const expected = formMediaExportRequest({
-      manifest,
-      requesterParticipantRef: request.requesterParticipantRef,
-      audienceRefs: request.audienceRefs,
-      exportPurposeRef: request.exportPurposeRef,
-      authorizationContexts
-    });
-    if (!same(expected, request)) throw new TypeError('media export request source/authorization context mismatch');
-  } else if (request.distributionClass === 'EXTERNAL_REQUEST') {
-    throw new TypeError('external media export verification requires exact authorization contexts');
+  if (
+    manifest === undefined || sequence === undefined || shots === undefined ||
+    frameEvidence === undefined || authorizationContexts === undefined
+  ) {
+    throw new TypeError('media export verification requires exact manifest + sequence + shots + frameEvidence + authorization context');
   }
+  const expected = formMediaExportRequest({
+    manifest,
+    sequence,
+    shots,
+    frameEvidence,
+    requesterParticipantRef: request.requesterParticipantRef,
+    audienceRefs: request.audienceRefs,
+    exportPurposeRef: request.exportPurposeRef,
+    authorizationContexts
+  });
+  if (!same(expected, request)) throw new TypeError('media export request exact provenance/authorization context mismatch');
   return request;
 }
