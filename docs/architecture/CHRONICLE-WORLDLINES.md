@@ -1058,3 +1058,73 @@ Passing this proof establishes the bounded Stage-07A replay determinism contract
 > Preserve verified history as an append-only causal Chronicle; let people revisit it through replay, create alternate futures through exact Worldline forks, retain only materially justified motion under explicit privacy/consent, bind reducer source plus explicit behavior bindings to the declared determinism epoch, execute the Stage-07A proof through a fresh canonical-input-only isolated context, and keep renderer spectacle, model inference and external effects separate from canonical world truth.
 
 <!-- [VEXWORLD][CHRONICLE][WORLDLINES][VXG RealForever] -->
+
+## Stage 07E — World Memory projection boundary
+
+World Memory is a **data projection over accepted Chronicle / Worldline evidence**, not a second history owner.
+
+```text
+WORLD_MEMORY_UI != CANONICAL_HISTORY
+REPLAY != MODEL_REINFERENCE
+REPLAY != FORK
+FORK != CHANGE_THE_PAST
+SAVED_MOMENT != WHOLE_SESSION_ARCHIVE
+
+FRIEND != SHARE_ALL_HISTORY
+VIEW_PERMISSION != FORK_PERMISSION
+FORK_PERMISSION != REDISTRIBUTION_PERMISSION
+REVOKED_ACCESS != HISTORY_DELETION
+PERSONAL_REPLAY != PUBLIC_PROJECTION
+```
+
+The VexWorld-owned Stage-07E contract is confined to:
+
+```text
+exact Chronicle + snapshot + promoted motion evidence
+-> bounded read-only projection
+-> optional private rehearsal fork request
+-> optional bounded saved-moment descriptor
+-> optional external policy request/decision envelope
+-> effect-free authorization result
+```
+
+Every downstream object that carries source meaning forward must re-bind the exact
+projection context rather than trusting a self-consistent digest alone. Rehashing a
+permission request or fork request cannot detach it from the Chronicle/snapshot evidence
+that produced its source projection.
+
+Replay/scrub projections are always explicit about:
+
+```text
+historyMutation=false
+modelReinference=false
+worldEffectPerformed=false
+retentionClass=TRANSIENT_REPLAY
+```
+
+Private rehearsal fork objects are requests only. They do not create branches, rewrite
+the source branch, invoke a model, or perform world effects.
+
+Saved moments remain exact bounded descriptors over selected projection evidence. They
+request only `EXPLICIT_SAVED_MOMENT` + `LOCAL_PRIVATE_ONLY` storage intent and do not
+claim Home, Memory, Vault, or persistence effects.
+
+External authorization remains capability-granular:
+
+```text
+VIEW
+REPLAY
+FORK_PRIVATE
+FORK_SHARED
+REDISTRIBUTE
+```
+
+The decision must come from explicit external policy evidence. Relationship labels,
+invitation state, delivery status, or Chronicle participation are not permission.
+`DENY` / `REVOKE` remove effective future grants without deleting accepted history.
+
+Stage 07E consumes only already-promoted motion windows. A live
+`EPHEMERAL_HOT_TAIL` object is not a World Memory projection source.
+
+No Stage-07E source path writes VexLife, Home, Memory, Vault, relationships, network
+delivery, models, sensors, physical systems, or public release state.
