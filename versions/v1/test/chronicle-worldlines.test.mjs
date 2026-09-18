@@ -969,6 +969,11 @@ test('synthetic motion capture qualification binds clock/calibration/transport a
     calibrationCoordinateSpaceRef: 'space.first-grove.wrong'
   }), /calibration coordinate-space mismatch/);
 
+  assert.throws(() => formSyntheticMotionCaptureSource({
+    ...sourceInput,
+    privacyClass: 'PARTY_SHARED'
+  }), /must begin PARTICIPANT_PRIVATE/);
+
   let tail = createMotionTail({
     tailRef: 'motion-tail.victor.qualified-headset.0001',
     participantRef: 'participant.victor',
@@ -1065,10 +1070,53 @@ test('synthetic motion capture qualification binds clock/calibration/transport a
   }
   assert.throws(() => verifyMotionTail(tamperedTail), /calibration coordinate-space mismatch/);
 
+  let materialChronicle = createChronicle({
+    timelineRef: 'timeline.first-grove.synthetic-motion-materiality.0001',
+    branchRef: 'worldline.first-grove.verified',
+    epoch: epoch()
+  });
+
+  const hit = appendChronicleEvent(materialChronicle, {
+    tick: 11,
+    ordinal: 0,
+    actorRef: 'participant.victor',
+    eventClass: 'HIT_RESOLVED',
+    privacyClass: 'PARTY_SHARED',
+    causationRefs: [],
+    correlationRefOrNull: 'correlation.synthetic-motion-materiality.0001',
+    payload: { materialityRef: 'materiality.fight.hit-resolution' }
+  });
+  materialChronicle = hit.chronicle;
+
+  const fracture = appendChronicleEvent(materialChronicle, {
+    tick: 12,
+    ordinal: 0,
+    actorRef: 'world.first-grove',
+    eventClass: 'ENVIRONMENT_FRACTURED',
+    privacyClass: 'PARTY_SHARED',
+    causationRefs: [hit.event.eventRef],
+    correlationRefOrNull: 'correlation.synthetic-motion-materiality.0001',
+    payload: { materialityRef: 'materiality.environment.wall-fracture' }
+  });
+  materialChronicle = fracture.chronicle;
+
+  const promoted = appendChronicleEvent(materialChronicle, {
+    tick: 13,
+    ordinal: 0,
+    actorRef: 'system.vexworld.chronicle',
+    eventClass: 'MOTION_WINDOW_PROMOTED',
+    privacyClass: 'PARTY_SHARED',
+    causationRefs: [hit.event.eventRef, fracture.event.eventRef],
+    correlationRefOrNull: 'correlation.synthetic-motion-materiality.0001',
+    payload: { windowRef: 'motion-window.victor.qualified.shared.0001' }
+  });
+  materialChronicle = promoted.chronicle;
+  verifyChronicle(materialChronicle);
+
   const eventRefs = [
-    'event.first-grove.hit-resolved.0001',
-    'event.first-grove.environment-fractured.0001',
-    'event.first-grove.motion-window-promoted.0001'
+    hit.event.eventRef,
+    fracture.event.eventRef,
+    promoted.event.eventRef
   ];
 
   const privateWindow = promoteMotionWindow(tail, {
