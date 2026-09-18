@@ -299,6 +299,7 @@ test('worker decision identity binds the exact received observation content and 
     weather: observation.weather === 'CLEAR' ? 'RAIN' : 'CLEAR'
   };
   const options = {
+    session: 'session.provenance.fixture.a',
     companion: companion.participantRef,
     workerId: 'worker.provenance.fixture',
     mode: 'ollama'
@@ -347,6 +348,17 @@ test('worker decision identity binds the exact received observation content and 
   assert.equal(first.modelIdentityOrNull.modelRef, `model.ollama.sha256.${MOCK_DIGEST}`);
   assert.ok(first.visibleContextRefs.includes(observation.worldRef));
   assert.ok(first.visibleContextRefs.includes(observation.human.participantRef));
+
+  const otherSession = formWorkerIntelligenceDecision({
+    options: { ...options, session: 'session.provenance.fixture.b' },
+    observation,
+    proposedIntent,
+    acceptedIntent,
+    modelIdentity,
+    controllerDisposition: 'OLLAMA',
+    fallbackReason: null
+  });
+  assert.notEqual(first.decisionRef, otherSession.decisionRef);
 });
 
 test('same companion identity survives worker-process rebind while intent sequence remains monotonic', async () => {
