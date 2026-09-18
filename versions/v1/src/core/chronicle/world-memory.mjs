@@ -146,7 +146,7 @@ function normalizeMotionWindows(windows) {
   return normalized.sort((left, right) =>
     (left.fromTick - right.fromTick) ||
     (left.toTick - right.toTick) ||
-    left.windowRef.localeCompare(right.windowRef, 'en')
+    (left.windowRef < right.windowRef ? -1 : left.windowRef > right.windowRef ? 1 : 0)
   );
 }
 
@@ -357,6 +357,21 @@ export function verifyWorldMemoryProjection(projection, {
   projection.includedMotionWindowSha256s.forEach((hash, index) =>
     assertSha256(hash, `projection.includedMotionWindowSha256s[${index}]`));
   assertPrivacy(projection.privacyClass, 'projection.privacyClass');
+  const expectedProjectionRef = 'world-memory.projection.' + hashCanonical({
+    viewerParticipantRef: projection.viewerParticipantRef,
+    sourceTimelineRef: projection.sourceTimelineRef,
+    sourceBranchRef: projection.sourceBranchRef,
+    sourceEventHeadSha256: projection.sourceEventHeadSha256,
+    sourceSnapshotSha256: projection.sourceSnapshotSha256,
+    fromTick: projection.fromTick,
+    toTick: projection.toTick,
+    includedEventRefs: projection.includedEventRefs,
+    includedDecisionRefs: projection.includedDecisionRefs,
+    includedMotionWindowRefs: projection.includedMotionWindowRefs
+  }).slice(0, 32);
+  if (projection.projectionRef !== expectedProjectionRef) {
+    throw new TypeError('World Memory projection coordinate ref mismatch');
+  }
   if (projection.retentionClass !== 'TRANSIENT_REPLAY') {
     throw new TypeError('World Memory projection must remain transient replay evidence');
   }
@@ -496,6 +511,16 @@ export function verifyPrivateRehearsalForkRequest(request, {
   assertSha256(request.sourceProjectionSha256, 'fork request.sourceProjectionSha256');
   assertSha256(request.sourceSnapshotSha256, 'fork request.sourceSnapshotSha256');
   assertUniqueSafeRefs(request.assumptionRefs, 'fork request.assumptionRefs');
+  const expectedForkRequestRef = 'world-memory.fork-request.' + hashCanonical({
+    projection: request.sourceProjectionSha256,
+    branch: request.requestedBranchRef,
+    formedBy: request.formedByParticipantRef,
+    purpose: request.purposeRef,
+    assumptions: request.assumptionRefs
+  }).slice(0, 32);
+  if (request.forkRequestRef !== expectedForkRequestRef) {
+    throw new TypeError('private rehearsal fork request coordinate ref mismatch');
+  }
   if (request.requestedBranchClass !== 'PRIVATE_REHEARSAL') {
     throw new TypeError('fork request must remain PRIVATE_REHEARSAL');
   }
@@ -674,6 +699,17 @@ export function verifySavedMomentDescriptor(moment, {
     throw new TypeError('saved moment requires bounded evidence');
   }
   assertSafeRef(moment.purposeRef, 'saved moment.purposeRef');
+  const expectedSavedMomentRef = 'world-memory.saved-moment.' + hashCanonical({
+    projection: moment.sourceProjectionSha256,
+    fromTick: moment.fromTick,
+    toTick: moment.toTick,
+    eventRefs: moment.includedEventRefs,
+    motionRefs: moment.includedMotionWindowRefs,
+    purposeRef: moment.purposeRef
+  }).slice(0, 32);
+  if (moment.savedMomentRef !== expectedSavedMomentRef) {
+    throw new TypeError('saved moment coordinate ref mismatch');
+  }
   if (moment.requestedRetentionClass !== 'EXPLICIT_SAVED_MOMENT') {
     throw new TypeError('saved moment retention class mismatch');
   }
@@ -810,6 +846,19 @@ export function verifyWorldMemoryPermissionRequest(request, {
   assertUniqueSafeRefs(request.requestedAudienceRefs, 'permission request.requestedAudienceRefs');
   assertRetention(request.requestedRetentionClass, 'permission request.requestedRetentionClass');
   assertSafeRef(request.externalPolicyOwnerRef, 'permission request.externalPolicyOwnerRef');
+  const expectedPermissionRequestRef = 'world-memory.permission-request.' + hashCanonical({
+    projection: request.sourceProjectionSha256,
+    requester: request.requesterParticipantRef,
+    subjects: request.subjectParticipantRefs,
+    capabilities: request.requestedCapabilityRefs,
+    purpose: request.purposeRef,
+    audience: request.requestedAudienceRefs,
+    retention: request.requestedRetentionClass,
+    owner: request.externalPolicyOwnerRef
+  }).slice(0, 32);
+  if (request.permissionRequestRef !== expectedPermissionRequestRef) {
+    throw new TypeError('World Memory permission request coordinate ref mismatch');
+  }
   const requiresAudience =
     request.requestedCapabilityRefs.includes('capability.world-memory.fork-shared') ||
     request.requestedCapabilityRefs.includes('capability.world-memory.redistribute');
@@ -1097,6 +1146,13 @@ export function verifyWorldMemoryAuthorization(authorization, {
   assertSha256(authorization.permissionRequestSha256, 'authorization.permissionRequestSha256');
   assertSha256(authorization.policyDecisionSha256, 'authorization.policyDecisionSha256');
   assertSha256(authorization.sourceProjectionSha256, 'authorization.sourceProjectionSha256');
+  const expectedAuthorizationRef = 'world-memory.authorization.' + hashCanonical({
+    request: authorization.permissionRequestSha256,
+    decision: authorization.policyDecisionSha256
+  }).slice(0, 32);
+  if (authorization.authorizationRef !== expectedAuthorizationRef) {
+    throw new TypeError('World Memory authorization coordinate ref mismatch');
+  }
   if (!AUTHORIZATION_CLASS.has(authorization.authorizationClass)) {
     throw new TypeError('World Memory authorization class is unsupported');
   }
