@@ -1024,7 +1024,7 @@ test('motion promotion digest is stable and expiry does not rewrite a promoted w
 });
 
 test('intelligence decision records bounded causal evidence and rejects hidden reasoning', () => {
-  const decision = formIntelligenceDecision({
+  const acceptedDecisionInput = {
     decisionRef: 'decision.participant.vex.0001',
     participantRef: 'participant.vex',
     workerRef: 'worker.vex.local.0001',
@@ -1046,7 +1046,8 @@ test('intelligence decision records bounded causal evidence and rejects hidden r
     rejectionReasonOrNull: null,
     fallbackReasonOrNull: null,
     conciseReasonOrNull: 'The incoming rush is close; I guard.'
-  });
+  };
+  const decision = formIntelligenceDecision(acceptedDecisionInput);
   assert.equal(decision.acceptedIntentOrNull.intentType, 'GUARD');
   assert.equal(decision.controllerDisposition, 'OLLAMA');
   assert.equal(verifyIntelligenceDecision(decision), decision);
@@ -1084,7 +1085,7 @@ test('intelligence decision records bounded causal evidence and rejects hidden r
     controllerRef: 'controller.vex.local-model.v1',
     controllerDisposition: 'OLLAMA',
     modelIdentityOrNull: null,
-    proposedIntent: { intentType: 'GUARD', targetRef: null },
+    proposedIntent: { intentType: 'GUARD', targetRef: null, reason: 'INCOMING_RUSH' },
     acceptedIntentOrNull: null,
     rejectionReasonOrNull: null,
     fallbackReasonOrNull: null,
@@ -1101,7 +1102,7 @@ test('intelligence decision records bounded causal evidence and rejects hidden r
     controllerRef: 'controller.vex.remote.deterministic-fallback',
     controllerDisposition: 'DETERMINISTIC_FALLBACK',
     modelIdentityOrNull: null,
-    proposedIntent: { intentType: 'GUARD', targetRef: null },
+    proposedIntent: { intentType: 'GUARD', targetRef: null, reason: 'INCOMING_RUSH' },
     acceptedIntentOrNull: { intentRef: 'intent.vex.guard.invalid', intentType: 'GUARD', targetRef: null },
     rejectionReasonOrNull: null,
     fallbackReasonOrNull: null,
@@ -1111,6 +1112,45 @@ test('intelligence decision records bounded causal evidence and rejects hidden r
   const tampered = canonicalClone(decision);
   tampered.conciseReasonOrNull = 'A different bounded outward reason.';
   assert.throws(() => verifyIntelligenceDecision(tampered), /decision digest mismatch/);
+
+  const prohibitedProposalExtras = [
+    ['hiddenPrompt', 'system prompt must not persist'],
+    ['credentials', 'secret-token'],
+    ['privateHomeContext', { roomRef: 'home.private.room' }],
+    ['rawModelOutput', { text: 'unbounded raw model payload' }]
+  ];
+
+  for (const [field, value] of prohibitedProposalExtras) {
+    assert.throws(() => formIntelligenceDecision({
+      ...acceptedDecisionInput,
+      proposedIntent: { ...acceptedDecisionInput.proposedIntent, [field]: value }
+    }), /proposedIntent fields do not match contract/);
+
+    const rehashed = canonicalClone(decision);
+    rehashed.proposedIntent[field] = value;
+    const body = canonicalClone(rehashed);
+    delete body.decisionSha256;
+    rehashed.decisionSha256 = hashCanonical(body);
+    assert.throws(() => verifyIntelligenceDecision(rehashed), /proposedIntent fields do not match contract/);
+  }
+
+  assert.throws(() => formIntelligenceDecision({
+    ...acceptedDecisionInput,
+    acceptedIntentOrNull: {
+      ...acceptedDecisionInput.acceptedIntentOrNull,
+      privateHomeContext: 'not-admitted'
+    }
+  }), /acceptedIntentOrNull fields do not match contract/);
+
+  const acceptedExtraRehashed = canonicalClone(decision);
+  acceptedExtraRehashed.acceptedIntentOrNull.rawModelOutput = 'not-admitted';
+  const acceptedExtraBody = canonicalClone(acceptedExtraRehashed);
+  delete acceptedExtraBody.decisionSha256;
+  acceptedExtraRehashed.decisionSha256 = hashCanonical(acceptedExtraBody);
+  assert.throws(
+    () => verifyIntelligenceDecision(acceptedExtraRehashed),
+    /acceptedIntentOrNull fields do not match contract/
+  );
 
   assert.throws(() => formIntelligenceDecision({
     decisionRef: 'decision.participant.vex.rejected.0001',
@@ -1124,6 +1164,8 @@ test('intelligence decision records bounded causal evidence and rejects hidden r
     modelIdentityOrNull: null,
     proposedIntent: {
       intentType: 'GUARD',
+      targetRef: null,
+      reason: 'INCOMING_RUSH',
       privateReasoning: 'unbounded hidden trace must not enter Chronicle'
     },
     acceptedIntentOrNull: null,
