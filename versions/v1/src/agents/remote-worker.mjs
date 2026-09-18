@@ -260,6 +260,12 @@ export function formWorkerIntelligenceDecision({
   }
   const modelDigest = modelIdentity ? canonicalModelDigest(modelIdentity.digest) : null;
   const workerDigest = hashCanonical(String(options.workerId));
+  const decisionCoordinateSha256 = hashCanonical({
+    sessionRef: String(options.session),
+    participantRef: options.companion,
+    intentRef: acceptedIntent.intentRef,
+    intentSequence: acceptedIntent.sequence
+  });
   const normalizedProposal = {
     intentType: proposedIntent.intentType,
     targetRef: proposedIntent.targetRef || null,
@@ -271,7 +277,7 @@ export function formWorkerIntelligenceDecision({
     targetRef: acceptedIntent.targetRef || null
   };
   return formIntelligenceDecision({
-    decisionRef: `decision.${options.companion}.${acceptedIntent.sequence}`,
+    decisionRef: `decision.vexworld.sha256.${decisionCoordinateSha256}`,
     participantRef: options.companion,
     workerRef: `worker.vexworld.sha256.${workerDigest}`,
     sourceObservationRef: observation.observationRef,
