@@ -517,15 +517,554 @@ export function verifyPrivateRehearsalForkRequest(request, {
   return request;
 }
 
+
+function resolveSavedMomentEvidence({
+  projection,
+  chronicle,
+  snapshot,
+  motionWindows,
+  fromTick,
+  toTick,
+  includedEventRefs,
+  includedMotionWindowRefs
+}) {
+  verifyWorldMemoryProjection(projection, { chronicle, snapshot, motionWindows });
+  assertNonNegativeInteger(fromTick, 'saved moment.fromTick');
+  assertNonNegativeInteger(toTick, 'saved moment.toTick');
+  if (toTick < fromTick) throw new TypeError('saved moment toTick must be >= fromTick');
+  if (fromTick < projection.fromTick || toTick > projection.toTick) {
+    throw new TypeError('saved moment interval must remain inside source projection');
+  }
+
+  assertUniqueSafeRefs(includedEventRefs, 'saved moment.includedEventRefs');
+  assertUniqueSafeRefs(includedMotionWindowRefs, 'saved moment.includedMotionWindowRefs');
+  if (!includedEventRefs.length && !includedMotionWindowRefs.length) {
+    throw new TypeError('saved moment requires at least one bounded evidence ref');
+  }
+  if (!subsetOf(includedEventRefs, projection.includedEventRefs)) {
+    throw new TypeError('saved moment event refs must be a subset of source projection');
+  }
+  if (!subsetOf(includedMotionWindowRefs, projection.includedMotionWindowRefs)) {
+    throw new TypeError('saved moment motion refs must be a subset of source projection');
+  }
+
+  const eventMap = projectionEventMap(chronicle);
+  for (const eventRef of includedEventRefs) {
+    const event = eventMap.get(eventRef);
+    if (!event || event.tick < fromTick || event.tick > toTick) {
+      throw new TypeError('saved moment event evidence falls outside selected interval');
+    }
+  }
+
+  const motionMap = new Map(normalizeMotionWindows(motionWindows).map((window) => [window.windowRef, window]));
+  for (const windowRef of includedMotionWindowRefs) {
+    const window = motionMap.get(windowRef);
+    if (!window || window.fromTick < fromTick || window.toTick > toTick) {
+      throw new TypeError('saved moment motion evidence falls outside selected interval');
+    }
+  }
+  return true;
+}
+
 export function formSavedMomentDescriptor(input) {
   assertExactKeys(input, [
-    'projection', 'chronicle', 'motionWindows', 'fromTick', 'toTick',
+    'projection', 'chronicle', 'snapshot', 'motionWindows', 'fromTick', 'toTick',
     'includedEventRefs', 'includedMotionWindowRefs', 'purposeRef',
     'requestedRetentionClass', 'requestedStorageIntent'
   ], 'saved moment input');
-  verifyWorldMemoryProjection(input.projection, {
+  resolveSavedMomentEvidence({
+    projection: input.projection,
     chronicle: input.chronicle,
-    snapshot: input.chronicleSnapshot ?? undefined,
-    motionWindows: input.motionWindows
+    snapshot: input.snapshot,
+    motionWindows: input.motionWindows,
+    fromTick: input.fromTick,
+    toTick: input.toTick,
+    includedEventRefs: input.includedEventRefs,
+    includedMotionWindowRefs: input.includedMotionWindowRefs
   });
+  assertSafeRef(input.purposeRef, 'saved moment.purposeRef');
+  if (input.requestedRetentionClass !== 'EXPLICIT_SAVED_MOMENT') {
+    throw new TypeError('saved moment may request only EXPLICIT_SAVED_MOMENT retention');
+  }
+  if (input.requestedStorageIntent !== 'LOCAL_PRIVATE_ONLY') {
+    throw new TypeError('saved moment storage intent must remain LOCAL_PRIVATE_ONLY');
+  }
+
+  const body = {
+    schemaVersion: WORLD_MEMORY_SCHEMA.savedMoment,
+    savedMomentRef: 'world-memory.saved-moment.' + hashCanonical({
+      projection: input.projection.projectionSha256,
+      fromTick: input.fromTick,
+      toTick: input.toTick,
+      eventRefs: input.includedEventRefs,
+      motionRefs: input.includedMotionWindowRefs,
+      purposeRef: input.purposeRef
+    }).slice(0, 32),
+    sourceProjectionRef: input.projection.projectionRef,
+    sourceProjectionSha256: input.projection.projectionSha256,
+    fromTick: input.fromTick,
+    toTick: input.toTick,
+    includedEventRefs: [...input.includedEventRefs],
+    includedMotionWindowRefs: [...input.includedMotionWindowRefs],
+    purposeRef: input.purposeRef,
+    requestedRetentionClass: input.requestedRetentionClass,
+    requestedStorageIntent: input.requestedStorageIntent,
+    wholeSessionRetentionRequested: false,
+    homeWritePerformed: false,
+    memoryWritePerformed: false,
+    vaultCommitPerformed: false,
+    persistentMemoryPromotionPerformed: false
+  };
+  return frozenCanonical({ ...body, savedMomentSha256: hashCanonical(body) });
+}
+
+export function verifySavedMomentDescriptor(moment, {
+  projection = null,
+  chronicle = null,
+  snapshot = null,
+  motionWindows = null
+} = {}) {
+  assertPlainObject(moment, 'saved moment');
+  assertExactKeys(moment, [
+    'schemaVersion', 'savedMomentRef', 'sourceProjectionRef',
+    'sourceProjectionSha256', 'fromTick', 'toTick', 'includedEventRefs',
+    'includedMotionWindowRefs', 'purposeRef', 'requestedRetentionClass',
+    'requestedStorageIntent', 'wholeSessionRetentionRequested',
+    'homeWritePerformed', 'memoryWritePerformed', 'vaultCommitPerformed',
+    'persistentMemoryPromotionPerformed', 'savedMomentSha256'
+  ], 'saved moment');
+  if (moment.schemaVersion !== WORLD_MEMORY_SCHEMA.savedMoment) {
+    throw new TypeError('saved moment schema mismatch');
+  }
+  assertSafeRef(moment.savedMomentRef, 'saved moment.savedMomentRef');
+  assertSafeRef(moment.sourceProjectionRef, 'saved moment.sourceProjectionRef');
+  assertSha256(moment.sourceProjectionSha256, 'saved moment.sourceProjectionSha256');
+  assertNonNegativeInteger(moment.fromTick, 'saved moment.fromTick');
+  assertNonNegativeInteger(moment.toTick, 'saved moment.toTick');
+  if (moment.toTick < moment.fromTick) throw new TypeError('saved moment toTick must be >= fromTick');
+  assertUniqueSafeRefs(moment.includedEventRefs, 'saved moment.includedEventRefs');
+  assertUniqueSafeRefs(moment.includedMotionWindowRefs, 'saved moment.includedMotionWindowRefs');
+  if (!moment.includedEventRefs.length && !moment.includedMotionWindowRefs.length) {
+    throw new TypeError('saved moment requires bounded evidence');
+  }
+  assertSafeRef(moment.purposeRef, 'saved moment.purposeRef');
+  if (moment.requestedRetentionClass !== 'EXPLICIT_SAVED_MOMENT') {
+    throw new TypeError('saved moment retention class mismatch');
+  }
+  if (moment.requestedStorageIntent !== 'LOCAL_PRIVATE_ONLY') {
+    throw new TypeError('saved moment storage intent mismatch');
+  }
+  if (
+    moment.wholeSessionRetentionRequested !== false ||
+    moment.homeWritePerformed !== false ||
+    moment.memoryWritePerformed !== false ||
+    moment.vaultCommitPerformed !== false ||
+    moment.persistentMemoryPromotionPerformed !== false
+  ) {
+    throw new TypeError('saved moment descriptor must not claim storage/promotion effects');
+  }
+  rejectHiddenReasoning(moment, 'saved moment');
+  assertSha256(moment.savedMomentSha256, 'saved moment.savedMomentSha256');
+  const { savedMomentSha256, ...body } = moment;
+  if (hashCanonical(body) !== savedMomentSha256) throw new TypeError('saved moment digest mismatch');
+
+  const contextual = projection !== null || chronicle !== null || snapshot !== null || motionWindows !== null;
+  if (contextual) {
+    if (projection === null || chronicle === null || snapshot === null || motionWindows === null) {
+      throw new TypeError('saved moment contextual verification requires projection, Chronicle, snapshot and motionWindows together');
+    }
+    resolveSavedMomentEvidence({
+      projection,
+      chronicle,
+      snapshot,
+      motionWindows,
+      fromTick: moment.fromTick,
+      toTick: moment.toTick,
+      includedEventRefs: moment.includedEventRefs,
+      includedMotionWindowRefs: moment.includedMotionWindowRefs
+    });
+    if (
+      moment.sourceProjectionRef !== projection.projectionRef ||
+      moment.sourceProjectionSha256 !== projection.projectionSha256
+    ) {
+      throw new TypeError('saved moment source projection mismatch');
+    }
+  }
+  return moment;
+}
+
+export function formWorldMemoryPermissionRequest(input) {
+  assertExactKeys(input, [
+    'projection', 'requesterParticipantRef', 'subjectParticipantRefs',
+    'requestedCapabilityRefs', 'purposeRef', 'requestedAudienceRefs',
+    'requestedRetentionClass', 'externalPolicyOwnerRef'
+  ], 'World Memory permission request input');
+  verifyWorldMemoryProjection(input.projection);
+  assertSafeRef(input.requesterParticipantRef, 'permission request.requesterParticipantRef');
+  if (input.requesterParticipantRef !== input.projection.viewerParticipantRef) {
+    throw new TypeError('permission requester must be the World Memory projection viewer');
+  }
+  assertUniqueSafeRefs(input.subjectParticipantRefs, 'permission request.subjectParticipantRefs', { allowEmpty: false });
+  assertCapabilities(input.requestedCapabilityRefs, 'permission request.requestedCapabilityRefs');
+  assertSafeRef(input.purposeRef, 'permission request.purposeRef');
+  assertUniqueSafeRefs(input.requestedAudienceRefs, 'permission request.requestedAudienceRefs');
+  assertRetention(input.requestedRetentionClass, 'permission request.requestedRetentionClass');
+  assertSafeRef(input.externalPolicyOwnerRef, 'permission request.externalPolicyOwnerRef');
+
+  const requiresAudience =
+    input.requestedCapabilityRefs.includes('capability.world-memory.fork-shared') ||
+    input.requestedCapabilityRefs.includes('capability.world-memory.redistribute');
+  if (requiresAudience && input.requestedAudienceRefs.length === 0) {
+    throw new TypeError('shared/redistribution permission request requires an explicit audience');
+  }
+
+  const body = {
+    schemaVersion: WORLD_MEMORY_SCHEMA.permissionRequest,
+    permissionRequestRef: 'world-memory.permission-request.' + hashCanonical({
+      projection: input.projection.projectionSha256,
+      requester: input.requesterParticipantRef,
+      subjects: input.subjectParticipantRefs,
+      capabilities: input.requestedCapabilityRefs,
+      purpose: input.purposeRef,
+      audience: input.requestedAudienceRefs,
+      retention: input.requestedRetentionClass,
+      owner: input.externalPolicyOwnerRef
+    }).slice(0, 32),
+    requesterParticipantRef: input.requesterParticipantRef,
+    subjectParticipantRefs: [...input.subjectParticipantRefs],
+    sourceProjectionRef: input.projection.projectionRef,
+    sourceProjectionSha256: input.projection.projectionSha256,
+    requestedCapabilityRefs: [...input.requestedCapabilityRefs],
+    purposeRef: input.purposeRef,
+    requestedAudienceRefs: [...input.requestedAudienceRefs],
+    requestedRetentionClass: input.requestedRetentionClass,
+    externalPolicyOwnerRef: input.externalPolicyOwnerRef,
+    externalDecisionRequired: true,
+    authorizationPerformed: false,
+    relationshipMutationPerformed: false,
+    homeWritePerformed: false,
+    memoryWritePerformed: false,
+    networkDeliveryPerformed: false
+  };
+  return frozenCanonical({ ...body, permissionRequestSha256: hashCanonical(body) });
+}
+
+export function verifyWorldMemoryPermissionRequest(request, { projection = null } = {}) {
+  assertPlainObject(request, 'World Memory permission request');
+  assertExactKeys(request, [
+    'schemaVersion', 'permissionRequestRef', 'requesterParticipantRef',
+    'subjectParticipantRefs', 'sourceProjectionRef', 'sourceProjectionSha256',
+    'requestedCapabilityRefs', 'purposeRef', 'requestedAudienceRefs',
+    'requestedRetentionClass', 'externalPolicyOwnerRef',
+    'externalDecisionRequired', 'authorizationPerformed',
+    'relationshipMutationPerformed', 'homeWritePerformed',
+    'memoryWritePerformed', 'networkDeliveryPerformed',
+    'permissionRequestSha256'
+  ], 'World Memory permission request');
+  if (request.schemaVersion !== WORLD_MEMORY_SCHEMA.permissionRequest) {
+    throw new TypeError('World Memory permission request schema mismatch');
+  }
+  assertSafeRef(request.permissionRequestRef, 'permission request.permissionRequestRef');
+  assertSafeRef(request.requesterParticipantRef, 'permission request.requesterParticipantRef');
+  assertUniqueSafeRefs(request.subjectParticipantRefs, 'permission request.subjectParticipantRefs', { allowEmpty: false });
+  assertSafeRef(request.sourceProjectionRef, 'permission request.sourceProjectionRef');
+  assertSha256(request.sourceProjectionSha256, 'permission request.sourceProjectionSha256');
+  assertCapabilities(request.requestedCapabilityRefs, 'permission request.requestedCapabilityRefs');
+  assertSafeRef(request.purposeRef, 'permission request.purposeRef');
+  assertUniqueSafeRefs(request.requestedAudienceRefs, 'permission request.requestedAudienceRefs');
+  assertRetention(request.requestedRetentionClass, 'permission request.requestedRetentionClass');
+  assertSafeRef(request.externalPolicyOwnerRef, 'permission request.externalPolicyOwnerRef');
+  const requiresAudience =
+    request.requestedCapabilityRefs.includes('capability.world-memory.fork-shared') ||
+    request.requestedCapabilityRefs.includes('capability.world-memory.redistribute');
+  if (requiresAudience && request.requestedAudienceRefs.length === 0) {
+    throw new TypeError('shared/redistribution permission request requires an explicit audience');
+  }
+  if (
+    request.externalDecisionRequired !== true ||
+    request.authorizationPerformed !== false ||
+    request.relationshipMutationPerformed !== false ||
+    request.homeWritePerformed !== false ||
+    request.memoryWritePerformed !== false ||
+    request.networkDeliveryPerformed !== false
+  ) {
+    throw new TypeError('permission request must remain an external-decision request with no local effects');
+  }
+  rejectHiddenReasoning(request, 'World Memory permission request');
+  assertSha256(request.permissionRequestSha256, 'permission request.permissionRequestSha256');
+  const { permissionRequestSha256, ...body } = request;
+  if (hashCanonical(body) !== permissionRequestSha256) throw new TypeError('permission request digest mismatch');
+
+  if (projection !== null) {
+    verifyWorldMemoryProjection(projection);
+    if (
+      request.requesterParticipantRef !== projection.viewerParticipantRef ||
+      request.sourceProjectionRef !== projection.projectionRef ||
+      request.sourceProjectionSha256 !== projection.projectionSha256
+    ) {
+      throw new TypeError('permission request source projection mismatch');
+    }
+  }
+  return request;
+}
+
+function validateDecisionAgainstRequest(decision, request) {
+  verifyWorldMemoryPermissionRequest(request);
+  verifyExternalPolicyDecision(decision);
+  if (
+    decision.permissionRequestRef !== request.permissionRequestRef ||
+    decision.permissionRequestSha256 !== request.permissionRequestSha256 ||
+    decision.policyOwnerRef !== request.externalPolicyOwnerRef
+  ) {
+    throw new TypeError('external policy decision does not bind the exact permission request');
+  }
+  if (!subsetOf(decision.grantedCapabilityRefs, request.requestedCapabilityRefs)) {
+    throw new TypeError('external policy decision grants an unrequested capability');
+  }
+  if (!subsetOf(decision.audienceRefs, request.requestedAudienceRefs)) {
+    throw new TypeError('external policy decision grants an unrequested audience');
+  }
+
+  if (decision.decisionClass === 'ALLOW') {
+    if (
+      !sameSet(decision.grantedCapabilityRefs, request.requestedCapabilityRefs) ||
+      !sameSet(decision.audienceRefs, request.requestedAudienceRefs)
+    ) {
+      throw new TypeError('ALLOW must grant the exact requested capability/audience set');
+    }
+  } else if (decision.decisionClass === 'NARROW') {
+    if (decision.grantedCapabilityRefs.length === 0) {
+      throw new TypeError('NARROW must retain at least one requested capability');
+    }
+    if (
+      sameSet(decision.grantedCapabilityRefs, request.requestedCapabilityRefs) &&
+      sameSet(decision.audienceRefs, request.requestedAudienceRefs)
+    ) {
+      throw new TypeError('NARROW must actually narrow capability or audience');
+    }
+  } else {
+    if (
+      decision.grantedCapabilityRefs.length !== 0 ||
+      decision.audienceRefs.length !== 0 ||
+      decision.consentRefOrNull !== null
+    ) {
+      throw new TypeError('DEFER/DENY/REVOKE must not grant capability, audience or consent');
+    }
+  }
+
+  const externalAudience = decision.audienceRefs.some((ref) => ref !== request.requesterParticipantRef);
+  const sharedCapability =
+    decision.grantedCapabilityRefs.includes('capability.world-memory.fork-shared') ||
+    decision.grantedCapabilityRefs.includes('capability.world-memory.redistribute');
+  if (
+    (decision.decisionClass === 'ALLOW' || decision.decisionClass === 'NARROW') &&
+    (externalAudience || sharedCapability) &&
+    decision.consentRefOrNull === null
+  ) {
+    throw new TypeError('externally shared World Memory authorization requires explicit consent evidence');
+  }
+  return true;
+}
+
+export function formSyntheticExternalPolicyDecision(input) {
+  assertExactKeys(input, [
+    'request', 'policyDecisionRef', 'decisionClass',
+    'grantedCapabilityRefs', 'audienceRefs',
+    'currentnessRef', 'consentRefOrNull'
+  ], 'synthetic external policy decision input');
+  verifyWorldMemoryPermissionRequest(input.request);
+  assertSafeRef(input.policyDecisionRef, 'policy decision.policyDecisionRef');
+  if (!POLICY_DECISION_CLASS.has(input.decisionClass)) {
+    throw new TypeError('policy decision class is unsupported');
+  }
+  assertCapabilities(input.grantedCapabilityRefs, 'policy decision.grantedCapabilityRefs', { allowEmpty: true });
+  assertUniqueSafeRefs(input.audienceRefs, 'policy decision.audienceRefs');
+  assertSafeRef(input.currentnessRef, 'policy decision.currentnessRef');
+  assertNullableSafeRef(input.consentRefOrNull, 'policy decision.consentRefOrNull');
+
+  const body = {
+    schemaVersion: WORLD_MEMORY_SCHEMA.policyDecision,
+    evidenceClass: 'SYNTHETIC_EXTERNAL_POLICY_FIXTURE',
+    policyDecisionRef: input.policyDecisionRef,
+    policyOwnerRef: input.request.externalPolicyOwnerRef,
+    permissionRequestRef: input.request.permissionRequestRef,
+    permissionRequestSha256: input.request.permissionRequestSha256,
+    decisionClass: input.decisionClass,
+    grantedCapabilityRefs: [...input.grantedCapabilityRefs],
+    audienceRefs: [...input.audienceRefs],
+    currentnessRef: input.currentnessRef,
+    consentRefOrNull: input.consentRefOrNull,
+    relationshipMutationPerformed: false,
+    homeWritePerformed: false,
+    memoryWritePerformed: false,
+    networkDeliveryPerformed: false
+  };
+  const formed = frozenCanonical({ ...body, policyDecisionSha256: hashCanonical(body) });
+  validateDecisionAgainstRequest(formed, input.request);
+  return formed;
+}
+
+export function verifyExternalPolicyDecision(decision) {
+  assertPlainObject(decision, 'external policy decision');
+  assertExactKeys(decision, [
+    'schemaVersion', 'evidenceClass', 'policyDecisionRef', 'policyOwnerRef',
+    'permissionRequestRef', 'permissionRequestSha256', 'decisionClass',
+    'grantedCapabilityRefs', 'audienceRefs', 'currentnessRef',
+    'consentRefOrNull', 'relationshipMutationPerformed',
+    'homeWritePerformed', 'memoryWritePerformed', 'networkDeliveryPerformed',
+    'policyDecisionSha256'
+  ], 'external policy decision');
+  if (decision.schemaVersion !== WORLD_MEMORY_SCHEMA.policyDecision) {
+    throw new TypeError('external policy decision schema mismatch');
+  }
+  if (decision.evidenceClass !== 'SYNTHETIC_EXTERNAL_POLICY_FIXTURE') {
+    throw new TypeError('07E accepts only synthetic external-policy fixture evidence');
+  }
+  assertSafeRef(decision.policyDecisionRef, 'policy decision.policyDecisionRef');
+  assertSafeRef(decision.policyOwnerRef, 'policy decision.policyOwnerRef');
+  assertSafeRef(decision.permissionRequestRef, 'policy decision.permissionRequestRef');
+  assertSha256(decision.permissionRequestSha256, 'policy decision.permissionRequestSha256');
+  if (!POLICY_DECISION_CLASS.has(decision.decisionClass)) {
+    throw new TypeError('policy decision class is unsupported');
+  }
+  assertCapabilities(decision.grantedCapabilityRefs, 'policy decision.grantedCapabilityRefs', { allowEmpty: true });
+  assertUniqueSafeRefs(decision.audienceRefs, 'policy decision.audienceRefs');
+  assertSafeRef(decision.currentnessRef, 'policy decision.currentnessRef');
+  assertNullableSafeRef(decision.consentRefOrNull, 'policy decision.consentRefOrNull');
+  if (
+    decision.relationshipMutationPerformed !== false ||
+    decision.homeWritePerformed !== false ||
+    decision.memoryWritePerformed !== false ||
+    decision.networkDeliveryPerformed !== false
+  ) {
+    throw new TypeError('external policy evidence must not claim VexLife/Home/network effects');
+  }
+  rejectHiddenReasoning(decision, 'external policy decision');
+  assertSha256(decision.policyDecisionSha256, 'policy decision.policyDecisionSha256');
+  const { policyDecisionSha256, ...body } = decision;
+  if (hashCanonical(body) !== policyDecisionSha256) throw new TypeError('external policy decision digest mismatch');
+  return decision;
+}
+
+export function evaluateWorldMemoryAuthorization({ request, decision }) {
+  validateDecisionAgainstRequest(decision, request);
+
+  let authorizationClass;
+  if (decision.decisionClass === 'ALLOW' || decision.decisionClass === 'NARROW') {
+    authorizationClass = 'AUTHORIZED';
+  } else if (decision.decisionClass === 'DEFER') {
+    authorizationClass = 'DEFERRED';
+  } else if (decision.decisionClass === 'REVOKE') {
+    authorizationClass = 'REVOKED';
+  } else {
+    authorizationClass = 'DENIED';
+  }
+
+  const effectiveCapabilityRefs = authorizationClass === 'AUTHORIZED'
+    ? [...decision.grantedCapabilityRefs]
+    : [];
+  const effectiveAudienceRefs = authorizationClass === 'AUTHORIZED'
+    ? [...decision.audienceRefs]
+    : [];
+  const consentRefOrNull = authorizationClass === 'AUTHORIZED'
+    ? decision.consentRefOrNull
+    : null;
+
+  const body = {
+    schemaVersion: WORLD_MEMORY_SCHEMA.authorization,
+    authorizationRef: 'world-memory.authorization.' + hashCanonical({
+      request: request.permissionRequestSha256,
+      decision: decision.policyDecisionSha256
+    }).slice(0, 32),
+    permissionRequestRef: request.permissionRequestRef,
+    permissionRequestSha256: request.permissionRequestSha256,
+    policyDecisionRef: decision.policyDecisionRef,
+    policyDecisionSha256: decision.policyDecisionSha256,
+    sourceProjectionRef: request.sourceProjectionRef,
+    sourceProjectionSha256: request.sourceProjectionSha256,
+    authorizationClass,
+    effectiveCapabilityRefs,
+    effectiveAudienceRefs,
+    consentRefOrNull,
+    historyMutation: false,
+    forkEffectPerformed: false,
+    relationshipMutationPerformed: false,
+    homeWritePerformed: false,
+    memoryWritePerformed: false,
+    networkDeliveryPerformed: false,
+    modelInvocationPerformed: false,
+    publicationPerformed: false
+  };
+  return frozenCanonical({ ...body, authorizationSha256: hashCanonical(body) });
+}
+
+export function verifyWorldMemoryAuthorization(authorization, {
+  request = null,
+  decision = null
+} = {}) {
+  assertPlainObject(authorization, 'World Memory authorization');
+  assertExactKeys(authorization, [
+    'schemaVersion', 'authorizationRef', 'permissionRequestRef',
+    'permissionRequestSha256', 'policyDecisionRef', 'policyDecisionSha256',
+    'sourceProjectionRef', 'sourceProjectionSha256', 'authorizationClass',
+    'effectiveCapabilityRefs', 'effectiveAudienceRefs', 'consentRefOrNull',
+    'historyMutation', 'forkEffectPerformed', 'relationshipMutationPerformed',
+    'homeWritePerformed', 'memoryWritePerformed', 'networkDeliveryPerformed',
+    'modelInvocationPerformed', 'publicationPerformed', 'authorizationSha256'
+  ], 'World Memory authorization');
+  if (authorization.schemaVersion !== WORLD_MEMORY_SCHEMA.authorization) {
+    throw new TypeError('World Memory authorization schema mismatch');
+  }
+  for (const [label, value] of [
+    ['authorizationRef', authorization.authorizationRef],
+    ['permissionRequestRef', authorization.permissionRequestRef],
+    ['policyDecisionRef', authorization.policyDecisionRef],
+    ['sourceProjectionRef', authorization.sourceProjectionRef]
+  ]) assertSafeRef(value, 'authorization.' + label);
+  assertSha256(authorization.permissionRequestSha256, 'authorization.permissionRequestSha256');
+  assertSha256(authorization.policyDecisionSha256, 'authorization.policyDecisionSha256');
+  assertSha256(authorization.sourceProjectionSha256, 'authorization.sourceProjectionSha256');
+  if (!AUTHORIZATION_CLASS.has(authorization.authorizationClass)) {
+    throw new TypeError('World Memory authorization class is unsupported');
+  }
+  assertCapabilities(authorization.effectiveCapabilityRefs, 'authorization.effectiveCapabilityRefs', { allowEmpty: true });
+  assertUniqueSafeRefs(authorization.effectiveAudienceRefs, 'authorization.effectiveAudienceRefs');
+  assertNullableSafeRef(authorization.consentRefOrNull, 'authorization.consentRefOrNull');
+  if (
+    authorization.authorizationClass !== 'AUTHORIZED' &&
+    (
+      authorization.effectiveCapabilityRefs.length !== 0 ||
+      authorization.effectiveAudienceRefs.length !== 0 ||
+      authorization.consentRefOrNull !== null
+    )
+  ) {
+    throw new TypeError('non-authorized result must not retain effective grants');
+  }
+  if (
+    authorization.historyMutation !== false ||
+    authorization.forkEffectPerformed !== false ||
+    authorization.relationshipMutationPerformed !== false ||
+    authorization.homeWritePerformed !== false ||
+    authorization.memoryWritePerformed !== false ||
+    authorization.networkDeliveryPerformed !== false ||
+    authorization.modelInvocationPerformed !== false ||
+    authorization.publicationPerformed !== false
+  ) {
+    throw new TypeError('World Memory authorization result must remain effect-free');
+  }
+  rejectHiddenReasoning(authorization, 'World Memory authorization');
+  assertSha256(authorization.authorizationSha256, 'authorization.authorizationSha256');
+  const { authorizationSha256, ...body } = authorization;
+  if (hashCanonical(body) !== authorizationSha256) throw new TypeError('World Memory authorization digest mismatch');
+
+  if (request !== null || decision !== null) {
+    if (request === null || decision === null) {
+      throw new TypeError('authorization contextual verification requires request and decision together');
+    }
+    const expected = evaluateWorldMemoryAuthorization({ request, decision });
+    if (expected.authorizationSha256 !== authorization.authorizationSha256) {
+      throw new TypeError('World Memory authorization request/decision context mismatch');
+    }
+  }
+  return authorization;
 }
