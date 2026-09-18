@@ -243,6 +243,14 @@ test('World Memory projection is bounded, read-only and source-grounded', () => 
   assert.equal(f.projection.worldEffectPerformed, false);
   assert.equal(f.projection.retentionClass, 'TRANSIENT_REPLAY');
 
+  const renamedProjection = canonicalClone(f.projection);
+  renamedProjection.projectionRef = 'world-memory.projection.forged';
+  rehash(renamedProjection, 'projectionSha256');
+  assert.throws(
+    () => verifyWorldMemoryProjection(renamedProjection),
+    /projection coordinate ref mismatch/
+  );
+
   const foreignEvent = canonicalClone(f.projection);
   foreignEvent.includedEventRefs[0] = 'worldline.foreign.event.000000000001.000000';
   foreignEvent.includedEventSha256s[0] = H('b');
@@ -334,6 +342,14 @@ test('replay, private fork request and saved moment remain distinct effect-free 
   assert.equal(forkRequest.sourceHistoryMutation, false);
   assert.equal(JSON.stringify(f.projection), projectionBefore);
 
+  const renamedFork = canonicalClone(forkRequest);
+  renamedFork.forkRequestRef = 'world-memory.fork-request.forged';
+  rehash(renamedFork, 'forkRequestSha256');
+  assert.throws(
+    () => verifyPrivateRehearsalForkRequest(renamedFork),
+    /fork request coordinate ref mismatch/
+  );
+
   const forkLie = canonicalClone(forkRequest);
   forkLie.requestedBranchClass = 'SHARED_ALTERNATE_HISTORY';
   rehash(forkLie, 'forkRequestSha256');
@@ -373,6 +389,14 @@ test('replay, private fork request and saved moment remain distinct effect-free 
   assert.equal(saved.vaultCommitPerformed, false);
   assert.equal(saved.wholeSessionRetentionRequested, false);
 
+  const renamedSavedMoment = canonicalClone(saved);
+  renamedSavedMoment.savedMomentRef = 'world-memory.saved-moment.forged';
+  rehash(renamedSavedMoment, 'savedMomentSha256');
+  assert.throws(
+    () => verifySavedMomentDescriptor(renamedSavedMoment),
+    /saved moment coordinate ref mismatch/
+  );
+
   assert.throws(() => formSavedMomentDescriptor({
     projection: f.projection,
     chronicle: f.chronicle,
@@ -410,6 +434,26 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
     requestedRetentionClass: 'TRANSIENT_REPLAY',
     externalPolicyOwnerRef: 'policy.vexlife.relationships-consent'
   });
+
+  const renamedRequest = canonicalClone(viewRequest);
+  renamedRequest.permissionRequestRef = 'world-memory.permission-request.forged';
+  rehash(renamedRequest, 'permissionRequestSha256');
+  assert.throws(
+    () => formSyntheticExternalPolicyDecision({
+      request: renamedRequest,
+      projection: f.projection,
+      chronicle: f.chronicle,
+      snapshot: f.snapshot,
+      motionWindows: [f.motionWindow],
+      policyDecisionRef: 'policy-decision.world-memory.renamed-request.0001',
+      decisionClass: 'ALLOW',
+      grantedCapabilityRefs: ['capability.world-memory.view'],
+      audienceRefs: ['participant.mira'],
+      currentnessRef: 'currentness.vexlife.relationships.renamed.0001',
+      consentRefOrNull: 'consent.world-memory.view.renamed.0001'
+    }),
+    /permission request coordinate ref mismatch/
+  );
 
   const forgedRequest = canonicalClone(viewRequest);
   forgedRequest.requesterParticipantRef = 'participant.mallory';
@@ -599,6 +643,14 @@ test('external policy evidence authorizes exact capabilities only and revoke nev
     snapshot: f.snapshot,
     motionWindows: [f.motionWindow]
   }), f.projection);
+
+  const renamedAuthorization = canonicalClone(viewAuthorization);
+  renamedAuthorization.authorizationRef = 'world-memory.authorization.forged';
+  rehash(renamedAuthorization, 'authorizationSha256');
+  assert.throws(
+    () => verifyWorldMemoryAuthorization(renamedAuthorization),
+    /authorization coordinate ref mismatch/
+  );
 
   const authLie = canonicalClone(viewAuthorization);
   authLie.effectiveCapabilityRefs.push('capability.world-memory.redistribute');
