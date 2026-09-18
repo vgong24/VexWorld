@@ -16,7 +16,10 @@ import {
 export const MOTION_TAIL_SCHEMA = 'vexworld.motion-hot-tail/v1';
 export const MOTION_SAMPLE_SCHEMA = 'vexworld.motion-sample/v1';
 export const MOTION_WINDOW_SCHEMA = 'vexworld.promoted-motion-window/v1';
+export const MOTION_CAPTURE_SOURCE_SCHEMA = 'vexworld.synthetic-motion-capture-source/v1';
+export const QUALIFIED_MOTION_SAMPLE_SCHEMA = 'vexworld.qualified-motion-sample/v1';
 export const MOTION_QUANTIZATION_PROFILE = 'motion.quantization.mm-and-microquaternion.v1';
+export const MOTION_CAPTURE_MODE = 'SYNTHETIC_FIXTURE_ONLY';
 
 export const MOTION_PRIVACY_CLASSES = Object.freeze([
   'PARTICIPANT_PRIVATE',
@@ -31,8 +34,15 @@ export const MOTION_RETENTION_CLASSES = Object.freeze([
   'EXPLICIT_SAVED_MOMENT'
 ]);
 
+export const MOTION_TRANSPORT_QUALITIES = Object.freeze([
+  'DIRECT_OBSERVED',
+  'INTERPOLATED_ESTIMATE',
+  'GAP_MARKER'
+]);
+
 const privacySet = new Set(MOTION_PRIVACY_CLASSES);
 const retentionSet = new Set(MOTION_RETENTION_CLASSES);
+const transportQualitySet = new Set(MOTION_TRANSPORT_QUALITIES);
 
 function assertPrivacy(value, label) {
   if (!privacySet.has(value)) throw new TypeError(`${label} is not a supported motion privacy class`);
@@ -42,6 +52,77 @@ function assertPrivacy(value, label) {
 function assertRetention(value, label) {
   if (!retentionSet.has(value)) throw new TypeError(`${label} is not a supported motion retention class`);
   return value;
+}
+
+function assertTransportQuality(value, label) {
+  if (!transportQualitySet.has(value)) {
+    throw new TypeError(`${label} is not a supported motion transport quality`);
+  }
+  return value;
+}
+
+export function verifySyntheticMotionCaptureSource(source) {
+  assertPlainObject(source, 'motion capture source');
+  assertExactKeys(source, [
+    'schemaVersion', 'captureMode', 'captureSourceRef', 'participantRef',
+    'sourceClassRef', 'coordinateSpaceRef', 'deviceClockDomainRef',
+    'clockAlignmentRef', 'clockAlignmentDomainRef', 'calibrationRef',
+    'calibrationCoordinateSpaceRef', 'transportProfileRef', 'privacyClass',
+    'retentionClass', 'captureSourceSha256'
+  ], 'motion capture source');
+  if (source.schemaVersion !== MOTION_CAPTURE_SOURCE_SCHEMA) {
+    throw new TypeError('motion capture source schema mismatch');
+  }
+  if (source.captureMode !== MOTION_CAPTURE_MODE) {
+    throw new TypeError('motion capture source must remain synthetic-fixture-only');
+  }
+  for (const [key, value] of [
+    ['captureSourceRef', source.captureSourceRef],
+    ['participantRef', source.participantRef],
+    ['sourceClassRef', source.sourceClassRef],
+    ['coordinateSpaceRef', source.coordinateSpaceRef],
+    ['deviceClockDomainRef', source.deviceClockDomainRef],
+    ['clockAlignmentRef', source.clockAlignmentRef],
+    ['clockAlignmentDomainRef', source.clockAlignmentDomainRef],
+    ['calibrationRef', source.calibrationRef],
+    ['calibrationCoordinateSpaceRef', source.calibrationCoordinateSpaceRef],
+    ['transportProfileRef', source.transportProfileRef]
+  ]) assertSafeRef(value, `motion capture source.${key}`);
+  if (source.clockAlignmentDomainRef !== source.deviceClockDomainRef) {
+    throw new TypeError('motion capture source clock-alignment domain mismatch');
+  }
+  if (source.calibrationCoordinateSpaceRef !== source.coordinateSpaceRef) {
+    throw new TypeError('motion capture source calibration coordinate-space mismatch');
+  }
+  assertPrivacy(source.privacyClass, 'motion capture source.privacyClass');
+  assertRetention(source.retentionClass, 'motion capture source.retentionClass');
+  if (source.retentionClass !== 'EPHEMERAL_HOT_TAIL') {
+    throw new TypeError('motion capture source must begin with EPHEMERAL_HOT_TAIL retention');
+  }
+  rejectHiddenReasoning(source, 'motion capture source');
+  assertSha256(source.captureSourceSha256, 'motion capture source.captureSourceSha256');
+  const { captureSourceSha256, ...body } = source;
+  if (hashCanonical(body) !== captureSourceSha256) {
+    throw new TypeError('motion capture source digest mismatch');
+  }
+  return source;
+}
+
+export function formSyntheticMotionCaptureSource(input) {
+  assertExactKeys(input, [
+    'captureSourceRef', 'participantRef', 'sourceClassRef', 'coordinateSpaceRef',
+    'deviceClockDomainRef', 'clockAlignmentRef', 'clockAlignmentDomainRef',
+    'calibrationRef', 'calibrationCoordinateSpaceRef', 'transportProfileRef',
+    'privacyClass', 'retentionClass'
+  ], 'motion capture source input');
+  const body = {
+    schemaVersion: MOTION_CAPTURE_SOURCE_SCHEMA,
+    captureMode: MOTION_CAPTURE_MODE,
+    ...canonicalClone(input)
+  };
+  const formed = frozenCanonical({ ...body, captureSourceSha256: hashCanonical(body) });
+  verifySyntheticMotionCaptureSource(formed);
+  return formed;
 }
 
 function assertSafeInteger(value, label) {
@@ -228,7 +309,89 @@ export function appendMotionSample(tail, input) {
   return Object.freeze({ tail: next, sample });
 }
 
-function validateMotionSample(sample, owner) {
+function qualifiedSampleBody(tail, captureSource, input) {
+  verifySyntheticMotionCaptureSource(captureSource);
+  assertExactKeys(input, [
+    'sequence', 'tick', 'sourceTimeMicroseconds', 'transportQuality',
+    'poseOrNull', 'materialityRefs'
+  ], 'qualified motion sample input');
+  if (
+    captureSource.participantRef !== tail.participantRef ||
+    captureSource.coordinateSpaceRef !== tail.coordinateSpaceRef ||
+    captureSource.privacyClass !== tail.privacyClass ||
+    captureSource.retentionClass !== tail.retentionClass
+  ) {
+    throw new TypeError('motion capture source does not match tail owner/privacy/retention coordinates');
+  }
+  assertNonNegativeInteger(input.sequence, 'qualified motion sample sequence');
+  assertNonNegativeInteger(input.tick, 'qualified motion sample tick');
+  assertNonNegativeInteger(input.sourceTimeMicroseconds, 'qualified motion sample sourceTimeMicroseconds');
+  assertTransportQuality(input.transportQuality, 'qualified motion sample transportQuality');
+  assertUniqueSafeRefs(input.materialityRefs, 'qualified motion sample materialityRefs');
+
+  const gap = input.transportQuality === 'GAP_MARKER';
+  if (gap && input.poseOrNull !== null) {
+    throw new TypeError('GAP_MARKER must not fabricate a motion pose');
+  }
+  if (!gap && input.poseOrNull === null) {
+    throw new TypeError('observed/interpolated qualified samples require a pose');
+  }
+
+  if (tail.latestSequenceOrNull !== null && input.sequence <= tail.latestSequenceOrNull) {
+    throw new TypeError('motion sample sequence must increase strictly');
+  }
+  if (tail.latestTickOrNull !== null && input.tick < tail.latestTickOrNull) {
+    throw new TypeError('motion sample tick cannot move backward');
+  }
+
+  let priorQualified = null;
+  for (const entry of tail.samples) {
+    if (entry.schemaVersion === QUALIFIED_MOTION_SAMPLE_SCHEMA) {
+      if (entry.captureSource.captureSourceRef !== captureSource.captureSourceRef) {
+        throw new TypeError('one motion tail cannot switch qualified capture source');
+      }
+      priorQualified = entry;
+    }
+  }
+  if (priorQualified && input.sourceTimeMicroseconds <= priorQualified.sourceTimeMicroseconds) {
+    throw new TypeError('qualified motion source time must increase strictly');
+  }
+
+  return {
+    schemaVersion: QUALIFIED_MOTION_SAMPLE_SCHEMA,
+    sampleRef: `${tail.tailRef}.sample.${String(input.sequence).padStart(10, '0')}`,
+    tailRef: tail.tailRef,
+    participantRef: tail.participantRef,
+    coordinateSpaceRef: tail.coordinateSpaceRef,
+    sequence: input.sequence,
+    tick: input.tick,
+    sourceRef: captureSource.captureSourceRef,
+    captureSource: canonicalClone(captureSource),
+    sourceTimeMicroseconds: input.sourceTimeMicroseconds,
+    transportQuality: input.transportQuality,
+    poseOrNull: gap ? null : canonicalClone(quantizeMotionPose(input.poseOrNull)),
+    materialityRefs: [...input.materialityRefs]
+  };
+}
+
+export function appendQualifiedMotionSample(tail, captureSource, input) {
+  verifyMotionTail(tail);
+  const body = qualifiedSampleBody(tail, captureSource, input);
+  const sample = frozenCanonical({ ...body, sampleSha256: hashCanonical(body) });
+  const ageFloor = Math.max(0, sample.tick - tail.maxAgeTicks);
+  const eligible = [...tail.samples.map(canonicalClone), canonicalClone(sample)]
+    .filter((entry) => entry.tick >= ageFloor);
+  const samples = eligible.slice(Math.max(0, eligible.length - tail.maxSamples));
+  const next = frozenCanonical({
+    ...canonicalClone(tail),
+    samples,
+    latestTickOrNull: sample.tick,
+    latestSequenceOrNull: sample.sequence
+  });
+  return Object.freeze({ tail: next, sample });
+}
+
+function validateLegacyMotionSample(sample, owner) {
   assertExactKeys(sample, [
     'schemaVersion', 'sampleRef', 'tailRef', 'participantRef', 'coordinateSpaceRef',
     'sequence', 'tick', 'sourceRef', 'pose', 'materialityRefs', 'sampleSha256'
@@ -259,6 +422,69 @@ function validateMotionSample(sample, owner) {
   return sample;
 }
 
+function validateQualifiedMotionSample(sample, owner) {
+  assertExactKeys(sample, [
+    'schemaVersion', 'sampleRef', 'tailRef', 'participantRef', 'coordinateSpaceRef',
+    'sequence', 'tick', 'sourceRef', 'captureSource', 'sourceTimeMicroseconds',
+    'transportQuality', 'poseOrNull', 'materialityRefs', 'sampleSha256'
+  ], 'qualified motion sample');
+  if (sample.schemaVersion !== QUALIFIED_MOTION_SAMPLE_SCHEMA) {
+    throw new TypeError('qualified motion sample schema mismatch');
+  }
+  assertSafeRef(sample.sampleRef, 'qualified motion sample sampleRef');
+  assertSafeRef(sample.tailRef, 'qualified motion sample tailRef');
+  assertSafeRef(sample.participantRef, 'qualified motion sample participantRef');
+  assertSafeRef(sample.coordinateSpaceRef, 'qualified motion sample coordinateSpaceRef');
+  if (
+    sample.tailRef !== owner.tailRef ||
+    sample.participantRef !== owner.participantRef ||
+    sample.coordinateSpaceRef !== owner.coordinateSpaceRef
+  ) {
+    throw new TypeError('qualified motion sample coordinate mismatch');
+  }
+  assertNonNegativeInteger(sample.sequence, 'qualified motion sample sequence');
+  assertNonNegativeInteger(sample.tick, 'qualified motion sample tick');
+  const expectedSampleRef = `${owner.tailRef}.sample.${String(sample.sequence).padStart(10, '0')}`;
+  if (sample.sampleRef !== expectedSampleRef) throw new TypeError('qualified motion sample ref mismatch');
+  verifySyntheticMotionCaptureSource(sample.captureSource);
+  if (sample.sourceRef !== sample.captureSource.captureSourceRef) {
+    throw new TypeError('qualified motion sample sourceRef/captureSource mismatch');
+  }
+  if (
+    sample.captureSource.participantRef !== owner.participantRef ||
+    sample.captureSource.coordinateSpaceRef !== owner.coordinateSpaceRef ||
+    sample.captureSource.privacyClass !== owner.privacyClass ||
+    sample.captureSource.retentionClass !== owner.retentionClass
+  ) {
+    throw new TypeError('qualified motion sample capture source does not match owner');
+  }
+  assertNonNegativeInteger(sample.sourceTimeMicroseconds, 'qualified motion sample sourceTimeMicroseconds');
+  assertTransportQuality(sample.transportQuality, 'qualified motion sample transportQuality');
+  const gap = sample.transportQuality === 'GAP_MARKER';
+  if (gap) {
+    if (sample.poseOrNull !== null) throw new TypeError('GAP_MARKER must not contain a motion pose');
+  } else {
+    if (sample.poseOrNull === null) throw new TypeError('observed/interpolated sample requires a pose');
+    validateQuantizedPose(sample.poseOrNull);
+  }
+  assertUniqueSafeRefs(sample.materialityRefs, 'qualified motion sample materialityRefs');
+  rejectHiddenReasoning(sample, 'qualified motion sample');
+  assertSha256(sample.sampleSha256, 'qualified motion sample sampleSha256');
+  const { sampleSha256, ...body } = sample;
+  if (hashCanonical(body) !== sampleSha256) throw new TypeError('qualified motion sample digest mismatch');
+  return sample;
+}
+
+function validateMotionSample(sample, owner) {
+  if (sample?.schemaVersion === MOTION_SAMPLE_SCHEMA) {
+    return validateLegacyMotionSample(sample, owner);
+  }
+  if (sample?.schemaVersion === QUALIFIED_MOTION_SAMPLE_SCHEMA) {
+    return validateQualifiedMotionSample(sample, owner);
+  }
+  throw new TypeError('motion sample schema is not supported');
+}
+
 export function verifyMotionTail(tail) {
   assertExactKeys(tail, [
     'schemaVersion', 'tailRef', 'participantRef', 'coordinateSpaceRef',
@@ -280,9 +506,29 @@ export function verifyMotionTail(tail) {
   if (!Array.isArray(tail.samples) || tail.samples.length > tail.maxSamples) throw new TypeError('motion tail sample count invalid');
   let priorSequence = -1;
   let priorTick = -1;
+  let qualifiedCaptureSourceRefOrNull = null;
+  let priorQualifiedSourceTimeOrNull = null;
   for (const sample of tail.samples) {
     validateMotionSample(sample, tail);
-    if (sample.sequence <= priorSequence || sample.tick < priorTick) throw new TypeError('motion tail sample order invalid');
+    if (sample.sequence <= priorSequence || sample.tick < priorTick) {
+      throw new TypeError('motion tail sample order invalid');
+    }
+    if (sample.schemaVersion === QUALIFIED_MOTION_SAMPLE_SCHEMA) {
+      if (
+        qualifiedCaptureSourceRefOrNull !== null &&
+        sample.captureSource.captureSourceRef !== qualifiedCaptureSourceRefOrNull
+      ) {
+        throw new TypeError('one motion tail cannot switch qualified capture source');
+      }
+      if (
+        priorQualifiedSourceTimeOrNull !== null &&
+        sample.sourceTimeMicroseconds <= priorQualifiedSourceTimeOrNull
+      ) {
+        throw new TypeError('qualified motion source time must increase strictly');
+      }
+      qualifiedCaptureSourceRefOrNull = sample.captureSource.captureSourceRef;
+      priorQualifiedSourceTimeOrNull = sample.sourceTimeMicroseconds;
+    }
     priorSequence = sample.sequence;
     priorTick = sample.tick;
   }
