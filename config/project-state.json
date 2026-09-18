@@ -8,9 +8,9 @@
   "currentVersionRef": "version.vexworld.v1",
   "currentVersionPath": "versions/v1",
   "forwardRouteDisposition": "ACTIVE_FORWARD_ROUTE",
-  "lastAcceptedMainRef": "github.commit.vexworld.6edd1adbd0e0f8ce623739318c24242e7c9d45c6",
-  "activeStageRef": "stage.vexworld.vw-fwd-07d",
-  "activeStageIssueRef": "github.issue.vexworld.92",
+  "lastAcceptedMainRef": "github.commit.vexworld.0e6cdbfe9b0281f64bc24a32b12ef56ef765f2ad",
+  "activeStageRef": "stage.vexworld.vw-fwd-07e",
+  "activeStageIssueRef": "github.issue.vexworld.97",
   "stageOrder": [
     "stage.vexworld.vw-fwd-01a",
     "stage.vexworld.vw-fwd-01b",
@@ -29,7 +29,8 @@
     "stage.vexworld.vw-fwd-07a",
     "stage.vexworld.vw-fwd-07b",
     "stage.vexworld.vw-fwd-07c",
-    "stage.vexworld.vw-fwd-07d"
+    "stage.vexworld.vw-fwd-07d",
+    "stage.vexworld.vw-fwd-07e"
   ],
   "stages": [
     {
@@ -584,12 +585,12 @@
       "stageRef": "stage.vexworld.vw-fwd-07d",
       "issueRef": "github.issue.vexworld.92",
       "title": "Verified/predicted heads, deterministic rollback and authoritative resync",
-      "state": "ACTIVE_SINGLE_FORWARD_LANE",
+      "state": "ACCEPTED_COMPLETE",
       "predecessorStageRef": "stage.vexworld.vw-fwd-07c",
       "parentStageRefs": [
         "stage.vexworld.vw-fwd-07c"
       ],
-      "sourceChanging": true,
+      "sourceChanging": false,
       "meaningOwnerRef": "project.vextreme.vexworld",
       "implementationOwnerRef": "role.vexworld.chronicle-rollback-resync-builder",
       "reviewOwnerRef": "role.vexworld.chronicle-rollback-resync-reviewer",
@@ -629,6 +630,60 @@
         "PHYSICAL_ACTUATION",
         "PUBLIC_RELEASE",
         "MERGE_WITHOUT_INDEPENDENT_REVIEW"
+      ],
+      "acceptedCloseReceiptRef": "github.issue.vexworld.92.comment.5724778020",
+      "acceptedMainRef": "github.commit.vexworld.0e6cdbfe9b0281f64bc24a32b12ef56ef765f2ad",
+      "reviewReceiptRefs": [
+        "github.pull.vexworld.95.comment.5724690555",
+        "github.issue.vexworld.96.comment.5724690982"
+      ]
+    },
+    {
+      "stageRef": "stage.vexworld.vw-fwd-07e",
+      "issueRef": "github.issue.vexworld.97",
+      "title": "World Memory projection and external sharing/consent envelopes",
+      "state": "ACTIVE_SINGLE_FORWARD_LANE",
+      "predecessorStageRef": "stage.vexworld.vw-fwd-07d",
+      "parentStageRefs": [
+        "stage.vexworld.vw-fwd-07d"
+      ],
+      "sourceChanging": true,
+      "meaningOwnerRef": "project.vextreme.vexworld",
+      "implementationOwnerRef": "role.vexworld.world-memory-projection-builder",
+      "reviewOwnerRef": "role.vexworld.world-memory-projection-reviewer",
+      "ownedPathPatterns": [
+        "config/project-state.json",
+        "docs/architecture/CHRONICLE-WORLDLINES.md",
+        "versions/v1/config/source-map.fragments/stage-07e-world-memory-projection.json",
+        "versions/v1/src/core/chronicle/world-memory.mjs",
+        "versions/v1/test/world-memory.test.mjs"
+      ],
+      "activationReceiptRef": "github.issue.vexworld.97.comment.5724784576",
+      "startingMainRef": "github.commit.vexworld.0e6cdbfe9b0281f64bc24a32b12ef56ef765f2ad",
+      "predecessorCloseReceiptRef": "github.issue.vexworld.92.comment.5724778020",
+      "claimRef": "claim.vexworld.chronicle-worldlines.stage-07e.20260918",
+      "allowedEffects": [
+        "SOURCE_MUTATION_WITHIN_EXACT_MEMBRANE",
+        "LOCAL_SYNTHETIC_TEST_EXECUTION",
+        "DRAFT_PR_FORMATION"
+      ],
+      "forbiddenEffects": [
+        "VEXLIFE_SOURCE_MUTATION",
+        "HOME_SOURCE_MUTATION",
+        "HOME_WRITE",
+        "MEMORY_WRITE",
+        "VAULT_COMMIT",
+        "RELATIONSHIP_MUTATION",
+        "REAL_NETWORK_DELIVERY",
+        "PRODUCTION_NETWORKING",
+        "MODEL_INVOCATION",
+        "MODEL_TRAINING",
+        "WEIGHT_MUTATION",
+        "PERSISTENT_MEMORY_PROMOTION",
+        "PHYSICAL_SENSING",
+        "PHYSICAL_ACTUATION",
+        "PUBLIC_RELEASE",
+        "MERGE_WITHOUT_INDEPENDENT_REVIEW"
       ]
     }
   ],
@@ -644,7 +699,8 @@
     "github.issue.vexworld.73",
     "github.issue.vexworld.81",
     "github.issue.vexworld.87",
-    "github.issue.vexworld.92"
+    "github.issue.vexworld.92",
+    "github.issue.vexworld.97"
   ],
   "knownUnknownRefs": [
     "unknown.vexworld.software-license",
@@ -662,8 +718,8 @@
     "unknown.vexworld.motion-capture-real-device-clock-alignment",
     "unknown.vexworld.world-memory-shared-replay-consent-defaults"
   ],
-  "currentStrongestClaim": "VW_FWD_07A_ACCEPTED__VW_FWD_07B_ACCEPTED__VW_FWD_07C_ACCEPTED__VW_FWD_07D_ACTIVE_LOCAL_SYNTHETIC_ROLLBACK_RESYNC_SOURCE_MUTATION_ADMITTED__PRODUCTION_NETWORKING_HELD",
-  "observedAt": "2026-09-18T02:29:10Z",
+  "currentStrongestClaim": "VW_FWD_07A_ACCEPTED__VW_FWD_07B_ACCEPTED__VW_FWD_07C_ACCEPTED__VW_FWD_07D_ACCEPTED__VW_FWD_07E_ACTIVE_WORLD_MEMORY_PROJECTION_SOURCE_MUTATION_ADMITTED__VEXLIFE_HOME_MEMORY_NETWORK_EFFECTS_HELD",
+  "observedAt": "2026-09-18T03:36:35Z",
   "effects": {
     "modelTraining": false,
     "productionNetwork": false,
