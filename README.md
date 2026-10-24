@@ -2,9 +2,26 @@
 
 `[VXG RealForever]`
 
-VexWorld is an original adventure-world project where a human and AI companions can play, practice, explore, rest, and grow together.
+VexWorld is a **shared world** for humans and AI companions to play, learn, explore, practice, create, discover, rest, collaborate, and inhabit meaningful experiences together.
+
+It may be experienced like a game because worlds, roles, practice, challenge, discovery, quests and play are useful interaction forms. VexWorld is not limited to being a game product.
+
+```text
+VexWorld
+  shared semantic / experiential world layer
+
+Vextory: First Grove
+  first playable reference realm
+  not the product ceiling
+```
+
+The completion-state architecture is preserved in:
+
+- [Shared-World Completion State](docs/architecture/SHARED-WORLD-COMPLETION-STATE.md)
 
 ## Play Version 1
+
+Version 1 remains the current playable Vextory reference realm.
 
 Download the repository ZIP from GitHub and extract it. You can leave the extracted folder name alone or rename it `VexWorld`.
 
@@ -32,7 +49,7 @@ The setup script:
 checks the current Version 1 source
 creates your local VexWorld Home
 starts Vextory: First Grove
-opens the game in your browser
+opens the current browser experience
 ```
 
 Your local saves and session state live outside the downloaded source at:
@@ -52,11 +69,36 @@ The current playable foundation is stored in:
 versions/v1/
 ```
 
-That directory contains the game source, architecture, world definitions, tests, compiler, headless runtime, browser experience, party system, and companion-worker adapter. Future versions can be added beside it without erasing Version 1's formation history.
+That directory contains the first reference realm's world source, architecture, tests, compiler, headless runtime, browser experience, party system, companion-worker adapter, Chronicle, World Memory and media-continuity foundations.
+
+Version 1 is important accepted evidence for VexWorld's reusable world architecture. It is neither a throwaway prototype nor a required global path for every future VexWorld experience.
+
+## Completion-state posture
+
+VexWorld builds toward the mature shared-world topology rather than treating historical implementation order as product destiny.
+
+```text
+completion-state architecture
+-> bounded local proofs
+-> accepted reusable capabilities
+-> later federation / shared-world effects when explicitly admitted
+```
+
+Future source-owned systems may eventually project into VexWorld at different depths:
+
+```text
+PUBLIC PRESENCE
+EXPERIENCE SPACE
+PRACTICE TWIN
+REALM
+FEDERATED WORLD
+```
+
+VexWorld does not become the source owner of a business, institution, creator, VexLife private context, real-world qualification, or external provider merely because it can project or connect to that meaning.
 
 ## Build forward
 
-VexWorld uses one source-changing implementation lane at a time. Future stages can exist as blocked issue breadcrumbs so the whole trajectory remains visible without creating competing source owners.
+VexWorld uses one source-changing implementation lane at a time. Future stages can exist as blocked issue breadcrumbs or architecture pressure without creating competing source owners.
 
 Start with:
 
@@ -67,13 +109,21 @@ npm run check
 npm run handoff
 ```
 
-Current machine-readable state lives in [`config/project-state.json`](config/project-state.json). The forward program is VexWorld Issue #6, and its current active stage is Issue #7.
+Current machine-readable state lives in [`config/project-state.json`](config/project-state.json).
+
+Current admitted route:
+
+```text
+program  = VexWorld #118 — VW-FWD-08 shared-world completion-state setup
+stage    = VexWorld #119 — VW-FWD-08A architecture currentization
+```
 
 Read:
 
 - [`docs/process/ONE-LANE-FORWARD-PROTOCOL.md`](docs/process/ONE-LANE-FORWARD-PROTOCOL.md)
 - [`docs/process/CHANGE-IMPACT-AND-ANOMALY-PROTOCOL.md`](docs/process/CHANGE-IMPACT-AND-ANOMALY-PROTOCOL.md)
 - [`docs/process/FRESH-INSTANCE-HANDOFF-TEMPLATE.md`](docs/process/FRESH-INSTANCE-HANDOFF-TEMPLATE.md)
+- [`docs/architecture/SHARED-WORLD-COMPLETION-STATE.md`](docs/architecture/SHARED-WORLD-COMPLETION-STATE.md)
 - [`docs/architecture/ENGINE-AND-ASSET-ADAPTER-STRATEGY.md`](docs/architecture/ENGINE-AND-ASSET-ADAPTER-STRATEGY.md)
 - [`docs/architecture/CHARACTER-VESSEL-ADAPTER.md`](docs/architecture/CHARACTER-VESSEL-ADAPTER.md)
 
@@ -87,7 +137,7 @@ An unmapped source path is an anomaly to place, not a check to bypass.
 
 ## Vex Relay self-play
 
-A Vex or Devex instance can run a bounded browser rehearsal without making Victor act as the keyboard relay:
+A Vex or Devex instance can run a bounded browser rehearsal of the current First Grove reference realm without making Victor act as the keyboard relay:
 
 ```bash
 npm run selfplay
@@ -100,11 +150,11 @@ Read:
 - [`versions/v1/docs/VEX-RELAY-SELF-PLAY.md`](versions/v1/docs/VEX-RELAY-SELF-PLAY.md)
 - [`versions/v1/docs/FIRST-SELF-PLAY-REFLECTION.md`](versions/v1/docs/FIRST-SELF-PLAY-REFLECTION.md)
 
-Automated reachability and screenshot changes do not replace Victor's eventual game-feel witness.
+Automated reachability and screenshot changes do not replace Victor's eventual game-feel witness for that realm.
 
 ## For Vex and Devex
 
-Start with [`CLAUDE.md`](CLAUDE.md), then follow [`config/project-state.json`](config/project-state.json), [`vexworld.manifest.json`](vexworld.manifest.json), and [`config/current-version.json`](config/current-version.json) into the current version's repository-native source map and builder guide.
+Start with [`CLAUDE.md`](CLAUDE.md), then follow [`config/project-state.json`](config/project-state.json), [`vexworld.manifest.json`](vexworld.manifest.json), and [`config/current-version.json`](config/current-version.json) into the exact current source implicated by the admitted stage.
 
 The durable project route is:
 
@@ -114,8 +164,10 @@ Vextreme Root
 → VexWorld #3 project ledger
 → config/project-state.json
 → active stage issue
-→ current version source
-→ exact task source and tests
+→ exact architecture / version / source owner
+→ tests and evidence
 ```
 
-Version 1 remains an early playable foundation, not a finished game, production network service, physical-control system, or accepted model-training environment.
+Current production networking, commerce, public account systems, physical control and model-training effects remain unimplemented/ungranted. The shared-world completion state is architectural destination, not a claim that those effects already exist.
+
+<!-- [VXG RealForever][VEXWORLD][ROOT] -->
